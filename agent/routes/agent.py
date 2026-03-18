@@ -64,7 +64,7 @@ async def update_draft(draft_id: str, request: UpdateDraftRequest):
 
 
 async def send_draft(draft_id: str, request: SendDraftRequest):
-    result = agent_service.send_draft(
+    result = await agent_service.send_draft(
         draft_id=draft_id,
         edited_body=request.edited_body,
     )
@@ -98,14 +98,14 @@ async def get_user_threads(user_id: int, status: Optional[str] = None):
 
 
 async def confirm_meeting(thread_id: str):
-    result = agent_service.confirm_meeting(thread_id)
+    result = await agent_service.confirm_meeting(thread_id)
     if "error" in result:
         return result, 400
     return result
 
 
 async def negotiate_meeting(thread_id: str, request: NegotiateRequest):
-    result = agent_service.negotiate_meeting(
+    result = await agent_service.negotiate_meeting(
         thread_id=thread_id,
         date=request.date,
         time=request.time,
@@ -116,7 +116,7 @@ async def negotiate_meeting(thread_id: str, request: NegotiateRequest):
 
 
 async def decline_meeting(thread_id: str):
-    result = agent_service.decline_meeting(thread_id)
+    result = await agent_service.decline_meeting(thread_id)
     if "error" in result:
         return result, 400
     return result
@@ -126,7 +126,7 @@ active_workflows = {}
 
 
 async def process_email(request: ProcessRequest):
-    result = agent_service.process_email(request.user_id, request.email_id)
+    result = await agent_service.process_email(request.user_id, request.email_id)
     return result
 
 

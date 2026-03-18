@@ -3,7 +3,7 @@ from langgraph.types import interrupt
 from pydantic import BaseModel
 from src.core.states import AgentState, EmailData
 from src.integrations.llm.client import get_llm
-from src.integrations.mail.client import mail_client
+from src.integrations.mail.sync_client import send_email_sync, poll_inbox_sync, mark_read_sync
 from datetime import datetime
 
 
@@ -64,7 +64,7 @@ def send_email(state: AgentState) -> dict:
         subject = f"Meeting Request for {state.meeting.date}" if state.meeting.date else "Meeting Request"
         draft = state.email.draft or ""
         
-        result = mail_client.send_email(
+        result = send_email_sync(
             sender_id=state.user_id,
             recipient_email=recipient,
             subject=subject,
@@ -85,12 +85,12 @@ def wait_for_reply(state: AgentState) -> dict:
 
         last_check = getattr(state, "last_check", None)
 
-        result = mail_client.poll_inbox(state.user_id, last_check)
+        result = poll_inbox_sync(state.user_id, last_check)
         new_emails = result.get("new_emails", [])
 
         if new_emails:
             latest = new_emails[0]
-            mail_client.mark_read(latest["id"])
+            mark_read_sync(latest["id"])
             reply_body = latest["body"]
             print(f"[wait_for_reply] received reply from {latest['sender_email']}")
             return {
@@ -123,7 +123,7 @@ def send_followup(state: AgentState) -> dict:
             f"Please let me know if the proposed time works for you.\n\n"
             f"Best regards"
         )
-        result = mail_client.send_email(
+        result = send_email_sync(
             sender_id=state.user_id,
             recipient_email=recipient,
             subject=subject,

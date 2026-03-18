@@ -4,6 +4,15 @@ from backend.models import User, Email
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime
 from typing import Optional, List
+import asyncio
+
+
+def _get_connection_manager():
+    try:
+        from backend.routes.ws_notifications import connection_manager
+        return connection_manager
+    except Exception:
+        return None
 
 
 class MailService:
@@ -88,6 +97,20 @@ class MailService:
             session.add(inbox_email)
             session.commit()
             session.refresh(email)
+            session.refresh(inbox_email)
+
+            try:
+                cm = _get_connection_manager()
+                if cm:
+                    asyncio.create_task(
+                        cm.send_to_user(recipient.id, {
+                            "event": "new_email",
+                            "email": inbox_email.to_dict(),
+                        })
+                    )
+            except Exception:
+                pass
+
             return {"success": True, "email_id": email.id, "message": "Email sent successfully"}
         finally:
             session.close()

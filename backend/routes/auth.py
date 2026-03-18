@@ -1,40 +1,36 @@
-from flask import request
-from flask_restful import Resource
+from fastapi import APIRouter, HTTPException, Body
+from pydantic import BaseModel
 from backend.services.mail_service import mail_service
 
-
-class SignupResource(Resource):
-    def post(self):
-        data = request.get_json()
-        username = data.get("username")
-        email = data.get("email")
-        password = data.get("password")
-
-        if not username or not email or not password:
-            return {"error": "Missing required fields"}, 400
-
-        result = mail_service.signup(username, email, password)
-        if not result["success"]:
-            return {"error": result["error"]}, 400
-
-        return {"user_id": result["user_id"], "message": result["message"]}, 201
+router = APIRouter()
 
 
-class LoginResource(Resource):
-    def post(self):
-        data = request.get_json()
-        email = data.get("email")
-        password = data.get("password")
+class SignupRequest(BaseModel):
+    username: str
+    email: str
+    password: str
 
-        if not email or not password:
-            return {"error": "Missing email or password"}, 400
 
-        result = mail_service.login(email, password)
-        if not result["success"]:
-            return {"error": result["error"]}, 401
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
-        return {
-            "user_id": result["user_id"],
-            "username": result["username"],
-            "email": result["email"],
-        }, 200
+
+@router.post("/signup")
+async def signup(request: SignupRequest):
+    result = mail_service.signup(request.username, request.email, request.password)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return {"user_id": result["user_id"], "message": result["message"]}
+
+
+@router.post("/login")
+async def login(request: LoginRequest):
+    result = mail_service.login(request.email, request.password)
+    if not result["success"]:
+        raise HTTPException(status_code=401, detail=result["error"])
+    return {
+        "user_id": result["user_id"],
+        "username": result["username"],
+        "email": result["email"],
+    }

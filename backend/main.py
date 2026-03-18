@@ -1,47 +1,48 @@
 import os
-from flask import Flask
-from flask_restful import Api
-from flask_cors import CORS
+from typing import Optional
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+
 from backend.database import init_db, seed_data
-from backend.routes.auth import SignupResource, LoginResource
-from backend.routes.email import (
-    SendEmailResource,
-    ReplyEmailResource,
-    InboxResource,
-    SentResource,
-    EmailDetailResource,
-    QueryEmailsResource,
-    PollInboxResource,
-    MarkReadResource,
-)
+from backend.routes.auth import router as auth_router
+from backend.routes.email import router as email_router
+from backend.routes.ws_notifications import router as ws_router, connection_manager
 
 
-def create_app():
-    app = Flask(__name__)
-    CORS(app)
-
-    app.config["DATABASE_URL"] = os.getenv("DATABASE_URL", "sqlite:///email-agent.db")
-
-    api = Api(app)
-
-    api.add_resource(SignupResource, "/api/auth/signup")
-    api.add_resource(LoginResource, "/api/auth/login")
-    api.add_resource(SendEmailResource, "/api/emails/send")
-    api.add_resource(ReplyEmailResource, "/api/emails/reply")
-    api.add_resource(InboxResource, "/api/emails/inbox")
-    api.add_resource(SentResource, "/api/emails/sent")
-    api.add_resource(EmailDetailResource, "/api/emails/<int:email_id>")
-    api.add_resource(QueryEmailsResource, "/api/emails/query")
-    api.add_resource(PollInboxResource, "/api/emails/poll")
-    api.add_resource(MarkReadResource, "/api/emails/mark_read")
-
-    return app
-
-
-app = create_app()
-
-if __name__ == "__main__":
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db()
     seed_data()
+    yield
+    await connection_manager.shutdown()
+
+
+app = FastAPI(
+    title="Email Backend API",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+app.include_router(email_router, prefix="/api/emails", tags=["emails"])
+app.include_router(ws_router, tags=["websocket"])
+
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+
+if __name__ == "__main__":
+    import uvicorn
     port = int(os.getenv("EMAIL_BACKEND_PORT", 5001))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=port, reload=True)
