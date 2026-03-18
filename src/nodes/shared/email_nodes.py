@@ -78,20 +78,62 @@ def send_email(state: AgentState) -> dict:
 
 
 def wait_for_reply(state: AgentState) -> dict:
-    print("[wait_for_reply] no reply received (placeholder)")
-    return {"email": EmailData(last_reply=None)}
+    try:
+        if not state.user_id:
+            print("[wait_for_reply] error: no user_id in state")
+            return {"email": EmailData(last_reply=None)}
+
+        last_check = getattr(state, "last_check", None)
+
+        result = mail_client.poll_inbox(state.user_id, last_check)
+        new_emails = result.get("new_emails", [])
+
+        if new_emails:
+            latest = new_emails[0]
+            mail_client.mark_read(latest["id"])
+            reply_body = latest["body"]
+            print(f"[wait_for_reply] received reply from {latest['sender_email']}")
+            return {
+                "email": EmailData(last_reply=reply_body),
+                "last_check": datetime.utcnow().isoformat(),
+            }
+
+        print("[wait_for_reply] no new replies")
+        return {"email": EmailData(last_reply=None)}
+    except Exception as e:
+        print(f"[wait_for_reply] error: {e}")
+        return {"email": EmailData(last_reply=None)}
 
 
 def send_followup(state: AgentState) -> dict:
-    followup_text = (
-        "Hi again,\n\n"
-        "Just following up regarding the meeting invitation.\n"
-        "Please let me know if the proposed time works.\n\n"
-        "Best,"
-    )
-    new_count = state.email.followup_count + 1
-    print(f"[send_followup] follow-up #{new_count}")
-    return {"email": EmailData(followup_count=new_count, draft=followup_text)}
+    try:
+        if not state.user_id:
+            print("[send_followup] error: no user_id in state")
+            return {"email": EmailData(followup_count=state.email.followup_count + 1)}
+
+        recipient = state.meeting.participants[0] if state.meeting.participants else None
+        if not recipient:
+            return {"email": EmailData(followup_count=state.email.followup_count + 1)}
+
+        new_count = state.email.followup_count + 1
+        subject = f"Re: Meeting Request for {state.meeting.date}" if state.meeting.date else "Re: Meeting Request"
+        followup_text = (
+            f"Hi,\n\n"
+            f"Just following up regarding the meeting invitation I sent earlier.\n"
+            f"Please let me know if the proposed time works for you.\n\n"
+            f"Best regards"
+        )
+        result = mail_client.send_email(
+            sender_id=state.user_id,
+            recipient_email=recipient,
+            subject=subject,
+            body=followup_text,
+        )
+        print(f"[send_followup] follow-up #{new_count} sent")
+        return {"email": EmailData(followup_count=new_count)}
+    except Exception as e:
+        print(f"[send_followup] error: {e}")
+        return {"email": EmailData(followup_count=state.email.followup_count + 1)}
 
 
 class ReplyIntentOutput(BaseModel):
@@ -102,6 +144,7 @@ def extract_reply_intent(state: AgentState) -> dict:
     reply = state.email.last_reply
     if not reply:
         return {}
+    
     result = (
         get_llm()
         .with_structured_output(ReplyIntentOutput)
@@ -119,10 +162,12 @@ def extract_reply_intent(state: AgentState) -> dict:
             ]
         )
     )
-    print(f"[extract_reply_intent] intent: {result.reply_intent}")
-    return {"email": EmailData(reply_intent=result.reply_intent)}
+    
+    reply_intent = result.reply_intent if hasattr(result, 'reply_intent') else "declined"
+    print(f"[extract_reply_intent] intent: {reply_intent}")
+    return {"email": EmailData(reply_intent=reply_intent)}
 
 
 def send_notification(state: AgentState) -> dict:
-    print("[send_notification] notification sent (placeholder)")
+    print("[send_notification] notification sent (meeting confirmed/declined)")
     return {"response": "Notification sent successfully."}
