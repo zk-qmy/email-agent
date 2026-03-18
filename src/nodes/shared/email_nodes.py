@@ -1,43 +1,80 @@
-from typing import Literal
+from typing import Literal, Optional
 from langgraph.types import interrupt
 from pydantic import BaseModel
 from src.core.states import AgentState, EmailData
 from src.integrations.llm.client import get_llm
+from src.integrations.mail.client import mail_client
+from datetime import datetime
 
 
 def draft_email(state: AgentState) -> dict:
     meeting = state.meeting
+    recipient = meeting.participants[0] if meeting.participants else "recipient@example.com"
+    subject = f"Meeting Request for {meeting.date}" if meeting.date else "Meeting Request"
     draft = (
-        f"Subject: Meeting Request\n\n"
         f"Hi,\n\n"
         f"I would like to schedule a meeting on {meeting.date} at {meeting.time}.\n\n"
         f"Best regards"
     )
-    print("[draft_email] draft created")
-    return {"email": EmailData(draft=draft), "response": draft}
+    print(f"[draft_email] draft created for {recipient}")
+    return {
+        "email": EmailData(draft=draft, approval_status="pending"),
+        "response": f"Subject: {subject}\n\n{draft}",
+    }
 
 
 def process_approval(state: AgentState) -> dict:
-    user_input = interrupt(
-        {
-            "email_draft": state.email.draft,
-            "message": "Approve or request edit?",
+    email_draft = state.email.draft or "No draft available"
+    
+    user_input = interrupt({
+        "type": "approval",
+        "message": "Please review and approve this email draft, or request edits.",
+        "email_draft": email_draft,
+        "missing_fields": [],
+        "data": {
+            "recipient": state.meeting.participants[0] if state.meeting.participants else None,
+            "subject": f"Meeting Request for {state.meeting.date}" if state.meeting.date else "Meeting Request",
         }
-    )
-    content = user_input["content"].lower()
-    if any(w in content for w in ["approved", "ok", "looks good"]):
+    })
+    
+    content = user_input.get("content", "").lower() if isinstance(user_input, dict) else str(user_input).lower()
+    
+    if any(w in content for w in ["approved", "ok", "looks good", "yes", "send"]):
         status = "approved"
     elif "edit" in content:
         status = "edit"
     else:
         status = "pending"
+    
     print(f"[process_approval] '{content}' → {status}")
     return {"email": EmailData(approval_status=status)}
 
 
 def send_email(state: AgentState) -> dict:
-    print(f"[send_email] sending:\n{state.email.draft}")
-    return {"email": EmailData(status="sent"), "response": "Email sent successfully."}
+    try:
+        if not state.user_id:
+            print("[send_email] error: no user_id in state")
+            return {"email": EmailData(status="failed"), "response": "Failed: no user_id"}
+
+        recipient = state.meeting.participants[0] if state.meeting.participants else None
+        if not recipient:
+            print("[send_email] error: no recipient found")
+            return {"email": EmailData(status="failed"), "response": "Failed: no recipient"}
+
+        subject = f"Meeting Request for {state.meeting.date}" if state.meeting.date else "Meeting Request"
+        draft = state.email.draft or ""
+        
+        result = mail_client.send_email(
+            sender_id=state.user_id,
+            recipient_email=recipient,
+            subject=subject,
+            body=draft,
+        )
+        print(f"[send_email] sent: {result}")
+        return {"email": EmailData(status="sent"), "response": "Email sent successfully."}
+    except Exception as e:
+        print(f"[send_email] error: {e}")
+        return {"email": EmailData(status="failed"), "response": f"Failed: {str(e)}"}
 
 
 def wait_for_reply(state: AgentState) -> dict:
