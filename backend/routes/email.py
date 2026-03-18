@@ -1,113 +1,97 @@
-from flask import request
-from flask_restful import Resource
+from fastapi import APIRouter, HTTPException, Query, Body
+from pydantic import BaseModel
+from typing import Optional
 from backend.services.mail_service import mail_service
 
-
-class SendEmailResource(Resource):
-    def post(self):
-        data = request.get_json()
-        sender_id = data.get("sender_id")
-        recipient_email = data.get("recipient_email")
-        subject = data.get("subject")
-        body = data.get("body")
-
-        if not all([sender_id, recipient_email, subject, body]):
-            return {"error": "Missing required fields"}, 400
-
-        result = mail_service.send_email(sender_id, recipient_email, subject, body)
-        if not result["success"]:
-            return {"error": result["error"]}, 400
-
-        return {"email_id": result["email_id"], "message": result["message"]}, 201
+router = APIRouter()
 
 
-class ReplyEmailResource(Resource):
-    def post(self):
-        data = request.get_json()
-        sender_id = data.get("sender_id")
-        parent_email_id = data.get("parent_email_id")
-        body = data.get("body")
-
-        if not all([sender_id, parent_email_id, body]):
-            return {"error": "Missing required fields"}, 400
-
-        result = mail_service.reply_email(sender_id, parent_email_id, body)
-        if not result["success"]:
-            return {"error": result["error"]}, 400
-
-        return {"email_id": result["email_id"], "message": result["message"]}, 201
+class SendEmailRequest(BaseModel):
+    sender_id: int
+    recipient_email: str
+    subject: str
+    body: str
 
 
-class InboxResource(Resource):
-    def get(self):
-        user_id = request.args.get("user_id", type=int)
-        unread_only = request.args.get("unread", "false").lower() == "true"
-
-        if not user_id:
-            return {"error": "Missing user_id"}, 400
-
-        emails = mail_service.get_inbox(user_id, unread_only)
-        return {"emails": emails}, 200
+class ReplyEmailRequest(BaseModel):
+    sender_id: int
+    parent_email_id: int
+    body: str
 
 
-class SentResource(Resource):
-    def get(self):
-        user_id = request.args.get("user_id", type=int)
-
-        if not user_id:
-            return {"error": "Missing user_id"}, 400
-
-        emails = mail_service.get_sent(user_id)
-        return {"emails": emails}, 200
+class QueryEmailsRequest(BaseModel):
+    user_id: int
+    sender_email: Optional[str] = None
+    subject_kw: Optional[str] = None
+    body_kw: Optional[str] = None
+    folder: Optional[str] = None
 
 
-class EmailDetailResource(Resource):
-    def get(self, email_id):
-        email = mail_service.get_email(email_id)
-        if not email:
-            return {"error": "Email not found"}, 404
-        return {"email": email}, 200
+class MarkReadRequest(BaseModel):
+    email_id: int
 
 
-class QueryEmailsResource(Resource):
-    def post(self):
-        data = request.get_json()
-        user_id = data.get("user_id")
-
-        if not user_id:
-            return {"error": "Missing user_id"}, 400
-
-        sender_email = data.get("sender_email")
-        subject_kw = data.get("subject_kw")
-        body_kw = data.get("body_kw")
-        folder = data.get("folder")
-
-        emails = mail_service.query_emails(user_id, sender_email, subject_kw, body_kw, folder)
-        return {"emails": emails}, 200
+@router.post("/send")
+async def send_email(request: SendEmailRequest):
+    result = mail_service.send_email(
+        request.sender_id, request.recipient_email, request.subject, request.body
+    )
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return {"email_id": result["email_id"], "message": result["message"]}
 
 
-class PollInboxResource(Resource):
-    def get(self):
-        user_id = request.args.get("user_id", type=int)
-        last_check = request.args.get("last_check")
-
-        if not user_id:
-            return {"error": "Missing user_id"}, 400
-
-        result = mail_service.poll_inbox(user_id, last_check)
-        return result, 200
+@router.post("/reply")
+async def reply_email(request: ReplyEmailRequest):
+    result = mail_service.reply_email(
+        request.sender_id, request.parent_email_id, request.body
+    )
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return {"email_id": result["email_id"], "message": result["message"]}
 
 
-class MarkReadResource(Resource):
-    def put(self):
-        data = request.get_json()
-        email_id = data.get("email_id")
+@router.get("/inbox")
+async def get_inbox(user_id: int = Query(...), unread: bool = Query(False)):
+    emails = mail_service.get_inbox(user_id, unread)
+    return {"emails": emails}
 
-        if not email_id:
-            return {"error": "Missing email_id"}, 400
 
-        result = mail_service.mark_read(email_id)
-        if not result["success"]:
-            return {"error": result["error"]}, 404
+@router.get("/sent")
+async def get_sent(user_id: int = Query(...)):
+    emails = mail_service.get_sent(user_id)
+    return {"emails": emails}
 
-        return {"success": True}, 200
+
+@router.get("/{email_id}")
+async def get_email(email_id: int):
+    email = mail_service.get_email(email_id)
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+    return {"email": email}
+
+
+@router.post("/query")
+async def query_emails(request: QueryEmailsRequest):
+    emails = mail_service.query_emails(
+        request.user_id,
+        request.sender_email,
+        request.subject_kw,
+        request.body_kw,
+        request.folder,
+    )
+    return {"emails": emails}
+
+
+@router.get("/poll")
+async def poll_inbox(user_id: int = Query(...), last_check: Optional[str] = Query(None)):
+    result = mail_service.poll_inbox(user_id, last_check)
+    return result
+
+
+@router.put("/mark_read")
+async def mark_read(request: MarkReadRequest):
+    result = mail_service.mark_read(request.email_id)
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return {"success": True}
