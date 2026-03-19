@@ -16,9 +16,9 @@ background_tasks: dict[str, asyncio.Task] = {}
 ws_connections: dict[int, list] = defaultdict(list)
 
 
-POLL_INTERVAL = 15
+POLL_INTERVAL = 86400
+FOLLOWUP_DELAY = 86400
 MAX_FOLLOWUP = 2
-FOLLOWUP_DELAY = 300
 
 
 def _generate_email_body(recipient: str, subject: str, context: str) -> str:
