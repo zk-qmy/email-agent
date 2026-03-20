@@ -10,12 +10,28 @@ from datetime import datetime
 def draft_email(state: AgentState) -> dict:
     meeting = state.meeting
     recipient = meeting.participants[0] if meeting.participants else "recipient@example.com"
-    subject = f"Meeting Request for {meeting.date}" if meeting.date else "Meeting Request"
-    draft = (
-        f"Hi,\n\n"
-        f"I would like to schedule a meeting on {meeting.date} at {meeting.time}.\n\n"
-        f"Best regards"
-    )
+    subject = meeting.date if meeting.date else "Meeting Request"
+    context = getattr(meeting, 'context', None) or getattr(meeting, 'purpose', None) or f"Meeting request for {meeting.time}" if meeting.time else "Meeting request"
+
+    prompt = f"""Write a professional email with the following details:
+- To: {recipient}
+- Subject: {subject}
+- Purpose: {context}
+
+Write only the email body, no subject line. Keep it concise and professional."""
+
+    try:
+        response = get_llm().invoke([
+            {
+                "role": "system",
+                "content": "You are a professional email writer. Write clear, concise, and professional emails."
+            },
+            {"role": "user", "content": prompt}
+        ])
+        draft = response.content if hasattr(response, 'content') else str(response)
+    except Exception:
+        draft = f"Hi,\n\n{context}\n\nBest regards"
+
     print(f"[draft_email] draft created for {recipient}")
     return {
         "email": EmailData(draft=draft, approval_status="pending"),
@@ -163,7 +179,7 @@ def extract_reply_intent(state: AgentState) -> dict:
         )
     )
     
-    reply_intent = result.reply_intent if hasattr(result, 'reply_intent') else "declined"
+    reply_intent = result.reply_intent if hasattr(result, 'reply_intent') else "confirmed"
     print(f"[extract_reply_intent] intent: {reply_intent}")
     return {"email": EmailData(reply_intent=reply_intent)}
 

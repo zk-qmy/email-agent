@@ -6,7 +6,6 @@ from collections import defaultdict
 
 from src.workflows.router import build_router
 from src.integrations.mail.client import mail_client
-from src.integrations.llm.client import get_llm
 
 
 drafts: dict[str, dict] = {}
@@ -19,27 +18,6 @@ ws_connections: dict[int, list] = defaultdict(list)
 POLL_INTERVAL = 86400
 FOLLOWUP_DELAY = 86400
 MAX_FOLLOWUP = 2
-
-
-def _generate_email_body(recipient: str, subject: str, context: str) -> str:
-    prompt = f"""Write a professional email with the following details:
-- To: {recipient}
-- Subject: {subject}
-- Purpose: {context}
-
-Write only the email body, no subject line. Keep it concise and professional."""
-
-    try:
-        response = get_llm().invoke([
-            {
-                "role": "system",
-                "content": "You are a professional email writer. Write clear, concise, and professional emails."
-            },
-            {"role": "user", "content": prompt}
-        ])
-        return response.content if hasattr(response, 'content') else str(response)
-    except Exception:
-        return f"Hi,\n\n{context}\n\nBest regards"
 
 
 def _add_message(thread: dict, role: str, content: str, action: str = None):
@@ -60,31 +38,6 @@ async def _notify_client(user_id: int, event: dict):
                 await websocket.send_json(event)
             except Exception as e:
                 print(f"[notify] Failed to send to client: {e}")
-
-
-async def _extract_intent(email_body: str) -> str:
-    prompt = f"""Classify this email reply into one of:
-- confirmed: Sender agrees to the meeting/time
-- negotiate: Sender wants a different time/date
-- declined: Sender declines the meeting
-
-Reply:
-{email_body}
-
-Return only ONE word: confirmed, negotiate, or declined."""
-
-    try:
-        result = get_llm().invoke([
-            {"role": "system", "content": "You classify email reply intents."},
-            {"role": "user", "content": prompt}
-        ])
-        content = result.content if hasattr(result, 'content') else str(result)
-        content = content.strip().lower()
-        if content in ["confirmed", "negotiate", "declined"]:
-            return content
-        return "confirmed"
-    except Exception:
-        return "confirmed"
 
 
 async def _process_reply(thread_id: str, reply: dict, user_id: int):
@@ -110,7 +63,24 @@ async def _process_reply(thread_id: str, reply: dict, user_id: int):
         "intent": "processing",
     }))
 
-    intent = await _extract_intent(reply["body"])
+    try:
+        graph = build_router()
+        result = await graph.ainvoke({
+            "messages": [{"role": "user", "content": reply["body"]}],
+            "workflow": "schedule",
+            "user_id": user_id,
+            "meeting": thread.get("meeting", {}),
+            "email": {"last_reply": reply["body"]},
+        }, {"configurable": {"thread_id": thread_id}})
+        result_dict = dict(result) if isinstance(result, dict) else result.model_dump()
+        email_data = result_dict.get("email", {})
+        if isinstance(email_data, dict):
+            intent = email_data.get("reply_intent", "confirmed")
+        else:
+            intent = getattr(email_data, 'reply_intent', None) or "confirmed"
+    except Exception:
+        intent = "confirmed"
+
     thread["reply_intent"] = intent
 
     await _notify_client(user_id, {
@@ -261,7 +231,16 @@ class AgentService:
         draft_id = f"draft-{uuid.uuid4().hex[:12]}"
         created_at = datetime.utcnow().isoformat()
 
-        body = _generate_email_body(recipient, subject, context)
+        result = self.graph.invoke({
+            "messages": [{"role": "user", "content": context}],
+            "workflow": "schedule",
+            "user_id": user_id,
+            "meeting": {"participants": [recipient], "date": subject, "context": context},
+            "email": {},
+        }, {"configurable": {"thread_id": draft_id}})
+
+        interrupt_data = result["__interrupt__"][0].value
+        draft_body = interrupt_data["email_draft"]
 
         draft = {
             "draft_id": draft_id,
@@ -269,7 +248,7 @@ class AgentService:
             "recipient": recipient,
             "subject": subject,
             "context": context,
-            "body": body,
+            "body": draft_body,
             "status": "pending",
             "thread_id": None,
             "created_at": created_at,
@@ -284,7 +263,7 @@ class AgentService:
             "draft": {
                 "recipient": recipient,
                 "subject": subject,
-                "body": body,
+                "body": draft_body,
             },
             "status": "pending",
             "created_at": created_at,
