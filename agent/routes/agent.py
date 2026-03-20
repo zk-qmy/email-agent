@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect, HTTPException
 from agent.services.agent_service import agent_service, ws_connections
 
 
@@ -36,48 +36,75 @@ class NegotiateRequest(BaseModel):
 
 
 async def create_draft(request: CreateDraftRequest):
-    result = agent_service.create_draft(
-        user_id=request.user_id,
-        recipient=request.recipient,
-        subject=request.subject,
-        context=request.context,
-    )
-    return result
+    try:
+        result = agent_service.create_draft(
+            user_id=request.user_id,
+            recipient=request.recipient,
+            subject=request.subject,
+            context=request.context,
+        )
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create draft: {str(e)}")
 
 
 async def get_draft(draft_id: str):
-    result = agent_service.get_draft(draft_id)
-    if not result:
-        return {"error": "Draft not found"}, 404
-    return result
+    try:
+        result = agent_service.get_draft(draft_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Draft not found")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get draft: {str(e)}")
 
 
 async def update_draft(draft_id: str, request: UpdateDraftRequest):
-    result = agent_service.update_draft(
-        draft_id=draft_id,
-        body=request.body,
-        subject=request.subject,
-    )
-    if "error" in result:
-        return result, 400
-    return result
+    try:
+        result = agent_service.update_draft(
+            draft_id=draft_id,
+            body=request.body,
+            subject=request.subject,
+        )
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update draft: {str(e)}")
 
 
 async def send_draft(draft_id: str, request: SendDraftRequest):
-    result = await agent_service.send_draft(
-        draft_id=draft_id,
-        edited_body=request.edited_body,
-    )
-    if "error" in result:
-        return result, 400
-    return result
+    try:
+        result = await agent_service.send_draft(
+            draft_id=draft_id,
+            edited_body=request.edited_body,
+        )
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send draft: {str(e)}")
 
 
 async def cancel_draft(draft_id: str):
-    result = agent_service.cancel_draft(draft_id)
-    if "error" in result:
-        return result, 400
-    return result
+    try:
+        result = agent_service.cancel_draft(draft_id)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to cancel draft: {str(e)}")
 
 
 async def get_user_drafts(user_id: int, status: Optional[str] = None):
@@ -86,10 +113,15 @@ async def get_user_drafts(user_id: int, status: Optional[str] = None):
 
 
 async def get_thread(thread_id: str):
-    result = agent_service.get_thread(thread_id)
-    if not result:
-        return {"error": "Thread not found"}, 404
-    return result
+    try:
+        result = agent_service.get_thread(thread_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Thread not found")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get thread: {str(e)}")
 
 
 async def get_user_threads(user_id: int, status: Optional[str] = None):
@@ -98,55 +130,94 @@ async def get_user_threads(user_id: int, status: Optional[str] = None):
 
 
 async def confirm_meeting(thread_id: str):
-    result = await agent_service.confirm_meeting(thread_id)
-    if "error" in result:
-        return result, 400
-    return result
+    try:
+        result = await agent_service.confirm_meeting(thread_id)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to confirm meeting: {str(e)}")
 
 
 async def negotiate_meeting(thread_id: str, request: NegotiateRequest):
-    result = await agent_service.negotiate_meeting(
-        thread_id=thread_id,
-        date=request.date,
-        time=request.time,
-    )
-    if "error" in result:
-        return result, 400
-    return result
+    try:
+        result = await agent_service.negotiate_meeting(
+            thread_id=thread_id,
+            date=request.date,
+            time=request.time,
+        )
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to negotiate meeting: {str(e)}")
 
 
 async def decline_meeting(thread_id: str):
-    result = await agent_service.decline_meeting(thread_id)
-    if "error" in result:
-        return result, 400
-    return result
+    try:
+        result = await agent_service.decline_meeting(thread_id)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to decline meeting: {str(e)}")
 
 
 active_workflows = {}
 
 
 async def process_email(request: ProcessRequest):
-    result = await agent_service.process_email(request.user_id, request.email_id)
-    return result
+    try:
+        result = await agent_service.process_email(request.user_id, request.email_id)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process email: {str(e)}")
 
 
 async def chat(request: ChatRequest):
-    result = agent_service.chat(request.thread_id, request.message, active_workflows)
-    return result
+    try:
+        result = agent_service.chat(request.thread_id, request.message, active_workflows)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process chat: {str(e)}")
 
 
 async def get_status(thread_id: str):
-    result = agent_service.get_status(thread_id, active_workflows)
-    if "error" in result:
-        return result, 404
-    return result
+    try:
+        result = agent_service.get_status(thread_id, active_workflows)
+        if "error" in result:
+            raise HTTPException(status_code=404, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
 
 
 async def get_history(thread_id: str):
-    result = agent_service.get_history(thread_id, active_workflows)
-    if "error" in result:
-        return result, 404
-    return result
+    try:
+        result = agent_service.get_history(thread_id, active_workflows)
+        if "error" in result:
+            raise HTTPException(status_code=404, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get history: {str(e)}")
 
 
 async def websocket_endpoint(websocket: WebSocket, user_id: int):

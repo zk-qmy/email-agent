@@ -235,19 +235,30 @@ class AgentService:
         draft_id = f"draft-{uuid.uuid4().hex[:12]}"
         created_at = datetime.utcnow().isoformat()
 
-        result = self.graph.invoke(
-            cast(AgentState, {  # type: ignore[arg-type]
-                "messages": [{"role": "user", "content": context}],
-                "workflow": "schedule",
-                "user_id": user_id,
-                "meeting": {"participants": [recipient], "date": subject, "context": context},
-                "email": {},
-            }),
-            {"configurable": {"thread_id": draft_id}},
-        )
+        try:
+            result = self.graph.invoke(
+                cast(AgentState, {  # type: ignore[arg-type]
+                    "messages": [{"role": "user", "content": context}],
+                    "workflow": "schedule",
+                    "user_id": user_id,
+                    "meeting": {"participants": [recipient], "date": subject, "context": context},
+                    "email": {},
+                }),
+                {"configurable": {"thread_id": draft_id}},
+            )
 
-        interrupt_data = result["__interrupt__"][0].value
-        draft_body = interrupt_data["email_draft"]
+            if "__interrupt__" not in result or not result["__interrupt__"]:
+                return {"error": "Workflow did not produce expected interrupt. Draft creation requires human confirmation."}
+
+            interrupt_data = result["__interrupt__"][0].value
+            draft_body = interrupt_data.get("email_draft")
+
+            if not draft_body:
+                return {"error": "Workflow did not produce an email draft."}
+        except KeyError as e:
+            return {"error": f"Unexpected workflow response format: missing key {e}"}
+        except Exception as e:
+            return {"error": f"Failed to create draft: {str(e)}"}
 
         draft = {
             "draft_id": draft_id,
@@ -744,13 +755,16 @@ class AgentService:
                 "data": {},
             }
 
-            if hasattr(error, 'value') and isinstance(error.value, dict):  # type: ignore[union-attr,attr-defined]
-                interrupt_data = cast(Any, error).value  # type: ignore[union-attr]
-                workflow["interrupt"] = {
-                    "type": interrupt_data.get("type", "info"),
-                    "question": interrupt_data.get("message", "Please provide input."),
-                    "data": interrupt_data,
-                }
+            try:
+                error_value = getattr(error, 'value', None)
+                if isinstance(error_value, dict):
+                    workflow["interrupt"] = {
+                        "type": error_value.get("type", "info"),
+                        "question": error_value.get("message", "Please provide input."),
+                        "data": error_value,
+                    }
+            except Exception:
+                pass
 
             return {
                 "status": "interrupted",
