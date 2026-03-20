@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, cast
 from langgraph.types import interrupt
 from pydantic import BaseModel
 from src.core.states import AgentState, MeetingData
@@ -30,10 +30,11 @@ def extract_meeting_info(state: AgentState) -> dict:
 
     existing_meeting = state.meeting if hasattr(state, 'meeting') else MeetingData()
 
+    extracted = cast(MeetingExtraction, result)
     updated = MeetingData(
-        date=result.date or getattr(existing_meeting, 'date', None),
-        time=result.time or getattr(existing_meeting, 'time', None),
-        participants=result.participants or getattr(existing_meeting, 'participants', []),
+        date=extracted.date or getattr(existing_meeting, 'date', None),
+        time=extracted.time or getattr(existing_meeting, 'time', None),
+        participants=extracted.participants or getattr(existing_meeting, 'participants', []),
         missing_fields=getattr(existing_meeting, 'missing_fields', []),
     )
     print(f"[extract_meeting_info] date={updated.date}, time={updated.time}, participants={updated.participants}")

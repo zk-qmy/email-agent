@@ -22,7 +22,7 @@ class User(Base):
             "id": self.id,
             "username": self.username,
             "email": self.email,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at is not None else None,
         }
 
 
@@ -55,5 +55,5 @@ class Email(Base):
             "parent_id": self.parent_id,
             "folder": self.folder,
             "is_read": self.is_read,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at is not None else None,
         }

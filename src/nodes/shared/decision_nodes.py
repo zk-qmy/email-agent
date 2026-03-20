@@ -9,7 +9,8 @@ class WorkflowOutput(BaseModel):
 
 
 def classify_workflow(state: AgentState) -> dict:
-    user_input = state.messages[-1]["content"]
+    last_msg = state.messages[-1]
+    user_input: str = last_msg["content"]  # type: ignore[index]
     structured_llm = get_llm().with_structured_output(WorkflowOutput)
     response = structured_llm.invoke([
         {
@@ -28,5 +29,5 @@ def classify_workflow(state: AgentState) -> dict:
             "content": user_input
         },
     ])
-    print(f"[classify] workflow: {response.workflow}")
-    return {"workflow": response.workflow}
+    print(f"[classify] workflow: {response.workflow}")  # type: ignore[union-attr]
+    return {"workflow": response.workflow}  # type: ignore[union-attr]

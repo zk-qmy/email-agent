@@ -72,7 +72,7 @@ class MailClient:
         body_kw: Optional[str] = None,
         folder: Optional[str] = None,
     ):
-        payload = {"user_id": user_id}
+        payload: dict[str, object] = {"user_id": user_id}
         if sender_email:
             payload["sender_email"] = sender_email
         if subject_kw:

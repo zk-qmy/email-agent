@@ -2,6 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from langgraph.types import Command
+from langgraph.constants import RunnableConfig
 from config.settings import settings
 from src.core.states import AgentState, EmailData
 from src.workflows.router import build_router
@@ -19,7 +20,7 @@ def run():
             reply_intent=None
         )
     )
-    config = {
+    config: RunnableConfig = {
         "configurable": {"thread_id": "session-1"},
         "recursion_limit": settings.RECURSION_LIMIT,
     }
@@ -47,7 +48,7 @@ def run():
         user_input = str(input(prompt))
         result = graph.invoke(
             Command(resume={"role": "user", "content": user_input}),
-            config=config,
+            config=config,  # type: ignore[arg-type]
         )
         print("\nAfter Resume:", result)
 
