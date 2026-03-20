@@ -1,11 +1,12 @@
 import uuid
 import asyncio
 from datetime import datetime
-from typing import Optional
+from typing import Optional, cast, Any
 from collections import defaultdict
 
 from src.workflows.router import build_router
 from src.integrations.mail.client import mail_client
+from src.core.states import AgentState
 
 
 drafts: dict[str, dict] = {}
@@ -20,7 +21,7 @@ FOLLOWUP_DELAY = 86400
 MAX_FOLLOWUP = 2
 
 
-def _add_message(thread: dict, role: str, content: str, action: str = None):
+def _add_message(thread: dict, role: str, content: str, action: str | None = None):
     msg = {
         "role": role,
         "content": content,
@@ -65,13 +66,16 @@ async def _process_reply(thread_id: str, reply: dict, user_id: int):
 
     try:
         graph = build_router()
-        result = await graph.ainvoke({
-            "messages": [{"role": "user", "content": reply["body"]}],
-            "workflow": "schedule",
-            "user_id": user_id,
-            "meeting": thread.get("meeting", {}),
-            "email": {"last_reply": reply["body"]},
-        }, {"configurable": {"thread_id": thread_id}})
+        result = await graph.ainvoke(
+            cast(AgentState, {  # type: ignore[arg-type]
+                "messages": [{"role": "user", "content": reply["body"]}],
+                "workflow": "schedule",
+                "user_id": user_id,
+                "meeting": thread.get("meeting", {}),
+                "email": {"last_reply": reply["body"]},
+            }),
+            {"configurable": {"thread_id": thread_id}},
+        )
         result_dict = dict(result) if isinstance(result, dict) else result.model_dump()
         email_data = result_dict.get("email", {})
         if isinstance(email_data, dict):
@@ -231,13 +235,16 @@ class AgentService:
         draft_id = f"draft-{uuid.uuid4().hex[:12]}"
         created_at = datetime.utcnow().isoformat()
 
-        result = self.graph.invoke({
-            "messages": [{"role": "user", "content": context}],
-            "workflow": "schedule",
-            "user_id": user_id,
-            "meeting": {"participants": [recipient], "date": subject, "context": context},
-            "email": {},
-        }, {"configurable": {"thread_id": draft_id}})
+        result = self.graph.invoke(
+            cast(AgentState, {  # type: ignore[arg-type]
+                "messages": [{"role": "user", "content": context}],
+                "workflow": "schedule",
+                "user_id": user_id,
+                "meeting": {"participants": [recipient], "date": subject, "context": context},
+                "email": {},
+            }),
+            {"configurable": {"thread_id": draft_id}},
+        )
 
         interrupt_data = result["__interrupt__"][0].value
         draft_body = interrupt_data["email_draft"]
@@ -634,7 +641,7 @@ class AgentService:
 
         try:
             result = self.graph.invoke(
-                initial_state,
+                cast(AgentState, initial_state),  # type: ignore[arg-type]
                 {"configurable": {"thread_id": thread_id}},
             )
 
@@ -669,7 +676,7 @@ class AgentService:
 
         try:
             result = self.graph.invoke(
-                current_state,
+                cast(AgentState, current_state),  # type: ignore[arg-type]
                 {"configurable": {"thread_id": thread_id}},
             )
 
@@ -737,8 +744,8 @@ class AgentService:
                 "data": {},
             }
 
-            if hasattr(error, 'value') and isinstance(error.value, dict):
-                interrupt_data = error.value
+            if hasattr(error, 'value') and isinstance(error.value, dict):  # type: ignore[union-attr,attr-defined]
+                interrupt_data = cast(Any, error).value  # type: ignore[union-attr]
                 workflow["interrupt"] = {
                     "type": interrupt_data.get("type", "info"),
                     "question": interrupt_data.get("message", "Please provide input."),

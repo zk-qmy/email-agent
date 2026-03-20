@@ -1,7 +1,7 @@
 import os
 import asyncio
 import websockets
-from typing import Optional, Callable, Awaitable
+from typing import Optional, Callable, Awaitable, Any
 import httpx
 
 EMAIL_BACKEND_URL = os.getenv("EMAIL_BACKEND_URL", "http://localhost:5001")
@@ -12,7 +12,7 @@ INITIAL_RECONNECT_DELAY = 1
 
 class BackendWSClient:
     def __init__(self):
-        self._connections: dict[int, websockets.WebSocketClientProtocol] = {}
+        self._connections: dict[int, Any] = {}
         self._listeners: dict[int, asyncio.Queue] = {}
         self._push_handler: Optional[Callable[[int, dict], Awaitable[None]]] = None
         self._http_client: Optional[httpx.AsyncClient] = None
@@ -81,7 +81,7 @@ class BackendWSClient:
     async def disconnect(self, user_id: int):
         await self._disconnect(user_id)
 
-    async def _listen_loop(self, user_id: int, ws: websockets.WebSocketClientProtocol):
+    async def _listen_loop(self, user_id: int, ws: Any):
         try:
             while self._running:
                 try:

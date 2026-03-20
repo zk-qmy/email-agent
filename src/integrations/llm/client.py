@@ -6,7 +6,7 @@ from config.settings import settings
 _instances: dict[str, ChatGoogleGenerativeAI] = {}
 
 _role_config = {
-    "fast": {"model": "gemini-2.0-flash", "temperature": 1.0},
+    "fast": {"model": "gemini-2.5-flash", "temperature": 1.0},
     "strong": {"model": "gemini-2.0-pro", "temperature": 1.0},
 }
 

@@ -9,10 +9,10 @@ def get_checkpointer() -> MemorySaver:
     if _checkpointer_instance is None:
         _checkpointer_instance = MemorySaver()
         try:
-            _checkpointer_instance.serde.allowed_msgpack_modules.add(
+            _checkpointer_instance.serde.allowed_msgpack_modules.add(  # type: ignore[attr-defined]
                 ("src.core.states", "EmailData")
             )
-            _checkpointer_instance.serde.allowed_msgpack_modules.add(
+            _checkpointer_instance.serde.allowed_msgpack_modules.add(  # type: ignore[attr-defined]
                 ("src.core.states", "MeetingData")
             )
         except AttributeError:

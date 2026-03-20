@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, cast
 from langgraph.types import interrupt
 from pydantic import BaseModel
 from src.core.states import AgentState, EmailData
@@ -34,7 +34,7 @@ Write only the email body, no subject line. Keep it concise and professional."""
 
     print(f"[draft_email] draft created for {recipient}")
     return {
-        "email": EmailData(draft=draft, approval_status="pending"),
+        "email": EmailData(draft=str(draft), approval_status="pending"),
         "response": f"Subject: {subject}\n\n{draft}",
     }
 
@@ -179,7 +179,7 @@ def extract_reply_intent(state: AgentState) -> dict:
         )
     )
     
-    reply_intent = result.reply_intent if hasattr(result, 'reply_intent') else "confirmed"
+    reply_intent = cast(ReplyIntentOutput, result).reply_intent  # type: ignore[union-attr]
     print(f"[extract_reply_intent] intent: {reply_intent}")
     return {"email": EmailData(reply_intent=reply_intent)}
 

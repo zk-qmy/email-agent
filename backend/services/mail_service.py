@@ -1,4 +1,6 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import update as sql_update
+from typing import cast
 from backend.database import SessionLocal
 from backend.models import User, Email
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -50,7 +52,7 @@ class MailService:
             if not user:
                 return {"success": False, "error": "Invalid email or password"}
 
-            if not check_password_hash(user.password_hash, password):
+            if not check_password_hash(str(user.password_hash), password):
                 return {"success": False, "error": "Invalid email or password"}
 
             return {
@@ -103,7 +105,7 @@ class MailService:
                 cm = _get_connection_manager()
                 if cm:
                     asyncio.create_task(
-                        cm.send_to_user(recipient.id, {
+                        cm.send_to_user(cast(int, recipient.id), {
                             "event": "new_email",
                             "email": inbox_email.to_dict(),
                         })
@@ -122,11 +124,12 @@ class MailService:
             if not parent_email:
                 return {"success": False, "error": "Parent email not found"}
 
-            subject = f"Re: {parent_email.subject}" if not parent_email.subject.startswith("Re:") else parent_email.subject
+            parent_subject = cast(str, parent_email.subject)
+            subject = f"Re: {parent_subject}" if not parent_subject.startswith("Re:") else parent_subject
 
             return self.send_email(
                 sender_id=sender_id,
-                recipient_email=parent_email.sender.email,
+                recipient_email=cast(str, parent_email.sender.email),
                 subject=subject,
                 body=body,
                 parent_id=parent_email_id,
@@ -142,7 +145,7 @@ class MailService:
                 Email.folder == "inbox",
             )
             if unread_only:
-                query = query.filter(Email.is_read == False)
+                query = query.filter(Email.is_read.is_(True))
             emails = query.order_by(Email.created_at.desc()).all()
             return [e.to_dict() for e in emails]
         finally:
@@ -226,12 +229,12 @@ class MailService:
     def mark_read(self, email_id: int) -> dict:
         session = self._get_session()
         try:
-            email = session.query(Email).filter(Email.id == email_id).first()
-            if not email:
-                return {"success": False, "error": "Email not found"}
-
-            email.is_read = True
+            result = session.execute(
+                sql_update(Email).where(Email.id == email_id).values(is_read=True)
+            )
             session.commit()
+            if result.rowcount == 0:  # type: ignore[union-attr]
+                return {"success": False, "error": "Email not found"}
             return {"success": True}
         finally:
             session.close()
