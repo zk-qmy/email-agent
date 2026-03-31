@@ -19,10 +19,14 @@ def classify_workflow(state: AgentState) -> dict:
                 "- schedule (meeting scheduling)\n"
                 "- ticket (support or issue ticket)\n"
                 "- chat (general conversation)\n\n"
-                "If uncertain, choose the closest match. Return only structured output."
+                "If uncertain, choose the closest match.\n"
+                "Return only structured output."
             ),
         },
-        {"role": "user", "content": user_input},
+        {
+            "role": "user",
+            "content": user_input
+        },
     ])
     print(f"[classify] workflow: {response.workflow}")
     return {"workflow": response.workflow}

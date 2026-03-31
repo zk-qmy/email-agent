@@ -30,11 +30,16 @@ def _route_approval(state: AgentState) -> str:
     return END
 
 
-def _route_after_wait(state: AgentState) -> str:
+def _route_followup(state: AgentState) -> str:
     if state.email.last_reply:
+        print("Reply received! Extracting intent...")
         return "extract_intent"
     if state.email.followup_count < settings.MAX_FOLLOWUP_COUNT:
+        print(f"State followup_count: {state.email.followup_count}")
+        print(f"Max follow-ups: {settings.MAX_FOLLOWUP_COUNT}")
+        print("Send follow-up email...")
         return "followup"
+    print("No reply after follow-ups. Sending notification...")
     return "send_notification"
 
 
@@ -67,19 +72,26 @@ def build_meeting_graph():
     builder.add_conditional_edges(
         "check_missing_fields",
         _route_missing_fields,
-        {"ask_for_missing_info": "ask_for_missing_info", "draft": "draft"},
+        {
+            "ask_for_missing_info": "ask_for_missing_info",
+            "draft": "draft"
+        },
     )
     builder.add_edge("ask_for_missing_info", "extract_meeting_info")
     builder.add_edge("draft", "process_approval")
     builder.add_conditional_edges(
         "process_approval",
         _route_approval,
-        {"send_email": "send_email", "draft": "draft", END: END},
+        {
+            "send_email": "send_email",
+            "draft": "draft",
+            END: END
+        },
     )
     builder.add_edge("send_email", "wait_reply")
     builder.add_conditional_edges(
         "wait_reply",
-        _route_after_wait,
+        _route_followup,
         {
             "extract_intent": "extract_intent",
             "followup": "followup",

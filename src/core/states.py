@@ -12,30 +12,41 @@ class MeetingData(BaseModel):
 
 class EmailData(BaseModel):
     draft: Optional[str] = None
-    approval_status: Optional[Literal["pending", "approved", "edit"]] = None
+    approval_status: Optional[
+        Literal["pending", "approved", "edit"]
+    ] = None
     followup_count: int = 0
     last_reply: Optional[str] = None
-    reply_intent: Optional[Literal["confirmed", "negotiate", "declined"]] = None
+    reply_intent: Optional[
+        Literal["confirmed", "negotiate", "declined"]
+    ] = None
     status: Optional[Literal["sent", "failed"]] = None
 
 
 def merge_mail(current: EmailData, update: EmailData) -> EmailData:
-    """Merge email state safely across checkpointed steps.
-
-    MemorySaver deserializes Pydantic models as plain dicts between steps,
-    so both branches below normalize to dict before merging.
-
-    Rules:
-    - followup_count: always keep the maximum (never let a default-0 reset it)
-    - all other fields: only overwrite if the incoming value is not None
+    """Merge only explicitly set (non-None) fields from update into current.
+    BUG_FIX: The original filter 'if v is not None' correctly keeps 0,
+    but EmailData(followup_count=new_count) still sets all OTHER fields to
+    their defaults (None/0), which then overwrite valid state values.
+    Fix: only merge fields that differ from a fresh EmailData() default,
+    OR the caller must pass only the changed fields via model_copy.
+    Simplest robust fix: accept a dict directly and only merge provided keys.
     """
-    current_dict = current.model_dump() if isinstance(current, EmailData) else dict(current)
-    update_dict = update.model_dump() if isinstance(update, EmailData) else dict(update)
+    if isinstance(update, dict):
+        # Dict updates: only merge the keys explicitly provided
+        current_dict = current.model_dump()
+        current_dict.update(update)
+        return EmailData(**current_dict)
+    # EmailData object: merge only fields that are not None,
+    # but treat followup_count specially — always take the max to avoid reset.
+    current_dict = current.model_dump()
+    update_dict = update.model_dump()
 
     merged = {**current_dict}
     for k, v in update_dict.items():
         if k == "followup_count":
-            merged[k] = max(current_dict.get(k, 0), v or 0)
+            # Always keep the higher count so increment is never lost
+            merged[k] = max(current_dict[k], v)
         elif v is not None:
             merged[k] = v
     return EmailData(**merged)
@@ -43,7 +54,10 @@ def merge_mail(current: EmailData, update: EmailData) -> EmailData:
 
 class AgentState(BaseModel):
     messages: List[dict] = Field(default_factory=list)
-    workflow: Optional[Literal["schedule", "ticket", "chat"]] = None
+    workflow: Optional[
+        Literal["schedule", "ticket", "chat"]
+    ] = None
     meeting: MeetingData = Field(default_factory=MeetingData)
+    # BUG_FIX: Added Field(default_factory=EmailData) so Pydantic has a default.
     email: Annotated[EmailData, merge_mail] = Field(default_factory=EmailData)
     response: Optional[str] = None

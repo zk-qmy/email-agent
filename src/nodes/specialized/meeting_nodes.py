@@ -20,7 +20,10 @@ def extract_meeting_info(state: AgentState) -> dict:
                 "and participants (emails if possible)."
             ),
         },
-        {"role": "user", "content": state.messages[-1]["content"]},
+        {
+            "role": "user",
+            "content": state.messages[-1]["content"]
+        },
     ])
     # Merge onto existing state — never wipe values from a previous turn
     updated = MeetingData(
@@ -54,10 +57,15 @@ def check_missing_fields(state: AgentState) -> dict:
 
 
 def ask_for_missing_info(state: AgentState) -> dict:
-    question = "I still need the following information: " + ", ".join(state.meeting.missing_fields) + "."
+    question = ("I still need the following information: "
+                + ", ".join(state.meeting.missing_fields)
+                + ".")
     print(f"[ask_for_missing_info] {question}")
     user_reply = interrupt({"message": question})
-    return {"messages": state.messages + [user_reply], "response": question}
+
+    # Append the user's reply to messages so extract_meeting_info sees new input.
+    updated_messages = state.messages + [user_reply]
+    return {"messages": updated_messages, "response": question}
 
 
 def book_calendar(state: AgentState) -> dict:

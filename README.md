@@ -143,3 +143,6 @@ email-agent/
     │   └── support_ticket.md
     └── setup.md
 ```
+
+## Schedule Meeting Workflow
+![Meeting Graph](assets/graph/meeting_graph.png)

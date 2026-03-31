@@ -5,19 +5,32 @@ from langgraph.types import Command
 from config.settings import settings
 from src.core.states import AgentState, EmailData
 from src.workflows.router import build_router
+from IPython.display import Image, display
 
 
 def run():
     graph = build_router()
     initial_state = AgentState(
         messages=[{"role": "user", "content": "Schedule a meeting with Prof Linh next Monday at 12 am"}],
-        email=EmailData(),
+        email=EmailData(
+            followup_count=0,
+            last_reply=None,
+            approval_status=None,
+            reply_intent=None
+        )
     )
     config = {
         "configurable": {"thread_id": "session-1"},
         "recursion_limit": settings.RECURSION_LIMIT,
     }
-
+    # Print Image
+    os.makedirs("assets/graph", exist_ok=True)
+    png_data = graph.get_graph(xray=True).draw_mermaid_png()
+    with open("assets/graph/meeting_graph.png", "wb") as f:
+        f.write(png_data)
+    print("Saved to assets/graph/meeting_graph.png")
+    # continue
+    
     result = graph.invoke(initial_state, config=config)
 
     while "__interrupt__" in result:
@@ -36,7 +49,7 @@ def run():
             Command(resume={"role": "user", "content": user_input}),
             config=config,
         )
-        print("\nResult:", result)
+        print("\nAfter Resume:", result)
 
 
 if __name__ == "__main__":

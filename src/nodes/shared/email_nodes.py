@@ -14,7 +14,9 @@ def draft_email(state: AgentState) -> dict:
         f"Best regards"
     )
     print("[draft_email] draft created")
-    return {"email": EmailData(draft=draft), "response": draft}
+    return {
+        "email": EmailData(draft=draft),
+        "response": draft}
 
 
 def process_approval(state: AgentState) -> dict:
@@ -25,6 +27,7 @@ def process_approval(state: AgentState) -> dict:
         }
     )
     content = user_input["content"].lower()
+    # TODO: USe LLM or keyword matching to determine approval status more robustly
     if any(w in content for w in ["approved", "ok", "looks good"]):
         status = "approved"
     elif "edit" in content:
@@ -37,7 +40,10 @@ def process_approval(state: AgentState) -> dict:
 
 def send_email(state: AgentState) -> dict:
     print(f"[send_email] sending:\n{state.email.draft}")
-    return {"email": EmailData(status="sent"), "response": "Email sent successfully."}
+    return {
+        "email": EmailData(status="sent"),
+        "response": "Email sent successfully."
+    }
 
 
 def wait_for_reply(state: AgentState) -> dict:
@@ -54,7 +60,12 @@ def send_followup(state: AgentState) -> dict:
     )
     new_count = state.email.followup_count + 1
     print(f"[send_followup] follow-up #{new_count}")
-    return {"email": EmailData(followup_count=new_count, draft=followup_text)}
+    return {
+        "email": EmailData(
+            followup_count=new_count,
+            draft=followup_text
+        )
+    }
 
 
 class ReplyIntentOutput(BaseModel):
@@ -74,7 +85,9 @@ def extract_reply_intent(state: AgentState) -> dict:
                     "role": "system",
                     "content": (
                         "Classify the email reply intent as one of:\n"
-                        "- confirmed\n- negotiate\n- declined\n"
+                        "- confirmed\n"
+                        "- negotiate\n"
+                        "- declined\n"
                         "Return structured output only."
                     ),
                 },

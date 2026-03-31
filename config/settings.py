@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     BASE_DIR: ClassVar[Path] = BASE_DIR  # ✅ ClassVar tells pydantic "not a field"
 
     GOOGLE_API_KEY: str
-    RECURSION_LIMIT: int = 5
+    RECURSION_LIMIT: int = 100
     MAX_FOLLOWUP_COUNT: int = 2
 
     class Config:
