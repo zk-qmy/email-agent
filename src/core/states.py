@@ -55,7 +55,6 @@ def merge_mail(current: EmailData, update: EmailData) -> EmailData:
 class AgentState(BaseModel):
     messages: List[dict] = Field(default_factory=list)
     workflow: Optional[Literal["schedule", "ticket", "chat"]] = None
-    user_id: Optional[int] = None
     email_id: Optional[int] = None
     meeting: MeetingData = Field(default_factory=MeetingData)
     # BUG_FIX: Added Field(default_factory=EmailData) so Pydantic has a default.

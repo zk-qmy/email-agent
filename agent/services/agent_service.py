@@ -7,9 +7,10 @@ from collections import defaultdict
 from src.workflows.router import build_router
 from src.integrations.mail.client import mail_client
 from src.core.states import AgentState
+from agent.services.draft_models import Draft, DraftContent
 
 
-drafts: dict[str, dict] = {}
+drafts: dict[str, Draft] = {}
 threads: dict[str, dict] = {}
 background_tasks: dict[str, asyncio.Task] = {}
 
@@ -56,44 +57,54 @@ async def _process_reply(thread_id: str, reply: dict, user_id: int):
     except Exception as e:
         print(f"[process_reply] Failed to mark read: {e}")
 
-    asyncio.create_task(_notify_client(user_id, {
-        "event": "reply_received",
-        "thread_id": thread_id,
-        "reply_body": reply["body"],
-        "sender": reply.get("sender_email"),
-        "intent": "processing",
-    }))
+    asyncio.create_task(
+        _notify_client(
+            user_id,
+            {
+                "event": "reply_received",
+                "thread_id": thread_id,
+                "reply_body": reply["body"],
+                "sender": reply.get("sender_email"),
+                "intent": "processing",
+            },
+        )
+    )
 
     try:
         graph = build_router()
         result = await graph.ainvoke(
-            cast(AgentState, {  # type: ignore[arg-type]
-                "messages": [{"role": "user", "content": reply["body"]}],
-                "workflow": "schedule",
-                "user_id": user_id,
-                "meeting": thread.get("meeting", {}),
-                "email": {"last_reply": reply["body"]},
-            }),
-            {"configurable": {"thread_id": thread_id}},
+            cast(
+                AgentState,
+                {  # type: ignore[arg-type]
+                    "messages": [{"role": "user", "content": reply["body"]}],
+                    "workflow": "schedule",
+                    "meeting": thread.get("meeting", {}),
+                    "email": {"last_reply": reply["body"]},
+                },
+            ),
+            {"configurable": {"thread_id": thread_id, "user_id": user_id}},
         )
         result_dict = dict(result) if isinstance(result, dict) else result.model_dump()
         email_data = result_dict.get("email", {})
         if isinstance(email_data, dict):
             intent = email_data.get("reply_intent", "confirmed")
         else:
-            intent = getattr(email_data, 'reply_intent', None) or "confirmed"
+            intent = getattr(email_data, "reply_intent", None) or "confirmed"
     except Exception:
         intent = "confirmed"
 
     thread["reply_intent"] = intent
 
-    await _notify_client(user_id, {
-        "event": "reply_received",
-        "thread_id": thread_id,
-        "reply_body": reply["body"],
-        "sender": reply.get("sender_email"),
-        "intent": intent,
-    })
+    await _notify_client(
+        user_id,
+        {
+            "event": "reply_received",
+            "thread_id": thread_id,
+            "reply_body": reply["body"],
+            "sender": reply.get("sender_email"),
+            "intent": intent,
+        },
+    )
 
 
 async def _poll_thread(thread_id: str):
@@ -103,14 +114,12 @@ async def _poll_thread(thread_id: str):
 
     try:
         result = await mail_client.poll_inbox(
-            user_id=thread["user_id"],
-            last_check=thread.get("last_check")
+            user_id=thread["user_id"], last_check=thread.get("last_check")
         )
 
         new_emails = result.get("new_emails", [])
         replies = [
-            e for e in new_emails
-            if e.get("sender_email") == thread["recipient"]
+            e for e in new_emails if e.get("sender_email") == thread["recipient"]
         ]
 
         if replies:
@@ -142,12 +151,15 @@ async def _auto_followup(thread_id: str):
         thread["followup_count"] += 1
 
         if thread["followup_count"] > MAX_FOLLOWUP:
-            await _notify_client(thread["user_id"], {
-                "event": "status_update",
-                "thread_id": thread_id,
-                "status": "max_followup_reached",
-                "message": "No response after maximum followups",
-            })
+            await _notify_client(
+                thread["user_id"],
+                {
+                    "event": "status_update",
+                    "thread_id": thread_id,
+                    "status": "max_followup_reached",
+                    "message": "No response after maximum followups",
+                },
+            )
             break
 
         followup_body = (
@@ -168,11 +180,14 @@ async def _auto_followup(thread_id: str):
         except Exception as e:
             print(f"[followup] Failed to send: {e}")
 
-        await _notify_client(thread["user_id"], {
-            "event": "followup_sent",
-            "thread_id": thread_id,
-            "followup_count": thread["followup_count"],
-        })
+        await _notify_client(
+            thread["user_id"],
+            {
+                "event": "followup_sent",
+                "thread_id": thread_id,
+                "followup_count": thread["followup_count"],
+            },
+        )
 
         await asyncio.sleep(POLL_INTERVAL)
 
@@ -206,7 +221,8 @@ class AgentService:
             return
 
         matching = [
-            (tid, t) for tid, t in threads.items()
+            (tid, t)
+            for tid, t in threads.items()
             if t["user_id"] == user_id
             and t["status"] == "waiting_reply"
             and t["recipient"] == sender_email
@@ -223,7 +239,9 @@ class AgentService:
                         background_tasks[thread_id].cancel()
                         del background_tasks[thread_id]
             except Exception as e:
-                print(f"[handle_backend_push] Error processing reply for thread {thread_id}: {e}")
+                print(
+                    f"[handle_backend_push] Error processing reply for thread {thread_id}: {e}"
+                )
 
     def create_draft(
         self,
@@ -237,18 +255,26 @@ class AgentService:
 
         try:
             result = self.graph.invoke(
-                cast(AgentState, {  # type: ignore[arg-type]
-                    "messages": [{"role": "user", "content": context}],
-                    "workflow": "schedule",
-                    "user_id": user_id,
-                    "meeting": {"participants": [recipient], "date": subject, "context": context},
-                    "email": {},
-                }),
-                {"configurable": {"thread_id": draft_id}},
+                cast(
+                    AgentState,
+                    {  # type: ignore[arg-type]
+                        "messages": [{"role": "user", "content": context}],
+                        "workflow": "schedule",
+                        "meeting": {
+                            "participants": [recipient],
+                            "date": subject,
+                            "context": context,
+                        },
+                        "email": {},
+                    },
+                ),
+                {"configurable": {"thread_id": draft_id, "user_id": user_id}},
             )
 
             if "__interrupt__" not in result or not result["__interrupt__"]:
-                return {"error": "Workflow did not produce expected interrupt. Draft creation requires human confirmation."}
+                return {
+                    "error": "Workflow did not produce expected interrupt. Draft creation requires human confirmation."
+                }
 
             interrupt_data = result["__interrupt__"][0].value
             draft_body = interrupt_data.get("email_draft")
@@ -260,19 +286,24 @@ class AgentService:
         except Exception as e:
             return {"error": f"Failed to create draft: {str(e)}"}
 
-        draft = {
-            "draft_id": draft_id,
-            "user_id": user_id,
-            "recipient": recipient,
-            "subject": subject,
-            "context": context,
-            "body": draft_body,
-            "status": "pending",
-            "thread_id": None,
-            "created_at": created_at,
-            "sent_at": None,
-            "email_id": None,
-        }
+        created_at = datetime.utcnow().isoformat()
+
+        draft = Draft(
+            draft_id=draft_id,
+            user_id=user_id,
+            draft=DraftContent(
+                recipient=recipient,
+                subject=subject,
+                body=draft_body,
+            ),
+            context=context,
+            status="pending",
+            thread_id=None,
+            email_id=None,
+            created_at=created_at,
+            sent_at=None,
+            updated_at=None,
+        )
 
         drafts[draft_id] = draft
 
@@ -293,42 +324,48 @@ class AgentService:
             return None
 
         return {
-            "draft_id": draft["draft_id"],
+            "draft_id": draft.draft_id,
             "draft": {
-                "recipient": draft["recipient"],
-                "subject": draft["subject"],
-                "body": draft["body"],
+                "recipient": draft.draft.recipient,
+                "subject": draft.draft.subject,
+                "body": draft.draft.body,
             },
-            "status": draft["status"],
-            "user_id": draft["user_id"],
-            "context": draft["context"],
-            "thread_id": draft.get("thread_id"),
-            "created_at": draft["created_at"],
-            "sent_at": draft.get("sent_at"),
-            "email_id": draft.get("email_id"),
+            "status": draft.status,
+            "user_id": draft.user_id,
+            "context": draft.context,
+            "thread_id": draft.thread_id,
+            "created_at": draft.created_at,
+            "sent_at": draft.sent_at,
+            "email_id": draft.email_id,
         }
 
-    def update_draft(self, draft_id: str, body: Optional[str] = None, subject: Optional[str] = None) -> dict:
+    def update_draft(
+        self, draft_id: str, body: Optional[str] = None, subject: Optional[str] = None
+    ) -> dict:
         draft = drafts.get(draft_id)
         if not draft:
             return {"error": "Draft not found"}
 
-        if draft["status"] != "pending":
-            return {"error": f"Cannot edit draft with status: {draft['status']}"}
+        if draft.status != "pending":
+            return {"error": f"Cannot edit draft with status: {draft.status}"}
+
+        updated_at = datetime.utcnow().isoformat()
 
         if body is not None:
-            draft["body"] = body
+            draft.draft.body = body
         if subject is not None:
-            draft["subject"] = subject
+            draft.draft.subject = subject
+        draft.updated_at = updated_at
 
         return {
             "draft_id": draft_id,
             "draft": {
-                "recipient": draft["recipient"],
-                "subject": draft["subject"],
-                "body": draft["body"],
+                "recipient": draft.draft.recipient,
+                "subject": draft.draft.subject,
+                "body": draft.draft.body,
             },
-            "status": draft["status"],
+            "status": draft.status,
+            "updated_at": updated_at,
         }
 
     def cancel_draft(self, draft_id: str) -> dict:
@@ -336,76 +373,82 @@ class AgentService:
         if not draft:
             return {"error": "Draft not found"}
 
-        if draft["status"] == "sent":
+        if draft.status == "sent":
             return {"error": "Cannot cancel a sent draft"}
 
-        draft["status"] = "cancelled"
+        draft.status = "cancelled"
 
         return {
             "draft_id": draft_id,
+            "draft": {
+                "recipient": draft.draft.recipient,
+                "subject": draft.draft.subject,
+                "body": draft.draft.body,
+            },
             "status": "cancelled",
         }
 
     def get_user_drafts(self, user_id: int, status: Optional[str] = None) -> list:
-        user_drafts = [
-            draft for draft in drafts.values()
-            if draft["user_id"] == user_id
-        ]
+        user_drafts = [draft for draft in drafts.values() if draft.user_id == user_id]
 
         if status:
-            user_drafts = [d for d in user_drafts if d["status"] == status]
+            user_drafts = [d for d in user_drafts if d.status == status]
 
-        user_drafts.sort(key=lambda x: x["created_at"], reverse=True)
+        user_drafts.sort(key=lambda x: x.created_at, reverse=True)
 
         return [
             {
-                "draft_id": d["draft_id"],
-                "recipient": d["recipient"],
-                "subject": d["subject"],
-                "status": d["status"],
-                "thread_id": d.get("thread_id"),
-                "created_at": d["created_at"],
-                "sent_at": d.get("sent_at"),
+                "draft_id": d.draft_id,
+                "draft": {
+                    "recipient": d.draft.recipient,
+                    "subject": d.draft.subject,
+                    "status": d.status,
+                },
+                "thread_id": d.thread_id,
+                "created_at": d.created_at,
+                "sent_at": d.sent_at,
             }
             for d in user_drafts
         ]
 
-    async def send_draft(self, draft_id: str, edited_body: Optional[str] = None) -> dict:
+    async def send_draft(
+        self, draft_id: str, edited_body: Optional[str] = None
+    ) -> dict:
         draft = drafts.get(draft_id)
         if not draft:
             return {"error": "Draft not found"}
 
-        if draft["status"] != "pending":
-            return {"error": f"Cannot send draft with status: {draft['status']}"}
+        if draft.status != "pending":
+            return {"error": f"Cannot send draft with status: {draft.status}"}
 
-        final_body = edited_body if edited_body else draft["body"]
+        final_body = edited_body if edited_body else draft.draft.body
 
         try:
             result = await mail_client.send_email(
-                sender_id=draft["user_id"],
-                recipient_email=draft["recipient"],
-                subject=draft["subject"],
+                sender_id=draft.user_id,
+                recipient_email=draft.draft.recipient,
+                subject=draft.draft.subject,
                 body=final_body,
             )
 
             email_id = result.get("email_id")
 
-            draft["status"] = "sent"
-            draft["sent_at"] = datetime.utcnow().isoformat()
-            draft["email_id"] = email_id
+            draft.status = "sent"
+            draft.sent_at = datetime.utcnow().isoformat()
+            draft.email_id = email_id
 
             thread_id = f"thread-{uuid.uuid4().hex[:12]}"
             thread = {
                 "thread_id": thread_id,
                 "draft_id": draft_id,
                 "email_id": email_id,
-                "user_id": draft["user_id"],
-                "recipient": draft["recipient"],
+                "user_id": draft.user_id,
+                "recipient": draft.draft.recipient,
                 "meeting": {
-                    "subject": draft["subject"],
+                    "subject": draft.draft.subject,
                     "date": None,
                     "time": None,
-                    "participants": [draft["recipient"]],
+                    "participants": [draft.draft.recipient],
                 },
                 "status": "waiting_reply",
                 "reply_intent": None,
@@ -419,29 +462,41 @@ class AgentService:
             }
 
             threads[thread_id] = thread
-            draft["thread_id"] = thread_id
+            draft.thread_id = thread_id
 
             from agent.services.ws_client import backend_ws_client
-            await backend_ws_client.connect(draft["user_id"])
+
+            await backend_ws_client.connect(draft.user_id)
 
             task = asyncio.create_task(_auto_followup(thread_id))
             background_tasks[thread_id] = task
 
-            await _notify_client(draft["user_id"], {
-                "event": "draft_sent",
-                "draft_id": draft_id,
-                "thread_id": thread_id,
-                "email_id": email_id,
-            })
+            await _notify_client(
+                draft.user_id,
+                {
+                    "event": "draft_sent",
+                    "draft_id": draft_id,
+                    "thread_id": thread_id,
+                    "email_id": email_id,
+                },
+            )
 
-            await _notify_client(draft["user_id"], {
-                "event": "waiting_reply",
-                "thread_id": thread_id,
-                "message": "Email sent. Waiting for reply...",
-            })
+            await _notify_client(
+                draft.user_id,
+                {
+                    "event": "waiting_reply",
+                    "thread_id": thread_id,
+                    "message": "Email sent. Waiting for reply...",
+                },
+            )
 
             return {
                 "draft_id": draft_id,
+                "draft": {
+                    "recipient": draft.draft.recipient,
+                    "subject": draft.draft.subject,
+                    "body": final_body,
+                },
                 "thread_id": thread_id,
                 "email_id": email_id,
                 "status": "sent",
@@ -474,8 +529,7 @@ class AgentService:
 
     def get_user_threads(self, user_id: int, status: Optional[str] = None) -> list:
         user_threads = [
-            thread for thread in threads.values()
-            if thread["user_id"] == user_id
+            thread for thread in threads.values() if thread["user_id"] == user_id
         ]
 
         if status:
@@ -509,12 +563,15 @@ class AgentService:
 
         _add_message(thread, "assistant", "Meeting confirmed")
 
-        await _notify_client(thread["user_id"], {
-            "event": "meeting_confirmed",
-            "thread_id": thread_id,
-            "meeting": thread["meeting"],
-            "message": "Meeting confirmed successfully",
-        })
+        await _notify_client(
+            thread["user_id"],
+            {
+                "event": "meeting_confirmed",
+                "thread_id": thread_id,
+                "meeting": thread["meeting"],
+                "message": "Meeting confirmed successfully",
+            },
+        )
 
         if thread_id in background_tasks:
             background_tasks[thread_id].cancel()
@@ -541,19 +598,25 @@ class AgentService:
 
         _add_message(thread, "assistant", f"Proposed new time: {date} at {time}")
 
-        await _notify_client(thread["user_id"], {
-            "event": "negotiation_started",
-            "thread_id": thread_id,
-            "new_date": date,
-            "new_time": time,
-            "message": f"New meeting proposal: {date} at {time}",
-        })
+        await _notify_client(
+            thread["user_id"],
+            {
+                "event": "negotiation_started",
+                "thread_id": thread_id,
+                "new_date": date,
+                "new_time": time,
+                "message": f"New meeting proposal: {date} at {time}",
+            },
+        )
 
-        await _notify_client(thread["user_id"], {
-            "event": "waiting_reply",
-            "thread_id": thread_id,
-            "message": "Waiting for response to new proposal...",
-        })
+        await _notify_client(
+            thread["user_id"],
+            {
+                "event": "waiting_reply",
+                "thread_id": thread_id,
+                "message": "Waiting for response to new proposal...",
+            },
+        )
 
         if thread_id not in background_tasks:
             task = asyncio.create_task(_auto_followup(thread_id))
@@ -582,11 +645,14 @@ class AgentService:
 
         _add_message(thread, "assistant", "Meeting declined")
 
-        await _notify_client(thread["user_id"], {
-            "event": "meeting_declined",
-            "thread_id": thread_id,
-            "message": "Meeting declined",
-        })
+        await _notify_client(
+            thread["user_id"],
+            {
+                "event": "meeting_declined",
+                "thread_id": thread_id,
+                "message": "Meeting declined",
+            },
+        )
 
         if thread_id in background_tasks:
             background_tasks[thread_id].cancel()
@@ -637,7 +703,12 @@ class AgentService:
         )
 
         initial_state = {
-            "messages": [{"role": "user", "content": f"Process email #{email_id} from user {user_id}"}],
+            "messages": [
+                {
+                    "role": "user",
+                    "content": f"Process email #{email_id} from user {user_id}",
+                }
+            ],
             "user_id": user_id,
             "email_id": email_id,
         }
@@ -739,7 +810,9 @@ class AgentService:
             "created_at": workflow.get("created_at"),
         }
 
-    def _handle_error(self, thread_id: str, error: Exception, active_workflows: dict, operation: str) -> dict:
+    def _handle_error(
+        self, thread_id: str, error: Exception, active_workflows: dict, operation: str
+    ) -> dict:
         workflow = active_workflows.get(thread_id)
         if not workflow:
             return {"error": f"{operation} failed: Thread not found", "status": "error"}
@@ -756,7 +829,7 @@ class AgentService:
             }
 
             try:
-                error_value = getattr(error, 'value', None)
+                error_value = getattr(error, "value", None)
                 if isinstance(error_value, dict):
                     workflow["interrupt"] = {
                         "type": error_value.get("type", "info"),
