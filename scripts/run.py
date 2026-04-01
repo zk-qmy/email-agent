@@ -1,9 +1,10 @@
-import sys, os
+import sys
+import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from langgraph.types import Command
-from langgraph.constants import RunnableConfig
-from config.settings import settings
+from langchain_core.runnables.config import RunnableConfig
 from src.core.states import AgentState, EmailData
 from src.workflows.router import build_router
 from IPython.display import Image, display
@@ -12,17 +13,17 @@ from IPython.display import Image, display
 def run():
     graph = build_router()
     initial_state = AgentState(
-        messages=[{"role": "user", "content": "Schedule a meeting with Prof Linh next Monday at 12 am"}],
-        email=EmailData(
-            followup_count=0,
-            last_reply=None,
-            approval_status=None,
-            reply_intent=None
-        )
+        messages=[
+            {
+                "role": "user",
+                "content": "Schedule a meeting with Prof Linh next Monday at 12 am",
+            }
+        ],
+        email=EmailData(),
     )
     config: RunnableConfig = {
-        "configurable": {"thread_id": "session-1"},
-        "recursion_limit": settings.RECURSION_LIMIT,
+        "configurable": {"thread_id": "session-1", "user_id": 1},
+        "recursion_limit": 25,
     }
     # Print Image
     os.makedirs("assets/graph", exist_ok=True)
@@ -48,7 +49,7 @@ def run():
         user_input = str(input(prompt))
         result = graph.invoke(
             Command(resume={"role": "user", "content": user_input}),
-            config=config,  # type: ignore[arg-type]
+            config=config,
         )
         print("\nAfter Resume:", result)
 
