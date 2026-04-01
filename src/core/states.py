@@ -29,7 +29,9 @@ def merge_mail(current: EmailData, update: EmailData) -> EmailData:
     - followup_count: always keep the maximum (never let a default-0 reset it)
     - all other fields: only overwrite if the incoming value is not None
     """
-    current_dict = current.model_dump() if isinstance(current, EmailData) else dict(current)
+    current_dict = (
+        current.model_dump() if isinstance(current, EmailData) else dict(current)
+    )
     update_dict = update.model_dump() if isinstance(update, EmailData) else dict(update)
 
     merged = {**current_dict}
@@ -44,7 +46,6 @@ def merge_mail(current: EmailData, update: EmailData) -> EmailData:
 class AgentState(BaseModel):
     messages: List[dict] = Field(default_factory=list)
     workflow: Optional[Literal["schedule", "ticket", "chat"]] = None
-    user_id: Optional[int] = None
     email_id: Optional[int] = None
     meeting: MeetingData = Field(default_factory=MeetingData)
     email: Annotated[EmailData, merge_mail] = Field(default_factory=EmailData)
