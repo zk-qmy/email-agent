@@ -1,7 +1,7 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 from fastapi import WebSocket, WebSocketDisconnect, HTTPException
-from agent.services.agent_service import agent_service, ws_connections
+from agent.services.agent_service import agent_service
 
 
 class CreateDraftRequest(BaseModel):
