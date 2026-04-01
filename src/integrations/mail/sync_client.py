@@ -2,7 +2,10 @@ import asyncio
 import nest_asyncio
 from typing import Optional
 
-nest_asyncio.apply()
+try:
+    nest_asyncio.apply()
+except ValueError:
+    pass  # Already patched or using uvloop
 
 from src.integrations.mail.client import mail_client
 
@@ -11,6 +14,7 @@ def _run_async(coro):
     try:
         loop = asyncio.get_running_loop()
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor() as pool:
             future = pool.submit(asyncio.run, coro)
             return future.result()
