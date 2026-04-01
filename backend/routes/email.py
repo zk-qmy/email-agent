@@ -54,13 +54,13 @@ async def reply_email(request: ReplyEmailRequest):
 @router.get("/inbox")
 async def get_inbox(user_id: int = Query(...), unread: bool = Query(False)):
     emails = mail_service.get_inbox(user_id, unread)
-    return {"emails": emails}
+    return {"emails": [{"email": e} for e in emails]}
 
 
 @router.get("/sent")
 async def get_sent(user_id: int = Query(...)):
     emails = mail_service.get_sent(user_id)
-    return {"emails": emails}
+    return {"emails": [{"email": e} for e in emails]}
 
 
 @router.get("/{email_id}")
@@ -84,7 +84,9 @@ async def query_emails(request: QueryEmailsRequest):
 
 
 @router.get("/poll")
-async def poll_inbox(user_id: int = Query(...), last_check: Optional[str] = Query(None)):
+async def poll_inbox(
+    user_id: int = Query(...), last_check: Optional[str] = Query(None)
+):
     result = mail_service.poll_inbox(user_id, last_check)
     return result
 
