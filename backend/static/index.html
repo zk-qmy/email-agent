@@ -35,47 +35,111 @@
             <div class="test-layout">
                 <div class="test-panel">
                     <div id="auth-tab" class="tab-pane active">
-                        <div class="section">
-                            <div class="test-group">
-                                <button
-                                    class="test-btn"
-                                    data-method="POST"
-                                    data-endpoint="/api/auth/login"
-                                    data-body='{"email": "{{email}}", "password": "{{password}}"}'
-                                >
-                                    Login
-                                </button>
-                                <button
-                                    class="test-btn"
-                                    data-method="POST"
-                                    data-endpoint="/api/auth/signup"
-                                    data-body='{"username": "{{username}}", "email": "{{email}}", "password": "{{password}}"}'
-                                >
-                                    Signup
-                                </button>
+                        <div class="api-section">
+                            <h2 class="section-title" data-section="auth-main">
+                                <span>Auth</span>
+                                <span class="toggle">▼</span>
+                            </h2>
+                            <div class="section-content" id="auth-main-section">
+                                <div class="test-group">
+                                    <button
+                                        class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/auth/login"
+                                        data-body='{"email": "{{email}}", "password": "{{password}}"}'
+                                    >
+                                        Login
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/auth/signup"
+                                        data-body='{"username": "{{username}}", "email": "{{email}}", "password": "{{password}}"}'
+                                    >
+                                        Signup
+                                    </button>
+                                </div>
+                                <div class="input-row">
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="email"
+                                        placeholder="email"
+                                        value=""
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="password"
+                                        placeholder="password"
+                                        value="password123"
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="username"
+                                        placeholder="username"
+                                        value=""
+                                    />
+                                </div>
                             </div>
-                            <div class="input-row">
-                                <input
-                                    type="text"
-                                    class="input-field"
-                                    data-var="email"
-                                    placeholder="email"
-                                    value=""
-                                />
-                                <input
-                                    type="text"
-                                    class="input-field"
-                                    data-var="password"
-                                    placeholder="password"
-                                    value="password123"
-                                />
-                                <input
-                                    type="text"
-                                    class="input-field"
-                                    data-var="username"
-                                    placeholder="username"
-                                    value=""
-                                />
+                        </div>
+                        <div class="api-section">
+                            <h2 class="section-title" data-section="auth-users">
+                                <span>Users</span>
+                                <span class="toggle">▼</span>
+                            </h2>
+                            <div
+                                class="section-content"
+                                id="auth-users-section"
+                            >
+                                <div class="test-group">
+                                    <button
+                                        class="test-btn"
+                                        data-method="GET"
+                                        data-endpoint="/api/auth/users/{{user_id}}"
+                                    >
+                                        Get User
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="PUT"
+                                        data-endpoint="/api/auth/users/{{user_id}}"
+                                        data-body='{"username": "{{username}}", "email": "{{email}}", "password": "{{password}}"}'
+                                    >
+                                        Update User
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="DELETE"
+                                        data-endpoint="/api/auth/users/{{user_id}}"
+                                    >
+                                        Delete User
+                                    </button>
+                                </div>
+                                <div class="input-row">
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="username"
+                                        placeholder="username"
+                                        value=""
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="email"
+                                        placeholder="email"
+                                        value=""
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="password"
+                                        placeholder="new password"
+                                        value=""
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
