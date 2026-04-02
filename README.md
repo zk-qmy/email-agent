@@ -16,13 +16,13 @@ The Email Agent is a multi-service system that:
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
 │   Client    │───▶│   Agent API  │───▶│   Backend   │
-│             │◀───│  (Port 8000) │◀───│ (Port 5001) │
+│  (Browser)  │◀───│  (Port 8000) │◀───│ (Port 5001) │
 └─────────────┘     └──────────────┘     └─────────────┘
-                           │
-                    ┌──────┴──────┐
-                    │  LangGraph  │
-                    │  Workflows  │
-                    └─────────────┘
+                            │              ┌─────────────┐
+                     ┌──────┴──────┐      │  Web UI     │
+                     │  LangGraph  │      │  (Static)   │
+                     │  Workflows  │      └─────────────┘
+                     └─────────────┘
 ```
 
 ## Actual Directory Structure
@@ -38,6 +38,8 @@ email-agent/
 ├── uv.lock
 ├── email-agent.db              # SQLite database
 │
+├── main.py                     # Package entry point
+│
 ├── agent/                      # Agent API service (FastAPI)
 │   ├── __init__.py
 │   ├── main.py                 # FastAPI app entry point
@@ -48,7 +50,8 @@ email-agent/
 │   └── services/
 │       ├── __init__.py
 │       ├── agent_service.py    # Core agent logic (788 lines)
-│       └── ws_client.py        # WebSocket client to backend
+│       ├── ws_client.py        # WebSocket client to backend
+│       └── draft_models.py     # Pydantic models for drafts
 │
 ├── backend/                    # Email backend service (FastAPI)
 │   ├── __init__.py
@@ -60,9 +63,13 @@ email-agent/
 │   │   ├── auth.py             # /api/auth/signup, /api/auth/login
 │   │   ├── email.py            # Email CRUD endpoints
 │   │   └── ws_notifications.py # WebSocket push notifications
-│   └── services/
-│       ├── __init__.py
-│       └── mail_service.py     # Email business logic
+│   ├── services/
+│   │   ├── __init__.py
+│   │   └── mail_service.py     # Email business logic
+│   └── static/                 # Web UI for API testing
+│       ├── index.html          # Main UI
+│       ├── styles.css          # Styling
+│       └── app.js              # Frontend JavaScript
 │
 ├── config/
 │   ├── __init__.py
@@ -193,6 +200,30 @@ Test the meeting scheduler workflow:
 ```bash
 python scripts/run.py
 ```
+
+## Web UI
+
+A built-in web interface is available for testing the API. Access it at:
+
+```
+http://localhost:5001/
+```
+
+### Features
+
+- **Tabbed Interface**: Switch between Auth, Email, and Agent endpoints
+- **User Selection**: Dropdown to select test users (alice, bob, charlie)
+- **Agent Status**: Real-time WebSocket connection indicator
+- **Collapsible Sections**: Organize API calls by category
+- **Response Panel**: View JSON responses from API calls
+
+### Usage
+
+1. Start the backend: `uvicorn backend.main:app --host 0.0.0.0 --port 5001 --reload`
+2. Open `http://localhost:5001/` in your browser
+3. Select a user from the dropdown
+4. Click any test button to make API calls
+5. View responses in the panel on the right
 
 ## Workflows
 
