@@ -12,6 +12,7 @@ import asyncio
 def _get_connection_manager():
     try:
         from backend.routes.ws_notifications import connection_manager
+
         return connection_manager
     except Exception:
         return None
@@ -27,9 +28,11 @@ class MailService:
     def signup(self, username: str, email: str, password: str) -> dict:
         session = self._get_session()
         try:
-            existing = session.query(User).filter(
-                (User.email == email) | (User.username == username)
-            ).first()
+            existing = (
+                session.query(User)
+                .filter((User.email == email) | (User.username == username))
+                .first()
+            )
             if existing:
                 return {"success": False, "error": "Username or email already exists"}
 
@@ -41,7 +44,11 @@ class MailService:
             session.add(user)
             session.commit()
             session.refresh(user)
-            return {"success": True, "user_id": user.id, "message": "User created successfully"}
+            return {
+                "success": True,
+                "user_id": user.id,
+                "message": "User created successfully",
+            }
         finally:
             session.close()
 
@@ -74,7 +81,9 @@ class MailService:
     ) -> dict:
         session = self._get_session()
         try:
-            recipient = session.query(User).filter(User.email == recipient_email).first()
+            recipient = (
+                session.query(User).filter(User.email == recipient_email).first()
+            )
             if not recipient:
                 return {"success": False, "error": "Recipient not found"}
 
@@ -105,27 +114,40 @@ class MailService:
                 cm = _get_connection_manager()
                 if cm:
                     asyncio.create_task(
-                        cm.send_to_user(cast(int, recipient.id), {
-                            "event": "new_email",
-                            "email": inbox_email.to_dict(),
-                        })
+                        cm.send_to_user(
+                            cast(int, recipient.id),
+                            {
+                                "event": "new_email",
+                                "email": inbox_email.to_dict(),
+                            },
+                        )
                     )
             except Exception:
                 pass
 
-            return {"success": True, "email_id": email.id, "message": "Email sent successfully"}
+            return {
+                "success": True,
+                "email_id": email.id,
+                "message": "Email sent successfully",
+            }
         finally:
             session.close()
 
     def reply_email(self, sender_id: int, parent_email_id: int, body: str) -> dict:
         session = self._get_session()
         try:
-            parent_email = session.query(Email).filter(Email.id == parent_email_id).first()
+            parent_email = (
+                session.query(Email).filter(Email.id == parent_email_id).first()
+            )
             if not parent_email:
                 return {"success": False, "error": "Parent email not found"}
 
             parent_subject = cast(str, parent_email.subject)
-            subject = f"Re: {parent_subject}" if not parent_subject.startswith("Re:") else parent_subject
+            subject = (
+                f"Re: {parent_subject}"
+                if not parent_subject.startswith("Re:")
+                else parent_subject
+            )
 
             return self.send_email(
                 sender_id=sender_id,
@@ -246,6 +268,64 @@ class MailService:
             if user:
                 return user.to_dict()
             return None
+        finally:
+            session.close()
+
+    def update_user(
+        self,
+        user_id: int,
+        username: Optional[str] = None,
+        email: Optional[str] = None,
+        password: Optional[str] = None,
+    ) -> dict:
+        session = self._get_session()
+        try:
+            user = session.query(User).filter(User.id == user_id).first()
+            if not user:
+                return {"success": False, "error": "User not found"}
+
+            if username is not None:
+                existing = (
+                    session.query(User)
+                    .filter(User.username == username, User.id != user_id)
+                    .first()
+                )
+                if existing:
+                    return {"success": False, "error": "Username already exists"}
+                user.username = username
+
+            if email is not None:
+                existing = (
+                    session.query(User)
+                    .filter(User.email == email, User.id != user_id)
+                    .first()
+                )
+                if existing:
+                    return {"success": False, "error": "Email already exists"}
+                user.email = email
+
+            if password is not None:
+                user.password_hash = generate_password_hash(password)
+
+            session.commit()
+            return {"success": True, "user": user.to_dict()}
+        finally:
+            session.close()
+
+    def delete_user(self, user_id: int) -> dict:
+        session = self._get_session()
+        try:
+            user = session.query(User).filter(User.id == user_id).first()
+            if not user:
+                return {"success": False, "error": "User not found"}
+
+            session.query(Email).filter(
+                (Email.sender_id == user_id) | (Email.recipient_id == user_id)
+            ).delete()
+
+            session.delete(user)
+            session.commit()
+            return {"success": True}
         finally:
             session.close()
 
