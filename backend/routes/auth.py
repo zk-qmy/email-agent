@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from backend.services.mail_service import mail_service
+from backend.database import SessionLocal
+from backend.models import User
 
 router = APIRouter()
 
@@ -14,6 +16,20 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+@router.get("/users")
+async def get_users():
+    session = SessionLocal()
+    try:
+        users = session.query(User).all()
+        return {
+            "users": [
+                {"id": u.id, "username": u.username, "email": u.email} for u in users
+            ]
+        }
+    finally:
+        session.close()
 
 
 @router.post("/signup")
