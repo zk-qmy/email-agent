@@ -7,9 +7,6 @@ from agent.routes.agent import (
     CreateDraftRequest,
     UpdateDraftRequest,
     SendDraftRequest,
-    ProcessRequest,
-    ChatRequest,
-    NegotiateRequest,
     create_draft,
     get_draft,
     update_draft,
@@ -19,10 +16,7 @@ from agent.routes.agent import (
     get_thread,
     get_user_threads,
     confirm_meeting,
-    negotiate_meeting,
     decline_meeting,
-    process_email,
-    chat,
     get_status,
     get_history,
     websocket_endpoint,
@@ -84,24 +78,9 @@ async def agent_confirm_meeting(thread_id: str):
     return await confirm_meeting(thread_id)
 
 
-@app.post("/api/agent/thread/{thread_id}/negotiate")
-async def agent_negotiate_meeting(thread_id: str, request: NegotiateRequest):
-    return await negotiate_meeting(thread_id, request)
-
-
 @app.post("/api/agent/thread/{thread_id}/decline")
 async def agent_decline_meeting(thread_id: str):
     return await decline_meeting(thread_id)
-
-
-@app.post("/api/agent/process")
-async def agent_process(request: ProcessRequest):
-    return await process_email(request)
-
-
-@app.post("/api/agent/chat")
-async def agent_chat(request: ChatRequest):
-    return await chat(request)
 
 
 @app.get("/api/agent/status/{thread_id}")
@@ -144,5 +123,6 @@ async def shutdown():
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("AGENT_PORT", 8000))
     uvicorn.run("agent.main:app", host="0.0.0.0", port=port, reload=True)

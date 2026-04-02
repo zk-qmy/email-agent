@@ -20,21 +20,6 @@ class SendDraftRequest(BaseModel):
     edited_body: Optional[str] = None
 
 
-class ProcessRequest(BaseModel):
-    user_id: int
-    email_id: int
-
-
-class ChatRequest(BaseModel):
-    thread_id: str
-    message: str
-
-
-class NegotiateRequest(BaseModel):
-    date: str
-    time: str
-
-
 async def create_draft(request: CreateDraftRequest):
     try:
         result = agent_service.create_draft(
@@ -138,23 +123,9 @@ async def confirm_meeting(thread_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to confirm meeting: {str(e)}")
-
-
-async def negotiate_meeting(thread_id: str, request: NegotiateRequest):
-    try:
-        result = await agent_service.negotiate_meeting(
-            thread_id=thread_id,
-            date=request.date,
-            time=request.time,
+        raise HTTPException(
+            status_code=500, detail=f"Failed to confirm meeting: {str(e)}"
         )
-        if "error" in result:
-            raise HTTPException(status_code=400, detail=result["error"])
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to negotiate meeting: {str(e)}")
 
 
 async def decline_meeting(thread_id: str):
@@ -166,34 +137,12 @@ async def decline_meeting(thread_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to decline meeting: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to decline meeting: {str(e)}"
+        )
 
 
 active_workflows = {}
-
-
-async def process_email(request: ProcessRequest):
-    try:
-        result = await agent_service.process_email(request.user_id, request.email_id)
-        if "error" in result:
-            raise HTTPException(status_code=400, detail=result["error"])
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process email: {str(e)}")
-
-
-async def chat(request: ChatRequest):
-    try:
-        result = agent_service.chat(request.thread_id, request.message, active_workflows)
-        if "error" in result:
-            raise HTTPException(status_code=400, detail=result["error"])
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process chat: {str(e)}")
 
 
 async def get_status(thread_id: str):
@@ -236,27 +185,29 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
                 thread_id = data.get("thread_id")
                 if thread_id:
                     from agent.services.agent_service import threads
+
                     thread = threads.get(thread_id)
                     if thread:
-                        await websocket.send_json({
-                            "event": "status",
-                            "thread_id": thread_id,
-                            "status": thread["status"],
-                            "reply_intent": thread["reply_intent"],
-                        })
+                        await websocket.send_json(
+                            {
+                                "event": "status",
+                                "thread_id": thread_id,
+                                "status": thread["status"],
+                                "reply_intent": thread["reply_intent"],
+                            }
+                        )
 
             elif event == "subscribe":
                 thread_id = data.get("thread_id")
-                await websocket.send_json({
-                    "event": "subscribed",
-                    "thread_id": thread_id,
-                })
+                await websocket.send_json(
+                    {
+                        "event": "subscribed",
+                        "thread_id": thread_id,
+                    }
+                )
 
     except WebSocketDisconnect:
         agent_service.remove_websocket(user_id, websocket)
     except Exception as e:
-        await websocket.send_json({
-            "event": "error",
-            "message": str(e)
-        })
+        await websocket.send_json({"event": "error", "message": str(e)})
         agent_service.remove_websocket(user_id, websocket)
