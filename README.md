@@ -245,30 +245,43 @@ Routes and responds to emails based on intent classification.
 
 ### Agent API (Port 8000)
 
-| Method | Endpoint                        | Description                           |
-| ------ | ------------------------------- | ------------------------------------- |
-| POST   | `/api/agent/draft`              | Create/read/update/send/cancel drafts |
-| GET    | `/api/agent/thread/{thread_id}` | Get thread messages                   |
-| POST   | `/api/agent/process`            | Process an email with the agent       |
-| POST   | `/api/agent/chat`               | Chat with the agent                   |
-| WS     | `/api/agent/ws/{user_id}`       | WebSocket for real-time updates       |
-| GET    | `/health`                       | Health check                          |
+| Method | Endpoint                              | Description                     |
+| ------ | ------------------------------------- | ------------------------------- |
+| POST   | `/api/agent/draft`                   | Create a new draft              |
+| GET    | `/api/agent/draft/{draft_id}`        | Get specific draft              |
+| POST   | `/api/agent/draft/{draft_id}/send`   | Send draft                      |
+| DELETE | `/api/agent/draft/{draft_id}`        | Cancel draft                    |
+| GET    | `/api/agent/drafts`                  | List user's drafts              |
+| GET    | `/api/agent/thread/{thread_id}`       | Get thread messages             |
+| GET    | `/api/agent/threads`                  | List user's threads             |
+| POST   | `/api/agent/thread/{thread_id}/confirm` | Confirm meeting             |
+| POST   | `/api/agent/thread/{thread_id}/decline` | Decline meeting            |
+| GET    | `/api/agent/status/{thread_id}`       | Get workflow status             |
+| GET    | `/api/agent/history/{thread_id}`      | Get workflow history           |
+| WS     | `/api/agent/ws/{user_id}`             | WebSocket for real-time updates|
+| GET    | `/health`                             | Health check                    |
 
 ### Backend API (Port 5001)
 
-| Method | Endpoint                 | Description                  |
-| ------ | ------------------------ | ---------------------------- |
-| POST   | `/api/auth/signup`       | User registration            |
-| POST   | `/api/auth/login`        | User login                   |
-| POST   | `/api/emails/send`       | Send email                   |
-| POST   | `/api/emails/reply`      | Reply to email               |
-| GET    | `/api/emails/inbox`      | Get inbox                    |
-| GET    | `/api/emails/sent`       | Get sent emails              |
-| GET    | `/api/emails/{email_id}` | Get specific email           |
-| GET    | `/api/emails/query`      | Query emails                 |
-| GET    | `/api/emails/poll`       | Poll for new emails          |
-| WS     | `/ws/push/{user_id}`     | WebSocket push notifications |
-| GET    | `/health`                | Health check                 |
+| Method | Endpoint                        | Description                  |
+| ------ | ------------------------------- | ---------------------------- |
+| GET    | `/api/auth/users`               | List all users               |
+| GET    | `/api/auth/users/{user_id}`     | Get specific user            |
+| PUT    | `/api/auth/users/{user_id}`     | Update user                  |
+| DELETE | `/api/auth/users/{user_id}`     | Delete user                  |
+| POST   | `/api/auth/signup`              | User registration            |
+| POST   | `/api/auth/login`               | User login                   |
+| POST   | `/api/emails/send`              | Send email                   |
+| POST   | `/api/emails/reply`             | Reply to email               |
+| GET    | `/api/emails/inbox`             | Get inbox                    |
+| GET    | `/api/emails/sent`              | Get sent emails              |
+| GET    | `/api/emails/{email_id}`       | Get specific email           |
+| POST   | `/api/emails/query`             | Query emails                 |
+| GET    | `/api/emails/poll`              | Poll for new emails          |
+| PUT    | `/api/emails/mark_read`         | Mark email as read           |
+| WS     | `/ws/push/{user_id}`           | WebSocket push notifications |
+| GET    | `/health`                       | Health check                 |
+| GET    | `/`                             | Web UI                       |
 
 ## Test Users
 
