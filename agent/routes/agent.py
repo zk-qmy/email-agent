@@ -11,15 +11,6 @@ class CreateDraftRequest(BaseModel):
     context: str
 
 
-class UpdateDraftRequest(BaseModel):
-    body: Optional[str] = None
-    subject: Optional[str] = None
-
-
-class SendDraftRequest(BaseModel):
-    edited_body: Optional[str] = None
-
-
 async def create_draft(request: CreateDraftRequest):
     try:
         result = agent_service.create_draft(
@@ -49,27 +40,10 @@ async def get_draft(draft_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get draft: {str(e)}")
 
 
-async def update_draft(draft_id: str, request: UpdateDraftRequest):
-    try:
-        result = agent_service.update_draft(
-            draft_id=draft_id,
-            body=request.body,
-            subject=request.subject,
-        )
-        if "error" in result:
-            raise HTTPException(status_code=400, detail=result["error"])
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update draft: {str(e)}")
-
-
-async def send_draft(draft_id: str, request: SendDraftRequest):
+async def send_draft(draft_id: str):
     try:
         result = await agent_service.send_draft(
             draft_id=draft_id,
-            edited_body=request.edited_body,
         )
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
