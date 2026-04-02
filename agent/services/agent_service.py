@@ -338,35 +338,6 @@ class AgentService:
             "email_id": draft.email_id,
         }
 
-    def update_draft(
-        self, draft_id: str, body: Optional[str] = None, subject: Optional[str] = None
-    ) -> dict:
-        draft = drafts.get(draft_id)
-        if not draft:
-            return {"error": "Draft not found"}
-
-        if draft.status != "pending":
-            return {"error": f"Cannot edit draft with status: {draft.status}"}
-
-        updated_at = datetime.utcnow().isoformat()
-
-        if body is not None:
-            draft.draft.body = body
-        if subject is not None:
-            draft.draft.subject = subject
-        draft.updated_at = updated_at
-
-        return {
-            "draft_id": draft_id,
-            "draft": {
-                "recipient": draft.draft.recipient,
-                "subject": draft.draft.subject,
-                "body": draft.draft.body,
-            },
-            "status": draft.status,
-            "updated_at": updated_at,
-        }
-
     def cancel_draft(self, draft_id: str) -> dict:
         draft = drafts.get(draft_id)
         if not draft:
@@ -410,9 +381,7 @@ class AgentService:
             for d in user_drafts
         ]
 
-    async def send_draft(
-        self, draft_id: str, edited_body: Optional[str] = None
-    ) -> dict:
+    async def send_draft(self, draft_id: str) -> dict:
         draft = drafts.get(draft_id)
         if not draft:
             return {"error": "Draft not found"}
@@ -420,7 +389,7 @@ class AgentService:
         if draft.status != "pending":
             return {"error": f"Cannot send draft with status: {draft.status}"}
 
-        final_body = edited_body if edited_body else draft.draft.body
+        final_body = draft.draft.body
 
         try:
             result = await mail_client.send_email(

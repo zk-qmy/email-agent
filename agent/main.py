@@ -5,11 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from agent.routes.agent import (
     CreateDraftRequest,
-    UpdateDraftRequest,
-    SendDraftRequest,
     create_draft,
     get_draft,
-    update_draft,
     send_draft,
     cancel_draft,
     get_user_drafts,
@@ -43,14 +40,9 @@ async def agent_get_draft(draft_id: str):
     return await get_draft(draft_id)
 
 
-@app.put("/api/agent/draft/{draft_id}")
-async def agent_update_draft(draft_id: str, request: UpdateDraftRequest):
-    return await update_draft(draft_id, request)
-
-
 @app.post("/api/agent/draft/{draft_id}/send")
-async def agent_send_draft(draft_id: str, request: SendDraftRequest):
-    return await send_draft(draft_id, request)
+async def agent_send_draft(draft_id: str):
+    return await send_draft(draft_id)
 
 
 @app.delete("/api/agent/draft/{draft_id}")
