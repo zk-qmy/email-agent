@@ -20,8 +20,14 @@ def get_checkpointer() -> MemorySaver:
     global _checkpointer_instance
 
     if _checkpointer_instance is None:
-        cp = MemorySaver()
-        _configure_serde(cp)
-        _checkpointer_instance = cp
-
+        _checkpointer_instance = MemorySaver()
+        try:
+            _checkpointer_instance.serde.allowed_msgpack_modules.add(  # type: ignore[attr-defined]
+                ("src.core.states", "EmailData")
+            )
+            _checkpointer_instance.serde.allowed_msgpack_modules.add(  # type: ignore[attr-defined]
+                ("src.core.states", "MeetingData")
+            )
+        except AttributeError:
+            pass  # older LangGraph versions don't expose this
     return _checkpointer_instance
