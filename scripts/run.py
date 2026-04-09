@@ -7,7 +7,6 @@ from langgraph.types import Command
 from langchain_core.runnables.config import RunnableConfig
 from src.core.states import AgentState, EmailData
 from src.workflows.router import build_router
-from IPython.display import Image, display
 
 
 def run():
