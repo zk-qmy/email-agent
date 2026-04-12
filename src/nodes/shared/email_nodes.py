@@ -10,6 +10,8 @@ from src.integrations.mail.sync_client import (
     mark_read_sync,
 )
 from datetime import datetime
+from config.prompts.base import PromptConfig
+from config.prompts.email import meeting_prompts
 
 
 def format_time(time_str: str) -> str:
@@ -31,45 +33,63 @@ def format_time(time_str: str) -> str:
         return time_str
 
 
-def draft_email(state: AgentState) -> dict:
+def draft_email(state: AgentState, prompts: PromptConfig = meeting_prompts) -> dict:
     meeting = state.meeting
+
+    # --- resolve runtime values ---
     recipient = (
         meeting.participants[0] if meeting.participants else "recipient@example.com"
     )
-    subject = meeting.date if meeting.date else "Meeting Request"
-    context = (
+    purpose = (
         getattr(meeting, "context", None)
         or getattr(meeting, "purpose", None)
-        or f"Meeting request for {format_time(meeting.time)}"
-        if meeting.time
-        else "Meeting request"
+        # or "discuss the agenda"
     )
 
-    prompt = f"""Write a professional email with the following details:
-- To: {recipient}
-- Subject: {subject}
-- Purpose: {context}
+    # --- build messages via NodePrompt (single source of truth) ---
+    prompt = prompts.get("draft_email")
+    messages = prompt.build_messages(
+        user_content="Draft the email now.",
+        recipient=recipient,
+        date=meeting.date or "TBD",
+        time=format_time(meeting.time) if meeting.time else "TBD",
+        purpose=purpose,
+    )
 
-Write only the email body, no subject line. Keep it concise and professional."""
-
+    # --- call LLM ---
     try:
-        response = get_llm().invoke(
-            [
-                {
-                    "role": "system",
-                    "content": "You are a professional email writer. Write clear, concise, and professional emails.",
-                },
-                {"role": "user", "content": prompt},
-            ]
-        )
-        draft = response.content if hasattr(response, "content") else str(response)
+        response = get_llm().invoke(messages)
+        raw_draft = response.content if hasattr(
+            response, "content") else str(response)
+        print(f"draft_email: LLM response:\n{raw_draft}")
+
+        # Handdle string and list response formats
+        if isinstance(raw_draft, list):
+            draft = "\n".join(
+                block["text"] for block in raw_draft
+                if isinstance(block, dict) and block.get("type") == "text"
+            )
+        print(f"draft_email: extracted draft:\n{draft}")
+
     except Exception:
-        draft = f"Hi,\n\n{context}\n\nBest regards"
+        print("[draft_email] LLM invocation failed, using fallback draft")
+        draft = (
+            f"Hi,\n\nI'd like to schedule a meeting on {meeting.date}.\n\nBest regards"
+        )
+
+    # --- parse subject out of draft ---
+    subject = meeting.date or "Meeting Request"
+    body = draft
+
+    if draft.startswith("Subject:"):
+        lines = draft.split("\n", 1)
+        subject = lines[0].replace("Subject:", "").strip()
+        body = lines[1].strip() if len(lines) > 1 else draft
 
     print(f"[draft_email] draft created for {recipient}")
     return {
-        "email": EmailData(draft=str(draft), approval_status="pending"),
-        "response": f"Subject: {subject}\n\n{draft}",
+        "email": EmailData(draft=body, approval_status="pending"),
+        "response": f"Subject: {subject}\n\n{body}",
     }
 
 
@@ -83,12 +103,16 @@ def process_approval(state: AgentState) -> dict:
             "email_draft": email_draft,
             "missing_fields": [],
             "data": {
-                "recipient": state.meeting.participants[0]
-                if state.meeting.participants
-                else None,
-                "subject": f"Meeting Request for {state.meeting.date}"
-                if state.meeting.date
-                else "Meeting Request",
+                "recipient": (
+                    state.meeting.participants[0]
+                    if state.meeting.participants
+                    else None
+                ),
+                "subject": (
+                    f"Meeting Request for {state.meeting.date}"
+                    if state.meeting.date
+                    else "Meeting Request"
+                ),
             },
         }
     )
@@ -103,6 +127,8 @@ def process_approval(state: AgentState) -> dict:
         status = "approved"
     elif "edit" in content:
         status = "edit"
+    elif "cancel" in content:
+        status = "cancelled"
     else:
         status = "pending"
 
@@ -169,7 +195,8 @@ def wait_for_reply(state: AgentState, config: RunnableConfig) -> dict:
             latest = new_emails[0]
             mark_read_sync(latest["id"])
             reply_body = latest["body"]
-            print(f"[wait_for_reply] received reply from {latest['sender_email']}")
+            print(
+                f"[wait_for_reply] received reply from {latest['sender_email']}")
             return {
                 "email": EmailData(last_reply=reply_body),
                 "last_check": datetime.utcnow().isoformat(),
@@ -238,9 +265,7 @@ def extract_reply_intent(state: AgentState) -> dict:
                     "role": "system",
                     "content": (
                         "Classify the email reply intent as one of:\n"
-                        "- confirmed\n"
-                        "- negotiate\n"
-                        "- declined\n"
+                        "- confirmed\n- negotiate\n- declined\n"
                         "Return structured output only."
                     ),
                 },
@@ -249,7 +274,8 @@ def extract_reply_intent(state: AgentState) -> dict:
         )
     )
 
-    reply_intent = cast(ReplyIntentOutput, result).reply_intent  # type: ignore[union-attr]
+    # type: ignore[union-attr]
+    reply_intent = cast(ReplyIntentOutput, result).reply_intent
     print(f"[extract_reply_intent] intent: {reply_intent}")
     return {"email": EmailData(reply_intent=reply_intent)}
 
