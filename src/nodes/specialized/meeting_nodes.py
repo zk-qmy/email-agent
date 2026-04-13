@@ -4,6 +4,8 @@ from langgraph.types import interrupt
 from pydantic import BaseModel
 from src.core.states import AgentState, MeetingData
 from src.integrations.llm.client import get_llm
+from config.prompts.email import meeting_prompts
+from config.prompts.base import PromptConfig
 
 
 class MeetingExtraction(BaseModel):
@@ -12,12 +14,28 @@ class MeetingExtraction(BaseModel):
     participants: Optional[List[str]] = None
 
 
-def extract_meeting_info(state: AgentState) -> dict:
+def extract_meeting_info(state: AgentState,
+                         prompt_config: PromptConfig = meeting_prompts
+                         ) -> dict:
     messages = state.messages if hasattr(state, "messages") else []
     last_message = messages[-1]["content"] if messages else ""
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    prompt = prompt_config.get("extract_meeting_info")
+    message_prompt = prompt.build_messages(
+        user_content=last_message,
+        today=datetime.now().strftime("%Y-%m-%d"),
+        date=state.meeting.date or "not yet provided",
+        time=state.meeting.time or "not yet provided",
+        participants=", ".join(
+            state.meeting.participants) or "not yet provided",
+    )
 
+    result = (
+        get_llm()
+        .with_structured_output(MeetingExtraction)
+        .invoke(message_prompt)
+    )
+    '''
     result = (
         get_llm()
         .with_structured_output(MeetingExtraction)
@@ -39,8 +57,10 @@ def extract_meeting_info(state: AgentState) -> dict:
             ]
         )
     )
+    '''
 
-    existing_meeting = state.meeting if hasattr(state, "meeting") else MeetingData()
+    existing_meeting = state.meeting if hasattr(
+        state, "meeting") else MeetingData()
 
     extracted = cast(MeetingExtraction, result)
     updated = MeetingData(
@@ -80,7 +100,8 @@ def check_missing_fields(state: AgentState) -> dict:
 
 def ask_for_missing_info(state: AgentState) -> dict:
     meeting = state.meeting if hasattr(state, "meeting") else MeetingData()
-    missing = meeting.missing_fields if hasattr(meeting, "missing_fields") else []
+    missing = meeting.missing_fields if hasattr(
+        meeting, "missing_fields") else []
 
     if not missing:
         missing_str = "required information"

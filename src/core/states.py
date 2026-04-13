@@ -13,7 +13,7 @@ class MeetingData(BaseModel):
 class EmailData(BaseModel):
     draft: Optional[str] = None
     approval_status: Optional[
-        Literal["pending", "approved", "edit"]
+        Literal["pending", "approved", "edit", "cancelled"]
     ] = None
     followup_count: int = 0
     last_reply: Optional[str] = None
