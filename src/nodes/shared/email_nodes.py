@@ -8,6 +8,7 @@ from src.integrations.mail.sync_client import (
     send_email_sync,
     poll_inbox_sync,
     mark_read_sync,
+    is_backend_available,
 )
 from datetime import datetime
 from config.prompts.base import PromptConfig
@@ -41,8 +42,7 @@ def draft_email(state: AgentState, prompts: PromptConfig = meeting_prompts) -> d
         meeting.participants[0] if meeting.participants else "recipient@example.com"
     )
     purpose = (
-        getattr(meeting, "context", None)
-        or getattr(meeting, "purpose", None)
+        getattr(meeting, "context", None) or getattr(meeting, "purpose", None)
         # or "discuss the agenda"
     )
 
@@ -59,14 +59,14 @@ def draft_email(state: AgentState, prompts: PromptConfig = meeting_prompts) -> d
     # --- call LLM ---
     try:
         response = get_llm().invoke(messages)
-        raw_draft = response.content if hasattr(
-            response, "content") else str(response)
+        raw_draft = response.content if hasattr(response, "content") else str(response)
         print(f"draft_email: LLM response:\n{raw_draft}")
 
         # Handdle string and list response formats
         if isinstance(raw_draft, list):
             draft = "\n".join(
-                block["text"] for block in raw_draft
+                block["text"]
+                for block in raw_draft
                 if isinstance(block, dict) and block.get("type") == "text"
             )
         print(f"draft_email: extracted draft:\n{draft}")
@@ -139,11 +139,22 @@ def process_approval(state: AgentState) -> dict:
 def send_email(state: AgentState, config: RunnableConfig) -> dict:
     try:
         user_id = config.get("configurable", {}).get("user_id")
+        fallback_to_queue = config.get("configurable", {}).get(
+            "fallback_to_queue", False
+        )
+
         if not user_id:
             print("[send_email] error: no user_id in config")
             return {
                 "email": EmailData(status="failed"),
                 "response": "Failed: no user_id",
+            }
+
+        if fallback_to_queue and not is_backend_available():
+            print("[send_email] backend unavailable, skipping (soft fail)")
+            return {
+                "email": EmailData(status="pending"),
+                "response": "Email not sent - backend unavailable",
             }
 
         recipient = (
@@ -180,8 +191,41 @@ def send_email(state: AgentState, config: RunnableConfig) -> dict:
 
 
 def wait_for_reply(state: AgentState, config: RunnableConfig) -> dict:
+    cfg = config.get("configurable", {})
+    state_no_response = getattr(state, "no_response_count", 0)
+    config_no_response = cfg.get("no_response_count", 0)
+
+    # Use state value if set, otherwise use config value
+    if state_no_response:
+        no_response_count = state_no_response
+    else:
+        no_response_count = config_no_response
+
+    mock_reply = cfg.get("mock_reply")
+
+    if no_response_count and no_response_count > 0:
+        print(f"[wait_for_reply] simulated no reply ({no_response_count} cycles left)")
+        return {
+            "email": EmailData(last_reply=None),
+            "no_response_count": no_response_count - 1,
+            "last_check": datetime.utcnow().isoformat(),
+        }
+
+    if mock_reply:
+        mock_bodies = {
+            "confirmed": "Yes, the meeting time works for me. I'll attend.",
+            "negotiate": "Can we reschedule to 2pm instead?",
+            "declined": "I won't be able to attend.",
+        }
+        reply_body = mock_bodies.get(mock_reply, "No response")
+        print(f"[wait_for_reply] mock reply: {mock_reply} -> {reply_body}")
+        return {
+            "email": EmailData(last_reply=reply_body),
+            "last_check": datetime.utcnow().isoformat(),
+        }
+
     try:
-        user_id = config.get("configurable", {}).get("user_id")
+        user_id = cfg.get("user_id")
         if not user_id:
             print("[wait_for_reply] error: no user_id in config")
             return {"email": EmailData(last_reply=None)}
@@ -195,8 +239,7 @@ def wait_for_reply(state: AgentState, config: RunnableConfig) -> dict:
             latest = new_emails[0]
             mark_read_sync(latest["id"])
             reply_body = latest["body"]
-            print(
-                f"[wait_for_reply] received reply from {latest['sender_email']}")
+            print(f"[wait_for_reply] received reply from {latest['sender_email']}")
             return {
                 "email": EmailData(last_reply=reply_body),
                 "last_check": datetime.utcnow().isoformat(),
@@ -212,6 +255,14 @@ def wait_for_reply(state: AgentState, config: RunnableConfig) -> dict:
 def send_followup(state: AgentState, config: RunnableConfig) -> dict:
     try:
         user_id = config.get("configurable", {}).get("user_id")
+        fallback_to_queue = config.get("configurable", {}).get(
+            "fallback_to_queue", False
+        )
+
+        if fallback_to_queue and not is_backend_available():
+            print("[send_followup] backend unavailable, skipping (soft fail)")
+            return {"email": EmailData(followup_count=state.email.followup_count + 1)}
+
         if not user_id:
             print("[send_followup] error: no user_id in config")
             return {"email": EmailData(followup_count=state.email.followup_count + 1)}

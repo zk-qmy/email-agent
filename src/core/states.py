@@ -12,15 +12,13 @@ class MeetingData(BaseModel):
 
 class EmailData(BaseModel):
     draft: Optional[str] = None
-    approval_status: Optional[
-        Literal["pending", "approved", "edit", "cancelled"]
-    ] = None
+    approval_status: Optional[Literal["pending", "approved", "edit", "cancelled"]] = (
+        None
+    )
     followup_count: int = 0
     last_reply: Optional[str] = None
-    reply_intent: Optional[
-        Literal["confirmed", "negotiate", "declined"]
-    ] = None
-    status: Optional[Literal["sent", "failed"]] = None
+    reply_intent: Optional[Literal["confirmed", "negotiate", "declined"]] = None
+    status: Optional[Literal["sent", "failed", "pending"]] = None
 
 
 def merge_mail(current: EmailData, update: EmailData) -> EmailData:
@@ -57,6 +55,6 @@ class AgentState(BaseModel):
     workflow: Optional[Literal["schedule", "ticket", "chat"]] = None
     email_id: Optional[int] = None
     meeting: MeetingData = Field(default_factory=MeetingData)
-    # BUG_FIX: Added Field(default_factory=EmailData) so Pydantic has a default.
     email: Annotated[EmailData, merge_mail] = Field(default_factory=EmailData)
     response: Optional[str] = None
+    no_response_count: int = 0

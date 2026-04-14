@@ -25,96 +25,64 @@ The Email Agent is a multi-service system that:
                      └─────────────┘
 ```
 
-## Actual Directory Structure
+## Folder Structure
 
 ```
 email-agent/
-│
-├── README.md
-├── .env.example
-├── .gitignore
-├── .python-version
-├── pyproject.toml
-├── uv.lock
-├── email-agent.db              # SQLite database
-│
-├── main.py                     # Package entry point
-│
-├── agent/                      # Agent API service (FastAPI)
-│   ├── __init__.py
-│   ├── main.py                 # FastAPI app entry point
-│   ├── dependencies.py
-│   ├── routes/
-│   │   ├── __init__.py
-│   │   └── agent.py            # Agent endpoints (/draft, /thread, /process, /chat)
-│   └── services/
-│       ├── __init__.py
-│       ├── agent_service.py    # Core agent logic (788 lines)
-│       ├── ws_client.py        # WebSocket client to backend
-│       └── draft_models.py     # Pydantic models for drafts
-│
-├── backend/                    # Email backend service (FastAPI)
-│   ├── __init__.py
-│   ├── main.py                 # FastAPI app entry point
-│   ├── database.py             # SQLAlchemy setup + seed data
-│   ├── models.py               # User, Email models
-│   ├── routes/
-│   │   ├── __init__.py
-│   │   ├── auth.py             # /api/auth/signup, /api/auth/login
-│   │   ├── email.py            # Email CRUD endpoints
-│   │   └── ws_notifications.py # WebSocket push notifications
-│   ├── services/
-│   │   ├── __init__.py
-│   │   └── mail_service.py     # Email business logic
-│   └── static/                 # Web UI for API testing
-│       ├── index.html          # Main UI
-│       ├── styles.css          # Styling
-│       └── app.js              # Frontend JavaScript
-│
-├── config/
-│   ├── __init__.py
-│   └── settings.py             # Pydantic settings
-│
-├── src/                        # Core library
-│   ├── __init__.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   └── states.py           # AgentState, MeetingData, EmailData
-│   ├── integrations/
-│   │   ├── __init__.py
-│   │   ├── llm/
-│   │   │   ├── __init__.py
-│   │   │   └── client.py       # Google Gemini LLM client
-│   │   └── mail/
-│   │       ├── __init__.py
-│   │       ├── client.py       # Async HTTP client to backend
-│   │       └── sync_client.py  # Sync mail operations
-│   ├── memory/
-│   │   ├── __init__.py
-│   │   └── checkpointer.py     # LangGraph MemorySaver
-│   ├── nodes/
-│   │   ├── __init__.py
-│   │   ├── shared/
-│   │   │   ├── __init__.py
-│   │   │   ├── decision_nodes.py # classify_workflow
-│   │   │   └── email_nodes.py    # draft, approve, send, wait, followup
-│   │   └── specialized/
-│   │       ├── __init__.py
-│   │       └── meeting_nodes.py # Meeting scheduling nodes
-│   └── workflows/
-│       ├── __init__.py
-│       ├── router.py           # Main LangGraph router
-│       └── meeting_scheduler.py # Meeting scheduling workflow
-│
-├── scripts/
-│   ├── __init__.py
-│   └── run.py                  # CLI test script
-│
-├── test/
-│   └── __init__.py
-│
-└── notebook/                   # For Jupyter notebooks
+├── agent/               # Agent API service (FastAPI)
+│   ├── main.py          # FastAPI entry point
+│   ├── routes/          # API endpoints
+│   ├── database.py      # SQLAlchemy setup
+│   └── services/        # Agent services
+├── backend/             # Email backend service (FastAPI)
+│   ├── main.py          # FastAPI entry point
+│   ├── database.py      # SQLAlchemy setup + seed data
+│   ├── models.py        # User, Email models
+│   ├── routes/          # API endpoints (auth, email, ws)
+│   └── services/        # Email business logic
+├── config/              # Configuration
+│   └── settings.py      # Pydantic settings
+├── src/                 # Core library
+│   ├── workflows/       # LangGraph workflows
+│   ├── nodes/           # Graph nodes
+│   └── integrations/    # LLM & mail clients
+├── scripts/             # CLI scripts
+│   └── run.py           # Test runner for workflows
+├── test/                # Test files
+│   ├── conftest.py      # Pytest fixtures
+│   ├── test_auth_api.py
+│   ├── test_email_api.py
+│   └── test_agent_proxy.py
+├── notebook/            # Jupyter notebooks
+├── assets/              # Test graphs
+├── main.py              # Package entry point
+└── pyproject.toml       # Project configuration
 ```
+
+## Testing
+
+Run tests with pytest:
+
+```bash
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest test/test_auth_api.py
+
+# Run with coverage
+pytest --cov
+```
+
+Test files:
+- `test/test_auth_api.py` - Authentication API tests
+- `test/test_email_api.py` - Email API tests
+- `test/test_agent_proxy.py` - Agent proxy tests
+
+Fixtures are defined in `test/conftest.py`.
 
 ## Installation
 
@@ -175,6 +143,24 @@ email-agent/
     GOOGLE_API_KEY=your_google_api_key_here
     ```
 
+## Testing
+
+Run tests with pytest:
+
+```bash
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest test/test_auth_api.py
+
+# Run with coverage
+pytest --cov
+```
+
 ## Running the Application
 
 ### Start Backend API (Port 5001)
@@ -195,11 +181,54 @@ uvicorn agent.main:app --host 0.0.0.0 --port 8000 --reload
 
 ### Run CLI Test Script
 
-Test the meeting scheduler workflow:
+The test script supports various options for testing the meeting scheduler workflow:
 
 ```bash
-python scripts/run.py
+python scripts/run.py [OPTIONS]
 ```
+
+#### Options
+
+| Option | Description |
+| ------ | ----------- |
+| `--no-backend` | Run without backend API (emails skipped, soft fail) |
+| `--simulate-reply [confirmed\|negotiate\|declined]` | Simulate reply from recipient (only when no_response_count exhausted) |
+| `--no-response-count N` | Simulate N rounds of no reply before ending flow |
+| `--max-followups N` | Max follow-up attempts before giving up (default: 2) |
+| `-m, --message TEXT` | Initial user message (default: "Schedule a meeting with Prof Linh next Monday at 12 am") |
+| `--graph-only` | Only generate graph PNG, don't run workflow |
+
+#### Examples
+
+```bash
+# Default run (requires backend)
+python scripts/run.py
+
+# Run without backend - emails skipped
+python scripts/run.py --no-backend
+
+# Simulate confirmed reply (requires backend for email sending)
+python scripts/run.py --simulate-reply confirmed
+
+# Run without backend + simulate confirmed reply
+python scripts/run.py --no-backend --simulate-reply confirmed
+
+# Simulate no reply for 2 cycles then end
+python scripts/run.py --no-response-count 2
+
+# Simulate no reply for 3 cycles + skip email sending
+python scripts/run.py --no-backend --no-response-count 3
+
+# Simulate no reply first, then simulate reply (reply ignored after no_response_count exhausted)
+python scripts/run.py --no-response-count 2 --simulate-reply confirmed
+
+# Custom message
+python scripts/run.py -m "Schedule meeting with John tomorrow at 3pm"
+
+# Generate graph only
+python scripts/run.py --graph-only
+```
+
 
 ## Web UI
 

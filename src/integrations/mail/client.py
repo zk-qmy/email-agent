@@ -67,6 +67,14 @@ class MailClient:
             logger.error(f"Request error to {url}: {e}")
             raise MailClientError(f"Request failed: {e}") from e
 
+    async def is_backend_available(self) -> bool:
+        try:
+            client = await self._get_client()
+            response = await client.get(f"{self.base_url}/health")
+            return response.status_code == 200
+        except:
+            return False
+
     async def signup(self, username: str, email: str, password: str):
         return await self._request(
             "POST",
