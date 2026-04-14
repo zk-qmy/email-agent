@@ -55,6 +55,6 @@ class AgentState(BaseModel):
     workflow: Optional[Literal["schedule", "ticket", "chat"]] = None
     email_id: Optional[int] = None
     meeting: MeetingData = Field(default_factory=MeetingData)
-    # BUG_FIX: Added Field(default_factory=EmailData) so Pydantic has a default.
     email: Annotated[EmailData, merge_mail] = Field(default_factory=EmailData)
     response: Optional[str] = None
+    no_response_count: int = 0

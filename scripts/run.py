@@ -41,8 +41,9 @@ def run(args):
             "user_id": 1,
             "mock_reply": args.simulate_reply,
             "fallback_to_queue": args.no_backend,
+            "no_response_count": args.no_response_count,
         },
-        "recursion_limit": 25,
+        "recursion_limit": 50,
     }
 
     result = graph.invoke(initial_state, config=config)
@@ -83,6 +84,12 @@ if __name__ == "__main__":
         type=int,
         default=2,
         help="Max follow-up attempts before giving up",
+    )
+    parser.add_argument(
+        "--no-response-count",
+        type=int,
+        default=0,
+        help="Simulate N rounds of no reply before ending flow",
     )
     parser.add_argument("-m", "--message", type=str, help="Initial user message")
     parser.add_argument(

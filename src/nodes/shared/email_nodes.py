@@ -191,7 +191,25 @@ def send_email(state: AgentState, config: RunnableConfig) -> dict:
 
 
 def wait_for_reply(state: AgentState, config: RunnableConfig) -> dict:
-    mock_reply = config.get("configurable", {}).get("mock_reply")
+    cfg = config.get("configurable", {})
+    state_no_response = getattr(state, "no_response_count", 0)
+    config_no_response = cfg.get("no_response_count", 0)
+
+    # Use state value if set, otherwise use config value
+    if state_no_response:
+        no_response_count = state_no_response
+    else:
+        no_response_count = config_no_response
+
+    mock_reply = cfg.get("mock_reply")
+
+    if no_response_count and no_response_count > 0:
+        print(f"[wait_for_reply] simulated no reply ({no_response_count} cycles left)")
+        return {
+            "email": EmailData(last_reply=None),
+            "no_response_count": no_response_count - 1,
+            "last_check": datetime.utcnow().isoformat(),
+        }
 
     if mock_reply:
         mock_bodies = {
@@ -207,31 +225,10 @@ def wait_for_reply(state: AgentState, config: RunnableConfig) -> dict:
         }
 
     try:
-        user_id = config.get("configurable", {}).get("user_id")
+        user_id = cfg.get("user_id")
         if not user_id:
             print("[wait_for_reply] error: no user_id in config")
             return {"email": EmailData(last_reply=None)}
-
-        last_check = getattr(state, "last_check", None)
-
-        result = poll_inbox_sync(user_id, last_check)
-        new_emails = result.get("new_emails", [])
-
-        if new_emails:
-            latest = new_emails[0]
-            mark_read_sync(latest["id"])
-            reply_body = latest["body"]
-            print(f"[wait_for_reply] received reply from {latest['sender_email']}")
-            return {
-                "email": EmailData(last_reply=reply_body),
-                "last_check": datetime.utcnow().isoformat(),
-            }
-
-        print("[wait_for_reply] no new replies")
-        return {"email": EmailData(last_reply=None)}
-    except Exception as e:
-        print(f"[wait_for_reply] error: {e}")
-        return {"email": EmailData(last_reply=None)}
 
         last_check = getattr(state, "last_check", None)
 
