@@ -12,15 +12,13 @@ class MeetingData(BaseModel):
 
 class EmailData(BaseModel):
     draft: Optional[str] = None
-    approval_status: Optional[
-        Literal["pending", "approved", "edit", "cancelled"]
-    ] = None
+    approval_status: Optional[Literal["pending", "approved", "edit", "cancelled"]] = (
+        None
+    )
     followup_count: int = 0
     last_reply: Optional[str] = None
-    reply_intent: Optional[
-        Literal["confirmed", "negotiate", "declined"]
-    ] = None
-    status: Optional[Literal["sent", "failed"]] = None
+    reply_intent: Optional[Literal["confirmed", "negotiate", "declined"]] = None
+    status: Optional[Literal["sent", "failed", "pending"]] = None
 
 
 def merge_mail(current: EmailData, update: EmailData) -> EmailData:
