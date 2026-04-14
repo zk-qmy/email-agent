@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import Annotated, List, Literal, Optional
 from pydantic import BaseModel, Field
 
+from src.state.base import BaseState
+
 
 class MeetingData(BaseModel):
     participants: List[str] = Field(default_factory=list)
@@ -52,11 +54,6 @@ def merge_mail(current: EmailData, update: EmailData) -> EmailData:
     return EmailData(**merged)
 
 
-class AgentState(BaseModel):
-    messages: List[dict] = Field(default_factory=list)
-    workflow: Optional[Literal["schedule", "ticket", "chat"]] = None
-    email_id: Optional[int] = None
+class ScheduleState(BaseState):
     meeting: MeetingData = Field(default_factory=MeetingData)
-    # BUG_FIX: Added Field(default_factory=EmailData) so Pydantic has a default.
     email: Annotated[EmailData, merge_mail] = Field(default_factory=EmailData)
-    response: Optional[str] = None

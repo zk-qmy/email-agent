@@ -76,7 +76,7 @@ class PromptConfig:
     Each field = one node's prompt.
     Subclass this per workflow and override only what you need.
     """
-    classify:        NodePrompt = field(default_factory=NodePrompt)
+    classify_workflow:        NodePrompt = field(default_factory=NodePrompt)
     extract_meeting_info: NodePrompt = field(default_factory=NodePrompt)
     # ask_missing:     NodePrompt = field(default_factory=NodePrompt)
     draft_email:     NodePrompt = field(default_factory=NodePrompt)

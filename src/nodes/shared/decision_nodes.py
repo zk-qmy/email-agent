@@ -1,6 +1,6 @@
 from typing import Literal
 from pydantic import BaseModel
-from src.core.states import AgentState
+from src.workflows.scheduling.state import AgentState
 from src.integrations.llm.client import get_llm
 
 

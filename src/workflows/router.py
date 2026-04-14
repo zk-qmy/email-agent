@@ -1,8 +1,8 @@
 from langgraph.graph import END, START, StateGraph
-from src.core.states import AgentState
+from src.workflows.scheduling.state import AgentState
 from src.memory.checkpointer import get_checkpointer
 from src.nodes.shared.decision_nodes import classify_workflow
-from src.workflows.meeting_scheduler import build_meeting_graph
+from src.workflows.scheduling.edges import build_meeting_graph
 # from src.workflows.support_ticket import build_support_graph  ← add when ready
 
 
