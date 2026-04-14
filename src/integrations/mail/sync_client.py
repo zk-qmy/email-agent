@@ -37,3 +37,7 @@ def poll_inbox_sync(user_id: int, last_check: Optional[str] = None):
 
 def mark_read_sync(email_id: int):
     return _run_async(mail_client.mark_read(email_id))
+
+
+def is_backend_available() -> bool:
+    return _run_async(mail_client.is_backend_available())
