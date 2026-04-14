@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 from src.workflows.router import build_router
 from src.core.states import AgentState, EmailData
@@ -9,20 +10,21 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-def run():
+def run(args):
     graph = build_router()
-    # Print Image
-    filename = datetime.now().strftime(
-        "meeting_graph_%Y%m%d_%H%M%S.png")
 
-    os.makedirs("assets/graph", exist_ok=True)
-    png_data = graph.get_graph(xray=True).draw_mermaid_png()
-    with open(f"assets/graph/{filename}", "wb") as f:
-        f.write(png_data)
-    print(f"Saved to assets/graph/{filename}")
+    if args.graph_only:
+        filename = datetime.now().strftime("meeting_graph_%Y%m%d_%H%M%S.png")
+        os.makedirs("assets/graph", exist_ok=True)
+        png_data = graph.get_graph(xray=True).draw_mermaid_png()
+        with open(f"assets/graph/{filename}", "wb") as f:
+            f.write(png_data)
+        print(f"Saved to assets/graph/{filename}")
+        return
 
-    # Run the graph with an initial user message
-    user_input = "Schedule a meeting with Prof Linh next Monday at 12 am"
+    user_input = (
+        args.message or "Schedule a meeting with Prof Linh next Monday at 12 am"
+    )
     initial_state = AgentState(
         messages=[
             {
@@ -32,12 +34,16 @@ def run():
         ],
         email=EmailData(),
     )
+
     config: RunnableConfig = {
-        "configurable": {"thread_id": "session-1", "user_id": 1},
+        "configurable": {
+            "thread_id": "session-1",
+            "user_id": 1,
+            "mock_reply": args.simulate_reply,
+            "fallback_to_queue": args.no_backend,
+        },
         "recursion_limit": 25,
     }
-
-    # continue
 
     result = graph.invoke(initial_state, config=config)
 
@@ -47,7 +53,7 @@ def run():
         print("Message:", interrupt_data.get("message", ""))
 
         if "email_draft" in interrupt_data:
-            print("\nDraft Email:\n", interrupt_data["email_draft"])
+            print("\nDraft Email:\n", interrupt_data.get("email_draft", ""))
             prompt = "Type: approved / edit / cancel: "
         else:
             prompt = "Your reply: "
@@ -61,4 +67,28 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    parser = argparse.ArgumentParser(description="Email Agent Runner")
+    parser.add_argument(
+        "--no-backend",
+        action="store_true",
+        help="Simulate no backend - emails skipped (soft fail)",
+    )
+    parser.add_argument(
+        "--simulate-reply",
+        choices=["confirmed", "negotiate", "declined"],
+        help="Simulate reply from recipient",
+    )
+    parser.add_argument(
+        "--max-followups",
+        type=int,
+        default=2,
+        help="Max follow-up attempts before giving up",
+    )
+    parser.add_argument("-m", "--message", type=str, help="Initial user message")
+    parser.add_argument(
+        "--graph-only",
+        action="store_true",
+        help="Only generate graph PNG, don't run workflow",
+    )
+    args = parser.parse_args()
+    run(args)
