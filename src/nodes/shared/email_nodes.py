@@ -49,7 +49,11 @@ def draft_email(state: AgentState, prompts: PromptConfig = meeting_prompts) -> d
     # --- build messages via NodePrompt (single source of truth) ---
     prompt = prompts.get("draft_email")
     messages = prompt.build_messages(
-        user_content="Draft the email now.",
+        user_content=(
+            "Schedule a meeting with Prof Linh next Monday at 12 am."
+            " I want to discuss with him about the review content for the next exam."
+            "Write the email 20 sentences long"
+        ), # TODO: add actual user message or meeting context
         recipient=recipient,
         date=meeting.date or "TBD",
         time=format_time(meeting.time) if meeting.time else "TBD",

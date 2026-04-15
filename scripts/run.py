@@ -22,7 +22,11 @@ def run():
     print(f"Saved to assets/graph/{filename}")
 
     # Run the graph with an initial user message
-    user_input = "Schedule a meeting with Prof Linh next Monday at 12 am"
+    user_input = (
+        """Schedule a meeting with Prof Linh next Monday at 12 am.
+        I want to discuss with him about the review content for the next exam.
+        """
+        )
     initial_state = AgentState(
         messages=[
             {

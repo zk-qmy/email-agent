@@ -76,12 +76,13 @@ class MeetingSchedulerPrompts(PromptConfig):
                 "Draft a professional meeting request email using the details in CONTEXT.\n"
                 "Format:\n"
                 "  Subject: <subject line>\n\n"
-                "  <body — 5 to 10 sentences max>\n\n"
+                "  <body — 2 to 3 sentences max>\n\n"
                 "  Best regards\n\n"
                 "Rules:\n"
                 "- Use the exact date and time from CONTEXT\n"
                 "- No placeholder text like [Name] or [Date]\n"
                 "- Write the subject line as the first line, prefixed with 'Subject:'"
+                "- If the user has specify requirements make sure to follow it (e.g., tone, length, specific phrases)"
             ),
             critic=(
                 "Verify:\n"
@@ -89,7 +90,8 @@ class MeetingSchedulerPrompts(PromptConfig):
                 "- Date and time from CONTEXT appear in the body\n"
                 "- No placeholder text\n"
                 "- Sign-off is included\n"
-                "- Body is 5 to 10 sentences, not longer"
+                "- Body is 2 to 3 sentences, not longer"
+                "- Make sure to follow any specific user requirements (e.g., tone, length, specific phrases)"
             ),
         )
     )
