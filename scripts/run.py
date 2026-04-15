@@ -23,8 +23,10 @@ def run():
 
     # Run the graph with an initial user message
     user_input = (
-        """Schedule a meeting with Prof Linh next Monday at 12 am.
-        I want to discuss with him about the review content for the next exam.
+        """
+        "Schedule a meeting with Prof Linh next Monday at 12 am."
+        "I want to discuss with him about the review content for the next exam."
+        "Write the email 20 sentences long"
         """
         )
     initial_state = AgentState(
