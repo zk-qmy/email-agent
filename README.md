@@ -11,20 +11,6 @@ The Email Agent is a multi-service system that:
 - Manages email drafts with human-in-the-loop approval
 - Provides real-time WebSocket notifications
 
-## Architecture
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Client    │───▶│   Agent API  │───▶│   Backend   │
-│  (Browser)  │◀───│  (Port 8000) │◀───│ (Port 5001) │
-└─────────────┘     └──────────────┘     └─────────────┘
-                            │              ┌─────────────┐
-                     ┌──────┴──────┐      │  Web UI     │
-                     │  LangGraph  │      │  (Static)   │
-                     │  Workflows  │      └─────────────┘
-                     └─────────────┘
-```
-
 ## Folder Structure
 
 ```
@@ -78,6 +64,7 @@ pytest --cov
 ```
 
 Test files:
+
 - `test/test_auth_api.py` - Authentication API tests
 - `test/test_email_api.py` - Email API tests
 - `test/test_agent_proxy.py` - Agent proxy tests
@@ -189,14 +176,14 @@ python scripts/run.py [OPTIONS]
 
 #### Options
 
-| Option | Description |
-| ------ | ----------- |
-| `--no-backend` | Run without backend API (emails skipped, soft fail) |
-| `--simulate-reply [confirmed\|negotiate\|declined]` | Simulate reply from recipient (only when no_response_count exhausted) |
-| `--no-response-count N` | Simulate N rounds of no reply before ending flow |
-| `--max-followups N` | Max follow-up attempts before giving up (default: 2) |
-| `-m, --message TEXT` | Initial user message (default: "Schedule a meeting with Prof Linh next Monday at 12 am") |
-| `--graph-only` | Only generate graph PNG, don't run workflow |
+| Option                                              | Description                                                                              |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `--no-backend`                                      | Run without backend API (emails skipped, soft fail)                                      |
+| `--simulate-reply [confirmed\|negotiate\|declined]` | Simulate reply from recipient (only when no_response_count exhausted)                    |
+| `--no-response-count N`                             | Simulate N rounds of no reply before ending flow                                         |
+| `--max-followups N`                                 | Max follow-up attempts before giving up (default: 2)                                     |
+| `-m, --message TEXT`                                | Initial user message (default: "Schedule a meeting with Prof Linh next Monday at 12 am") |
+| `--graph-only`                                      | Only generate graph PNG, don't run workflow                                              |
 
 #### Examples
 
@@ -228,7 +215,6 @@ python scripts/run.py -m "Schedule meeting with John tomorrow at 3pm"
 # Generate graph only
 python scripts/run.py --graph-only
 ```
-
 
 ## Web UI
 
