@@ -4,7 +4,7 @@ from src.workflows.ticket.graph import build_ticket_graph
 _GRAPHS = {}
 
 
-async def startup():
+def startup():
     """Call this explicitly on app startup, not at import time."""
     _GRAPHS["schedule"] = build_meeting_graph()
     _GRAPHS["ticket"] = build_ticket_graph()

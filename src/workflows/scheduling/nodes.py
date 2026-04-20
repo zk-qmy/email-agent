@@ -35,29 +35,6 @@ def extract_meeting_info(state: ScheduleState,
         .with_structured_output(MeetingExtraction)
         .invoke(message_prompt)
     )
-    '''
-    result = (
-        get_llm()
-        .with_structured_output(MeetingExtraction)
-        .invoke(
-            [
-                {
-                    "role": "system",
-                    "content": (
-                        f"Extract meeting information from the conversation.\n"
-                        f"Today's date is: {today}\n"
-                        f"- Return date as YYYY-MM-DD format.\n"
-                        f"- If the date is relative (like 'next Monday', 'this Friday', 'tomorrow'), "
-                        f"interpret it relative to today's date ({today}) and return the resolved YYYY-MM-DD date.\n"
-                        f"- Time should be in HH:MM format.\n"
-                        f"- Participants should be names or emails."
-                    ),
-                },
-                {"role": "user", "content": last_message},
-            ]
-        )
-    )
-    '''
 
     existing_meeting = state.meeting if hasattr(
         state, "meeting") else MeetingData()
