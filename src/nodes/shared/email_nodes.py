@@ -1,8 +1,8 @@
-from typing import Literal, Optional, cast
+from typing import Literal, cast
 from langgraph.types import interrupt
 from langchain_core.runnables.config import RunnableConfig
 from pydantic import BaseModel
-from src.core.states import AgentState, EmailData
+from src.workflows.scheduling.state import EmailData, ScheduleState
 from src.integrations.llm.client import get_llm
 from src.integrations.mail.sync_client import (
     send_email_sync,
@@ -11,7 +11,7 @@ from src.integrations.mail.sync_client import (
 )
 from datetime import datetime
 from config.prompts.base import PromptConfig
-from config.prompts.email import meeting_prompts
+from config.prompts.scheduling import meeting_prompts
 
 
 def format_time(time_str: str) -> str:
@@ -33,7 +33,7 @@ def format_time(time_str: str) -> str:
         return time_str
 
 
-def draft_email(state: AgentState, prompts: PromptConfig = meeting_prompts) -> dict:
+def draft_email(state: ScheduleState, prompts: PromptConfig = meeting_prompts) -> dict:
     meeting = state.meeting
 
     # --- resolve runtime values ---
@@ -95,7 +95,7 @@ def draft_email(state: AgentState, prompts: PromptConfig = meeting_prompts) -> d
     }
 
 
-def process_approval(state: AgentState) -> dict:
+def process_approval(state: ScheduleState) -> dict:
     email_draft = state.email.draft or "No draft available"
 
     user_input = interrupt(
@@ -138,7 +138,7 @@ def process_approval(state: AgentState) -> dict:
     return {"email": EmailData(approval_status=status)}
 
 
-def send_email(state: AgentState, config: RunnableConfig) -> dict:
+def send_email(state: ScheduleState, config: RunnableConfig) -> dict:
     try:
         user_id = config.get("configurable", {}).get("user_id")
         if not user_id:
@@ -181,7 +181,7 @@ def send_email(state: AgentState, config: RunnableConfig) -> dict:
         return {"email": EmailData(status="failed"), "response": f"Failed: {str(e)}"}
 
 
-def wait_for_reply(state: AgentState, config: RunnableConfig) -> dict:
+def wait_for_reply(state: ScheduleState, config: RunnableConfig) -> dict:
     try:
         user_id = config.get("configurable", {}).get("user_id")
         if not user_id:
@@ -211,7 +211,7 @@ def wait_for_reply(state: AgentState, config: RunnableConfig) -> dict:
         return {"email": EmailData(last_reply=None)}
 
 
-def send_followup(state: AgentState, config: RunnableConfig) -> dict:
+def send_followup(state: ScheduleState, config: RunnableConfig) -> dict:
     try:
         user_id = config.get("configurable", {}).get("user_id")
         if not user_id:
@@ -253,7 +253,7 @@ class ReplyIntentOutput(BaseModel):
     reply_intent: Literal["confirmed", "negotiate", "declined"]
 
 
-def extract_reply_intent(state: AgentState) -> dict:
+def extract_reply_intent(state: ScheduleState) -> dict:
     reply = state.email.last_reply
     if not reply:
         return {}
@@ -282,6 +282,6 @@ def extract_reply_intent(state: AgentState) -> dict:
     return {"email": EmailData(reply_intent=reply_intent)}
 
 
-def send_notification(state: AgentState) -> dict:
+def send_notification(state: ScheduleState) -> dict:
     print("[send_notification] notification sent (meeting confirmed/declined)")
     return {"response": "Notification sent successfully."}

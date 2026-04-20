@@ -11,7 +11,6 @@ write_noti
 from dataclasses import dataclass, field
 from config.prompts.base import NodePrompt, PromptConfig
 from config.prompts.system_prompt import SystemPrompt
-from datetime import datetime
 
 
 @dataclass
@@ -22,18 +21,6 @@ class MeetingSchedulerPrompts(PromptConfig):
     You can add custom fields as needed.
     The NodePrompt parts (system/context/task/critic) can use $variable substitution.
     """
-
-    classify: NodePrompt = field(
-        default_factory=lambda: NodePrompt(
-            system=SystemPrompt.system_prompt,
-            task=(
-                """
-        """
-            ),
-            critic=("""        """),
-        )
-    )
-
     extract_meeting_info: NodePrompt = field(
         default_factory=lambda: NodePrompt(
             system=SystemPrompt.system_prompt,
@@ -76,6 +63,7 @@ class MeetingSchedulerPrompts(PromptConfig):
                 "Draft a professional meeting request email using the details in CONTEXT.\n"
                 "Format:\n"
                 "  Subject: <subject line>\n\n"
+                "  <body — 2 to 3 sentences max>\n\n"
                 "  <body — 2 to 3 sentences max>\n\n"
                 "  Best regards\n\n"
                 "Rules:\n"

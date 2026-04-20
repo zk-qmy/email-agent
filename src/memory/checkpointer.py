@@ -5,8 +5,8 @@ _checkpointer_instance = None
 
 def _configure_serde(cp: MemorySaver):
     modules = {
-        ("src.core.states", "EmailData"),
-        ("src.core.states", "MeetingData"),
+        ("src.workflows.ticket.state", "EmailData"), # TODO: move to shared states if used by multiple workflows
+        ("src.workflows.ticket.state", "MeetingData"),
     }
 
     if hasattr(cp, "serde"):
@@ -23,10 +23,10 @@ def get_checkpointer() -> MemorySaver:
         _checkpointer_instance = MemorySaver()
         try:
             _checkpointer_instance.serde.allowed_msgpack_modules.add(  # type: ignore[attr-defined]
-                ("src.core.states", "EmailData")
+                ("src.workflows.ticket.state", "EmailData") # TODO: move to shared states if used by multiple workflows
             )
             _checkpointer_instance.serde.allowed_msgpack_modules.add(  # type: ignore[attr-defined]
-                ("src.core.states", "MeetingData")
+                ("src.workflows.ticket.state", "MeetingData")
             )
         except AttributeError:
             pass  # older LangGraph versions don't expose this

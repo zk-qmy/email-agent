@@ -6,7 +6,7 @@ from collections import defaultdict
 
 from src.workflows.router import build_router
 from src.integrations.mail.client import mail_client
-from src.core.states import AgentState
+from src.workflows.scheduling.state import AgentState
 from agent.services.draft_models import Draft, DraftContent
 
 

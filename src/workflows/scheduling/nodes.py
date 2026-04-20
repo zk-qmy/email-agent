@@ -2,9 +2,9 @@ from datetime import datetime
 from typing import Optional, List, cast
 from langgraph.types import interrupt
 from pydantic import BaseModel
-from src.core.states import AgentState, MeetingData
+from src.workflows.scheduling.state import MeetingData, ScheduleState
 from src.integrations.llm.client import get_llm
-from config.prompts.email import meeting_prompts
+from config.prompts.scheduling import meeting_prompts
 from config.prompts.base import PromptConfig
 
 
@@ -14,7 +14,7 @@ class MeetingExtraction(BaseModel):
     participants: Optional[List[str]] = None
 
 
-def extract_meeting_info(state: AgentState,
+def extract_meeting_info(state: ScheduleState,
                          prompt_config: PromptConfig = meeting_prompts
                          ) -> dict:
     messages = state.messages if hasattr(state, "messages") else []
@@ -35,29 +35,6 @@ def extract_meeting_info(state: AgentState,
         .with_structured_output(MeetingExtraction)
         .invoke(message_prompt)
     )
-    '''
-    result = (
-        get_llm()
-        .with_structured_output(MeetingExtraction)
-        .invoke(
-            [
-                {
-                    "role": "system",
-                    "content": (
-                        f"Extract meeting information from the conversation.\n"
-                        f"Today's date is: {today}\n"
-                        f"- Return date as YYYY-MM-DD format.\n"
-                        f"- If the date is relative (like 'next Monday', 'this Friday', 'tomorrow'), "
-                        f"interpret it relative to today's date ({today}) and return the resolved YYYY-MM-DD date.\n"
-                        f"- Time should be in HH:MM format.\n"
-                        f"- Participants should be names or emails."
-                    ),
-                },
-                {"role": "user", "content": last_message},
-            ]
-        )
-    )
-    '''
 
     existing_meeting = state.meeting if hasattr(
         state, "meeting") else MeetingData()
@@ -76,7 +53,7 @@ def extract_meeting_info(state: AgentState,
     return {"meeting": updated}
 
 
-def check_missing_fields(state: AgentState) -> dict:
+def check_missing_fields(state: ScheduleState) -> dict:
     meeting = state.meeting if hasattr(state, "meeting") else MeetingData()
 
     missing = []
@@ -98,7 +75,7 @@ def check_missing_fields(state: AgentState) -> dict:
     }
 
 
-def ask_for_missing_info(state: AgentState) -> dict:
+def ask_for_missing_info(state: ScheduleState) -> dict:
     meeting = state.meeting if hasattr(state, "meeting") else MeetingData()
     missing = meeting.missing_fields if hasattr(
         meeting, "missing_fields") else []
@@ -134,7 +111,7 @@ def ask_for_missing_info(state: AgentState) -> dict:
     return {"messages": state.messages + [{"role": "user", "content": user_content}]}
 
 
-def book_calendar(state: AgentState) -> dict:
+def book_calendar(state: ScheduleState) -> dict:
     meeting = state.meeting if hasattr(state, "meeting") else MeetingData()
     date = getattr(meeting, "date", None)
     time = getattr(meeting, "time", None)

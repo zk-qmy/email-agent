@@ -1,59 +1,34 @@
+
+
+from datetime import datetime
+import os
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
-from src.core.states import AgentState
+from src.workflows.scheduling.edges import (
+    _route_approval, _route_followup, _route_intent,
+    _route_missing_fields, _route_intent, _route_followup,
+    _route_missing_fields
+)
+from src.workflows.scheduling.nodes import (
+    ask_for_missing_info, book_calendar, book_calendar,
+    check_missing_fields, extract_meeting_info, extract_meeting_info
+)
+from src.workflows.scheduling.state import ScheduleState
 from src.nodes.shared.email_nodes import (
     draft_email,
+    extract_reply_intent,
     extract_reply_intent,
     process_approval,
     send_email,
     send_followup,
     send_notification,
-    wait_for_reply,
+    wait_for_reply
 )
-from src.nodes.specialized.meeting_nodes import (
-    ask_for_missing_info,
-    book_calendar,
-    check_missing_fields,
-    extract_meeting_info,
-)
-from config.settings import settings
-
-
-def _route_missing_fields(state: AgentState) -> str:
-    return "ask_for_missing_info" if state.meeting.missing_fields else "draft"
-
-
-def _route_approval(state: AgentState) -> str:
-    if state.email.approval_status == "approved":
-        return "send_email"
-    if state.email.approval_status == "edit":
-        return "draft"
-    return END
-
-
-def _route_followup(state: AgentState) -> str:
-    if state.email.last_reply:
-        print("Reply received! Extracting intent...")
-        return "extract_intent"
-    if state.email.followup_count < settings.MAX_FOLLOWUP_COUNT:
-        print(f"State followup_count: {state.email.followup_count}")
-        print(f"Max follow-ups: {settings.MAX_FOLLOWUP_COUNT}")
-        print("Send follow-up email...")
-        return "followup"
-    print("No reply after follow-ups. Sending notification...")
-    return "send_notification"
-
-
-def _route_intent(state: AgentState) -> str:
-    if state.email.reply_intent == "confirmed":
-        return "book_calendar"
-    if state.email.reply_intent == "negotiate":
-        return "draft"
-    return "send_notification"
 
 
 def build_meeting_graph():
     """Compiled meeting subgraph. No checkpointer — parent router owns it."""
-    builder = StateGraph(AgentState)
+    builder = StateGraph(ScheduleState)
 
     builder.add_node("extract_meeting_info", extract_meeting_info)
     builder.add_node("check_missing_fields", check_missing_fields)
@@ -111,4 +86,17 @@ def build_meeting_graph():
     builder.add_edge("book_calendar", "send_notification")
     builder.add_edge("send_notification", END)
 
-    return builder.compile()
+    return builder.compile(checkpointer=MemorySaver())
+
+
+# if __name__ == "__main__":
+#     # Print the graph to a file for visualization
+#     # graph = build_meeting_graph()
+#     # filename = datetime.now().strftime(
+#     #     "scheduling_graph_%Y%m%d_%H%M%S.png")
+
+#     # os.makedirs("assets/test_graph", exist_ok=True)
+#     # png_data = graph.get_graph(xray=True).draw_mermaid_png()
+#     # with open(f"assets/test_graph/{filename}", "wb") as f:
+#     #     f.write(png_data)
+#     # print(f"Saved to assets/test_graph/{filename}")
