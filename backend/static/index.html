@@ -1,501 +1,337 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Email Agent API Tester</title>
-        <link rel="stylesheet" href="/static/styles.css" />
-    </head>
-    <body>
-        <div id="app" class="container">
-            <h1>Email Agent API Tester</h1>
-
-            <div class="user-bar">
-                <select id="user-select">
-                    <option value="">Loading users...</option>
-                </select>
-                <button id="refresh-users" class="btn btn-secondary">
-                    Refresh
-                </button>
-                <div class="agent-status">
-                    <span
-                        id="agent-status-indicator"
-                        class="status-indicator"
-                    ></span>
-                    <span id="agent-status-text">Checking agent...</span>
-                </div>
-            </div>
-
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="auth">Auth</button>
-                <button class="tab-btn" data-tab="email">Email</button>
-                <button class="tab-btn" data-tab="agent">Agent</button>
-            </div>
-
-            <div class="test-layout">
-                <div class="test-panel">
-                    <div id="auth-tab" class="tab-pane active">
-                        <div class="api-section">
-                            <h2 class="section-title" data-section="auth-main">
-                                <span>Auth</span>
-                                <span class="toggle">▼</span>
-                            </h2>
-                            <div class="section-content" id="auth-main-section">
-                                <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="POST"
-                                        data-endpoint="/api/auth/login"
-                                        data-body='{"email": "{{email}}", "password": "{{password}}"}'
-                                    >
-                                        Login
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="POST"
-                                        data-endpoint="/api/auth/signup"
-                                        data-body='{"username": "{{username}}", "email": "{{email}}", "password": "{{password}}"}'
-                                    >
-                                        Signup
-                                    </button>
-                                </div>
-                                <div class="input-row">
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="email"
-                                        placeholder="email"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="password"
-                                        placeholder="password"
-                                        value="password123"
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="username"
-                                        placeholder="username"
-                                        value=""
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                        <div class="api-section">
-                            <h2 class="section-title" data-section="auth-users">
-                                <span>Users</span>
-                                <span class="toggle">▼</span>
-                            </h2>
-                            <div
-                                class="section-content"
-                                id="auth-users-section"
-                            >
-                                <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/auth/users/{{user_id}}"
-                                    >
-                                        Get User
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="PUT"
-                                        data-endpoint="/api/auth/users/{{user_id}}"
-                                        data-body='{"username": "{{username}}", "email": "{{email}}", "password": "{{password}}"}'
-                                    >
-                                        Update User
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="DELETE"
-                                        data-endpoint="/api/auth/users/{{user_id}}"
-                                    >
-                                        Delete User
-                                    </button>
-                                </div>
-                                <div class="input-row">
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="username"
-                                        placeholder="username"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="email"
-                                        placeholder="email"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="password"
-                                        placeholder="new password"
-                                        value=""
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="email-tab" class="tab-pane">
-                        <div class="api-section">
-                            <h2 class="section-title" data-section="emails-get">
-                                <span>Get</span>
-                                <span class="toggle">▼</span>
-                            </h2>
-                            <div
-                                class="section-content"
-                                id="emails-get-section"
-                            >
-                                <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/emails/inbox?user_id={{user_id}}"
-                                    >
-                                        Get Inbox
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/emails/sent?user_id={{user_id}}"
-                                    >
-                                        Get Sent
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/emails/{{email_id}}"
-                                    >
-                                        Get Email
-                                    </button>
-                                </div>
-                                <div class="input-row">
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="email_id"
-                                        placeholder="email_id"
-                                        value=""
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="api-section">
-                            <h2
-                                class="section-title"
-                                data-section="emails-send"
-                            >
-                                <span>Send</span>
-                                <span class="toggle">▼</span>
-                            </h2>
-                            <div
-                                class="section-content"
-                                id="emails-send-section"
-                            >
-                                <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="POST"
-                                        data-endpoint="/api/emails/send"
-                                        data-body='{"sender_id": {{user_id}}, "recipient_email": "{{recipient_email}}", "subject": "{{subject}}", "body": "{{body}}"}'
-                                    >
-                                        Send Email
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="POST"
-                                        data-endpoint="/api/emails/reply"
-                                        data-body='{"sender_id": {{user_id}}, "parent_email_id": {{email_id}}, "body": "{{body}}"}'
-                                    >
-                                        Reply
-                                    </button>
-                                </div>
-                                <div class="input-row">
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="recipient_email"
-                                        placeholder="recipient_email"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="subject"
-                                        placeholder="subject"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="body"
-                                        placeholder="body"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="email_id"
-                                        placeholder="parent_email_id"
-                                        value=""
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="api-section">
-                            <h2
-                                class="section-title"
-                                data-section="emails-update"
-                            >
-                                <span>Update</span>
-                                <span class="toggle">▼</span>
-                            </h2>
-                            <div
-                                class="section-content"
-                                id="emails-update-section"
-                            >
-                                <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="PUT"
-                                        data-endpoint="/api/emails/mark_read"
-                                        data-body='{"email_id": {{email_id}}}'
-                                    >
-                                        Mark Read
-                                    </button>
-                                </div>
-                                <div class="input-row">
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="email_id"
-                                        placeholder="email_id"
-                                        value=""
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="agent-tab" class="tab-pane">
-                        <div class="api-section">
-                            <h2 class="section-title" data-section="agent-list">
-                                <span>List</span>
-                                <span class="toggle">▼</span>
-                            </h2>
-                            <div
-                                class="section-content"
-                                id="agent-list-section"
-                            >
-                                <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/agent/drafts?user_id={{user_id}}"
-                                    >
-                                        Get Drafts
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/agent/threads?user_id={{user_id}}"
-                                    >
-                                        Get Threads
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="api-section">
-                            <h2
-                                class="section-title"
-                                data-section="agent-draft"
-                            >
-                                <span>Draft</span>
-                                <span class="toggle">▼</span>
-                            </h2>
-                            <div
-                                class="section-content"
-                                id="agent-draft-section"
-                            >
-                                <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="POST"
-                                        data-endpoint="/api/agent/draft"
-                                        data-body='{"user_id": {{user_id}}, "recipient": "{{recipient_email}}", "subject": "{{subject}}", "context": "{{context}}"}'
-                                    >
-                                        Create Draft
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/agent/draft/{{draft_id}}"
-                                    >
-                                        Get Draft
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="POST"
-                                        data-endpoint="/api/agent/draft/{{draft_id}}/send"
-                                        data-body="{}"
-                                    >
-                                        Send Draft
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="DELETE"
-                                        data-endpoint="/api/agent/draft/{{draft_id}}"
-                                    >
-                                        Cancel Draft
-                                    </button>
-                                </div>
-                                <div class="input-row">
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="draft_id"
-                                        placeholder="draft_id"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="recipient_email"
-                                        placeholder="recipient"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="subject"
-                                        placeholder="subject"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="context"
-                                        placeholder="context"
-                                        value=""
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="api-section">
-                            <h2
-                                class="section-title"
-                                data-section="agent-thread"
-                            >
-                                <span>Thread</span>
-                                <span class="toggle">▼</span>
-                            </h2>
-                            <div
-                                class="section-content"
-                                id="agent-thread-section"
-                            >
-                                <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/agent/thread/{{thread_id}}"
-                                    >
-                                        Get Thread
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/agent/status/{{thread_id}}"
-                                    >
-                                        Get Status
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/agent/history/{{thread_id}}"
-                                    >
-                                        Get History
-                                    </button>
-                                </div>
-                                <div class="input-row">
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="thread_id"
-                                        placeholder="thread_id"
-                                        value=""
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="api-section">
-                            <h2
-                                class="section-title"
-                                data-section="agent-meeting"
-                            >
-                                <span>Meeting</span>
-                                <span class="toggle">▼</span>
-                            </h2>
-                            <div
-                                class="section-content"
-                                id="agent-meeting-section"
-                            >
-                                <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="POST"
-                                        data-endpoint="/api/agent/thread/{{thread_id}}/confirm"
-                                        data-body="{}"
-                                    >
-                                        Confirm Meeting
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="POST"
-                                        data-endpoint="/api/agent/thread/{{thread_id}}/decline"
-                                        data-body="{}"
-                                    >
-                                        Decline Meeting
-                                    </button>
-                                </div>
-                                <div class="input-row">
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="thread_id"
-                                        placeholder="thread_id"
-                                        value=""
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="response-panel">
-                    <div class="response-header">
-                        <h3>Response</h3>
-                        <button id="clear-response" class="btn btn-secondary">
-                            Clear
-                        </button>
-                    </div>
-                    <pre id="response-output"></pre>
-                </div>
-            </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Email Agent</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-icon">EA</div>
+          <div class="brand-text">
+            <span class="brand-name">Email Agent</span>
+            <span class="brand-tag">AI-Powered</span>
+          </div>
         </div>
 
-        <script src="/static/app.js"></script>
-    </body>
+        <div class="sidebar-section">
+          <label class="sidebar-label">Logged in as</label>
+          <select id="user-select" class="user-select">
+            <option value="">Loading users...</option>
+          </select>
+        </div>
+
+        <div class="sidebar-section">
+          <label class="sidebar-label">View mode</label>
+          <div class="role-toggle">
+            <button class="role-btn active" data-role="user">User</button>
+            <button class="role-btn" data-role="admin">Admin</button>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <div id="user-nav">
+            <button class="nav-item active" data-view="compose">
+              <span class="nav-icon">✏️</span>
+              <span class="nav-label">Compose</span>
+            </button>
+            <button class="nav-item" data-view="inbox">
+              <span class="nav-icon">📥</span>
+              <span class="nav-label">Inbox</span>
+              <span class="nav-badge hidden" id="inbox-badge">0</span>
+            </button>
+            <button class="nav-item" data-view="sent">
+              <span class="nav-icon">📤</span>
+              <span class="nav-label">Sent</span>
+            </button>
+            <button class="nav-item" data-view="drafts">
+              <span class="nav-icon">📝</span>
+              <span class="nav-label">AI Drafts</span>
+            </button>
+          </div>
+          <div id="admin-nav" class="hidden">
+            <button class="nav-item active" data-view="review">
+              <span class="nav-icon">📋</span>
+              <span class="nav-label">Course Emails</span>
+              <span class="nav-badge hidden" id="course-badge">0</span>
+            </button>
+            <button class="nav-item" data-view="all-emails">
+              <span class="nav-icon">📧</span>
+              <span class="nav-label">All Emails</span>
+            </button>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="agent-status-row">
+            <div class="status-dot" id="agent-dot"></div>
+            <span id="agent-text">Checking agent...</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+
+        <!-- Compose View -->
+        <div class="view" id="view-compose">
+          <div class="view-header">
+            <div>
+              <h1 class="view-title">AI Email Composer</h1>
+              <p class="view-subtitle">Describe what you need — AI drafts it for you instantly</p>
+            </div>
+          </div>
+          <div class="compose-layout">
+            <div class="compose-left">
+              <div class="card compose-card">
+                <div class="form-group">
+                  <label class="form-label">To <span class="required">*</span></label>
+                  <input type="email" id="compose-to" class="form-input" placeholder="recipient@example.com" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Subject <span class="optional">(optional)</span></label>
+                  <input type="text" id="compose-subject" class="form-input" placeholder="AI will suggest one if left blank" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">What do you need? <span class="required">*</span></label>
+                  <textarea
+                    id="compose-context"
+                    class="form-textarea"
+                    rows="6"
+                    placeholder="Examples:&#10;• Schedule a meeting with them next Monday at 2pm to discuss the Python course&#10;• Write a follow-up about the course enrollment deadline&#10;• Send a professional intro for our new data science program"
+                  ></textarea>
+                </div>
+                <div class="compose-footer">
+                  <button id="compose-generate" class="btn btn-primary btn-lg">
+                    <span class="btn-icon">✨</span>
+                    Generate Draft
+                  </button>
+                </div>
+              </div>
+
+              <!-- Quick examples -->
+              <div class="examples-section">
+                <p class="examples-label">Try an example:</p>
+                <div class="examples-list">
+                  <button class="example-chip" data-example="schedule">📅 Schedule meeting</button>
+                  <button class="example-chip" data-example="followup">📩 Follow-up email</button>
+                  <button class="example-chip" data-example="intro">🤝 Introduction</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="compose-right">
+              <!-- Draft panel (hidden until draft is generated) -->
+              <div class="draft-panel hidden" id="draft-panel">
+                <div class="card draft-card">
+                  <div class="draft-card-header">
+                    <div class="draft-title-row">
+                      <h3 class="draft-title">AI Draft</h3>
+                      <span class="draft-badge pending" id="draft-status-badge">Generating…</span>
+                    </div>
+                    <p class="draft-hint">Review and edit before sending</p>
+                  </div>
+
+                  <div class="draft-loading" id="draft-loading">
+                    <div class="spinner"></div>
+                    <p>AI is crafting your email…</p>
+                  </div>
+
+                  <div class="draft-content hidden" id="draft-content">
+                    <div class="draft-meta-block">
+                      <div class="draft-meta-row">
+                        <span class="meta-key">To:</span>
+                        <span class="meta-val" id="draft-to-display"></span>
+                      </div>
+                      <div class="draft-meta-row">
+                        <span class="meta-key">Subject:</span>
+                        <span class="meta-val" id="draft-subject-display"></span>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Email body</label>
+                      <textarea id="draft-body-edit" class="form-textarea draft-body-textarea" rows="10"></textarea>
+                    </div>
+                    <div class="draft-actions">
+                      <button id="draft-send-btn" class="btn btn-success">
+                        <span class="btn-icon">📤</span> Send Email
+                      </button>
+                      <button id="draft-cancel-btn" class="btn btn-ghost">
+                        Discard
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Meeting detected card -->
+                <div class="card meeting-card hidden" id="meeting-card">
+                  <div class="meeting-header">
+                    <span class="meeting-emoji">📅</span>
+                    <div>
+                      <h4 class="meeting-title">Meeting Detected</h4>
+                      <p class="meeting-subtitle">AI extracted these meeting details</p>
+                    </div>
+                  </div>
+                  <div class="meeting-details" id="meeting-details"></div>
+                  <div class="meeting-actions hidden" id="meeting-actions">
+                    <button id="meeting-confirm-btn" class="btn btn-success btn-sm">✓ Confirm Meeting</button>
+                    <button id="meeting-decline-btn" class="btn btn-danger btn-sm">✕ Decline</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty state when no draft yet -->
+              <div class="compose-empty-state" id="compose-empty-state">
+                <div class="empty-state-icon">🤖</div>
+                <h3>AI Assistant Ready</h3>
+                <p>Fill in the recipient and describe your request, then click "Generate Draft" to let the AI compose your email.</p>
+                <ul class="feature-list">
+                  <li>✓ Automatically schedules meetings</li>
+                  <li>✓ Drafts professional emails</li>
+                  <li>✓ Editable before sending</li>
+                  <li>✓ Sends follow-ups automatically</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inbox View -->
+        <div class="view hidden" id="view-inbox">
+          <div class="view-header">
+            <div>
+              <h1 class="view-title">Inbox</h1>
+              <p class="view-subtitle" id="inbox-subtitle">Loading…</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="refresh-inbox">↻ Refresh</button>
+          </div>
+          <div class="email-split">
+            <div class="email-list-panel" id="inbox-list">
+              <div class="email-empty"><span class="empty-icon">⏳</span><p>Loading…</p></div>
+            </div>
+            <div class="email-reader-panel" id="inbox-reader">
+              <div class="reader-empty">
+                <span class="empty-icon">📬</span>
+                <p>Select an email to read</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sent View -->
+        <div class="view hidden" id="view-sent">
+          <div class="view-header">
+            <div>
+              <h1 class="view-title">Sent</h1>
+              <p class="view-subtitle" id="sent-subtitle">Loading…</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="refresh-sent">↻ Refresh</button>
+          </div>
+          <div class="email-split">
+            <div class="email-list-panel" id="sent-list">
+              <div class="email-empty"><span class="empty-icon">⏳</span><p>Loading…</p></div>
+            </div>
+            <div class="email-reader-panel" id="sent-reader">
+              <div class="reader-empty">
+                <span class="empty-icon">📤</span>
+                <p>Select an email to read</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Drafts View -->
+        <div class="view hidden" id="view-drafts">
+          <div class="view-header">
+            <div>
+              <h1 class="view-title">AI Drafts</h1>
+              <p class="view-subtitle">Manage your AI-generated draft emails</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="refresh-drafts">↻ Refresh</button>
+          </div>
+          <div class="drafts-grid" id="drafts-grid">
+            <div class="email-empty"><span class="empty-icon">⏳</span><p>Loading…</p></div>
+          </div>
+        </div>
+
+        <!-- Admin: Course Emails View -->
+        <div class="view hidden" id="view-review">
+          <div class="view-header">
+            <div>
+              <h1 class="view-title">Course Email Review</h1>
+              <p class="view-subtitle">Incoming emails related to courses and training</p>
+            </div>
+            <div class="header-actions">
+              <input type="text" id="course-search" class="form-input search-input" placeholder="Search…" />
+              <button class="btn btn-secondary btn-sm" id="refresh-review">↻ Refresh</button>
+            </div>
+          </div>
+          <div class="stats-row" id="review-stats"></div>
+          <div class="email-split">
+            <div class="email-list-panel" id="review-list">
+              <div class="email-empty"><span class="empty-icon">⏳</span><p>Loading…</p></div>
+            </div>
+            <div class="email-reader-panel" id="review-reader">
+              <div class="reader-empty">
+                <span class="empty-icon">📋</span>
+                <p>Select an email to review</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin: All Emails View -->
+        <div class="view hidden" id="view-all-emails">
+          <div class="view-header">
+            <div>
+              <h1 class="view-title">All Emails</h1>
+              <p class="view-subtitle">All emails across all users</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="refresh-all">↻ Refresh</button>
+          </div>
+          <div class="email-split">
+            <div class="email-list-panel" id="all-list">
+              <div class="email-empty"><span class="empty-icon">⏳</span><p>Loading…</p></div>
+            </div>
+            <div class="email-reader-panel" id="all-reader">
+              <div class="reader-empty">
+                <span class="empty-icon">📧</span>
+                <p>Select an email to read</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+
+    <!-- Reply Modal -->
+    <div class="modal-overlay hidden" id="reply-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Reply</h3>
+          <button class="modal-close" id="reply-modal-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Message</label>
+            <textarea id="reply-body" class="form-textarea" rows="6" placeholder="Type your reply…"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="reply-send-btn" class="btn btn-primary">Send Reply</button>
+          <button id="reply-cancel-btn" class="btn btn-ghost">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/app.js"></script>
+  </body>
 </html>

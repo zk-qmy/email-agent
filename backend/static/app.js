@@ -1,308 +1,751 @@
-const API_BASE = "";
+'use strict';
 
-function formatJson(data) {
-    return JSON.stringify(data, null, 2);
+/* ─── State ─── */
+const state = {
+  currentUser: null,
+  users: [],
+  role: 'user',
+  currentView: 'compose',
+  currentDraft: null,
+  currentThreadId: null,
+  draftPollTimer: null,
+  ws: null,
+  inboxEmails: [],
+  sentEmails: [],
+  replyTargetEmailId: null,
+};
+
+/* ─── API ─── */
+const api = {
+  async req(method, path, body) {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    const res = await fetch(path, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    return data;
+  },
+  getUsers:       ()             => api.req('GET', '/api/auth/users'),
+  getInbox:       (uid)          => api.req('GET', `/api/emails/inbox?user_id=${uid}`),
+  getSent:        (uid)          => api.req('GET', `/api/emails/sent?user_id=${uid}`),
+  getEmail:       (eid)          => api.req('GET', `/api/emails/${eid}`),
+  markRead:       (eid)          => api.req('PUT', '/api/emails/mark_read', { email_id: eid }),
+  sendEmail:      (sid, to, sub, body) => api.req('POST', '/api/emails/send', { sender_id: sid, recipient_email: to, subject: sub, body }),
+  replyEmail:     (sid, pid, body)     => api.req('POST', '/api/emails/reply', { sender_id: sid, parent_email_id: pid, body }),
+  createDraft:    (uid, to, sub, ctx)  => api.req('POST', '/api/agent/draft', { user_id: uid, recipient: to, subject: sub, context: ctx }),
+  getDraft:       (did)          => api.req('GET', `/api/agent/draft/${did}`),
+  getDrafts:      (uid)          => api.req('GET', `/api/agent/drafts?user_id=${uid}`),
+  sendDraft:      (did, body)    => api.req('POST', `/api/agent/draft/${did}/send`, body !== undefined ? { body } : {}),
+  cancelDraft:    (did)          => api.req('DELETE', `/api/agent/draft/${did}`),
+  getThread:      (tid)          => api.req('GET', `/api/agent/thread/${tid}`),
+  confirmMeeting: (tid)          => api.req('POST', `/api/agent/thread/${tid}/confirm`, {}),
+  declineMeeting: (tid)          => api.req('POST', `/api/agent/thread/${tid}/decline`, {}),
+  agentHealth:    ()             => api.req('GET', '/health'),
+};
+
+/* ─── Utilities ─── */
+function formatDate(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  if (isNaN(d)) return str;
+  const now = new Date();
+  if (d.toDateString() === now.toDateString())
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function getInputValue(sectionContent, field) {
-    const input = sectionContent.querySelector(
-        `.input-field[data-var="${field}"]`,
-    );
-    return input ? input.value : "";
+function trunc(s, n = 70) {
+  if (!s) return '';
+  return s.length > n ? s.slice(0, n) + '…' : s;
 }
 
-function interpolateEndpoint(endpoint, userId, sectionContent) {
-    let result = endpoint;
-    result = result.replace(/\{\{user_id\}\}/g, userId);
-    result = result.replace(
-        /\{\{email_id\}\}/g,
-        getInputValue(sectionContent, "email_id"),
-    );
-    result = result.replace(
-        /\{\{draft_id\}\}/g,
-        getInputValue(sectionContent, "draft_id"),
-    );
-    result = result.replace(
-        /\{\{thread_id\}\}/g,
-        getInputValue(sectionContent, "thread_id"),
-    );
-    return result;
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-function interpolateBody(body, userId, sectionContent) {
-    if (!body) return body;
-    let result = body;
-    result = result.replace(/\{\{user_id\}\}/g, userId);
-    result = result.replace(
-        /\{\{email\}\}/g,
-        getInputValue(sectionContent, "email"),
-    );
-    result = result.replace(
-        /\{\{password\}\}/g,
-        getInputValue(sectionContent, "password"),
-    );
-    result = result.replace(
-        /\{\{username\}\}/g,
-        getInputValue(sectionContent, "username"),
-    );
-    result = result.replace(
-        /\{\{email_id\}\}/g,
-        getInputValue(sectionContent, "email_id"),
-    );
-    result = result.replace(
-        /\{\{recipient_email\}\}/g,
-        getInputValue(sectionContent, "recipient_email"),
-    );
-    result = result.replace(
-        /\{\{subject\}\}/g,
-        getInputValue(sectionContent, "subject"),
-    );
-    result = result.replace(
-        /\{\{body\}\}/g,
-        getInputValue(sectionContent, "body"),
-    );
-    result = result.replace(
-        /\{\{draft_id\}\}/g,
-        getInputValue(sectionContent, "draft_id"),
-    );
-    result = result.replace(
-        /\{\{thread_id\}\}/g,
-        getInputValue(sectionContent, "thread_id"),
-    );
-    result = result.replace(
-        /\{\{context\}\}/g,
-        getInputValue(sectionContent, "context"),
-    );
-    result = result.replace(
-        /\{\{date\}\}/g,
-        getInputValue(sectionContent, "date"),
-    );
-    result = result.replace(
-        /\{\{time\}\}/g,
-        getInputValue(sectionContent, "time"),
-    );
-    result = result.replace(
-        /\{\{message\}\}/g,
-        getInputValue(sectionContent, "message"),
-    );
-    return result;
+/* ─── Toast ─── */
+function toast(msg, type) {
+  type = type || 'info';
+  const icons = { success: '✓', error: '✕', info: 'i' };
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.innerHTML = '<span class="toast-icon">' + (icons[type] || icons.info) + '</span><span>' + escHtml(msg) + '</span>';
+  document.getElementById('toast-container').appendChild(el);
+  requestAnimationFrame(function() { el.classList.add('show'); });
+  setTimeout(function() {
+    el.classList.remove('show');
+    setTimeout(function() { el.remove(); }, 300);
+  }, 3500);
 }
 
-async function callApi(endpoint, options = {}) {
-    const startTime = Date.now();
-    try {
-        const response = await fetch(`${API_BASE}${endpoint}`, {
-            headers: {
-                "Content-Type": "application/json",
-                ...options.headers,
-            },
-            ...options,
-        });
-
-        const elapsed = Date.now() - startTime;
-        const contentType = response.headers.get("content-type") || "";
-
-        let data;
-        let isJson = contentType.includes("application/json");
-
-        if (isJson) {
-            data = await response.json();
-        } else {
-            data = await response.text();
-        }
-
-        const result = {
-            status: response.status,
-            statusText: response.statusText,
-            time: `${elapsed}ms`,
-            data: data,
-        };
-
-        return result;
-    } catch (error) {
-        return {
-            status: 0,
-            statusText: "Error",
-            time: `${Date.now() - startTime}ms`,
-            error: error.message,
-        };
-    }
+/* ─── WebSocket ─── */
+function connectWS(userId) {
+  if (state.ws) { state.ws.close(); state.ws = null; }
+  var proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  var url = proto + '://' + location.host + '/api/agent/ws/' + userId;
+  try {
+    state.ws = new WebSocket(url);
+    state.ws.onopen  = function() { setAgentStatus(true); };
+    state.ws.onclose = function() {
+      setAgentStatus(false);
+      setTimeout(function() { if (state.currentUser) connectWS(state.currentUser.id); }, 5000);
+    };
+    state.ws.onerror = function() { setAgentStatus(false); };
+    state.ws.onmessage = function(ev) {
+      try { handleWsEvent(JSON.parse(ev.data)); } catch(e) {}
+    };
+  } catch(e) {
+    setAgentStatus(false);
+  }
 }
 
-function displayResponse(result) {
-    const output = document.getElementById("response-output");
-    const statusColor =
-        result.status >= 200 && result.status < 300 ? "#10b981" : "#ef4444";
-
-    output.innerHTML = `<span style="color: ${statusColor}">${result.status} ${result.statusText}</span> (${result.time})\n\n${formatJson(result.data || result.error)}`;
+function handleWsEvent(data) {
+  var event = data && data.event;
+  switch (event) {
+    case 'new_email':
+      toast('New email received!', 'info');
+      updateInboxBadge(1);
+      if (state.currentView === 'inbox') loadInbox();
+      break;
+    case 'reply_received':
+      toast('Reply received!', 'info');
+      if (state.currentView === 'inbox') loadInbox();
+      break;
+    case 'workflow_complete':
+      toast('Email workflow completed!', 'success');
+      break;
+    case 'followup_sent':
+      toast('Follow-up email sent automatically.', 'info');
+      break;
+    case 'status_update':
+      toast((data.payload && data.payload.message) || 'Status updated.', 'info');
+      break;
+  }
 }
 
-function displayError(error) {
-    const output = document.getElementById("response-output");
-    output.innerHTML = `<span style="color: #ef4444">Error</span>\n\n${error}`;
+function setAgentStatus(online) {
+  document.getElementById('agent-dot').className = 'status-dot ' + (online ? 'online' : 'offline');
+  document.getElementById('agent-text').textContent = online ? 'Agent online' : 'Agent offline';
 }
 
-async function checkAgentStatus() {
-    const indicator = document.getElementById("agent-status-indicator");
-    const text = document.getElementById("agent-status-text");
-
-    try {
-        const result = await callApi("/api/agent/health");
-        if (result.status === 200 && result.data.status === "online") {
-            indicator.className = "status-indicator online";
-            text.textContent = "Agent: Online";
-        } else {
-            indicator.className = "status-indicator offline";
-            text.textContent = "Agent: Offline";
-        }
-    } catch (e) {
-        indicator.className = "status-indicator offline";
-        text.textContent = "Agent: Offline";
-    }
+/* ─── Init ─── */
+async function init() {
+  setupEventListeners();
+  showView('compose');
+  await loadUsers();
+  checkAgentHealth();
 }
 
 async function loadUsers() {
-    const select = document.getElementById("user-select");
-    select.innerHTML = '<option value="">Loading...</option>';
-
-    try {
-        const result = await callApi("/api/auth/users");
-
-        if (result.status >= 200 && result.status < 300 && result.data.users) {
-            const users = result.data.users;
-            if (users.length === 0) {
-                select.innerHTML = '<option value="">No users found</option>';
-            } else {
-                select.innerHTML = users
-                    .map(
-                        (u) =>
-                            `<option value="${u.id}">${u.username} (${u.email})</option>`,
-                    )
-                    .join("");
-                
-                // Auto-select first user and fill fields
-                select.selectedIndex = 0;
-                if (select.value) {
-                    select.dispatchEvent(new Event("change"));
-                }
-            }
-        } else {
-            select.innerHTML = '<option value="">Error loading users</option>';
-        }
-    } catch (error) {
-        select.innerHTML = '<option value="">Error loading users</option>';
-    }
+  try {
+    var users = await api.getUsers();
+    state.users = users;
+    var sel = document.getElementById('user-select');
+    sel.innerHTML = users.map(function(u) {
+      return '<option value="' + u.id + '">' + escHtml(u.username) + ' (' + escHtml(u.email) + ')</option>';
+    }).join('');
+    if (users.length > 0) selectUser(users[0].id);
+  } catch(e) {
+    toast('Could not load users — is the backend running?', 'error');
+  }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    loadUsers();
-    checkAgentStatus();
+function selectUser(userId) {
+  var user = state.users.find(function(u) { return u.id == userId; });
+  if (!user) return;
+  state.currentUser = user;
+  connectWS(user.id);
+  refreshCurrentView();
+}
 
-    setInterval(checkAgentStatus, 30000);
+async function checkAgentHealth() {
+  try {
+    await api.agentHealth();
+    setAgentStatus(true);
+  } catch(e) {
+    setAgentStatus(false);
+  }
+}
 
-    document.getElementById("refresh-users").addEventListener("click", () => {
-        loadUsers();
+/* ─── View Management ─── */
+function showView(viewName) {
+  state.currentView = viewName;
+  document.querySelectorAll('.view').forEach(function(v) { v.classList.add('hidden'); });
+  var view = document.getElementById('view-' + viewName);
+  if (view) view.classList.remove('hidden');
+
+  document.querySelectorAll('[data-view]').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.view === viewName);
+  });
+
+  refreshCurrentView();
+}
+
+function refreshCurrentView() {
+  if (!state.currentUser) return;
+  switch (state.currentView) {
+    case 'inbox':      loadInbox(); break;
+    case 'sent':       loadSent(); break;
+    case 'drafts':     loadDrafts(); break;
+    case 'review':     loadCourseEmails(); break;
+    case 'all-emails': loadAllEmails(); break;
+  }
+}
+
+/* ─── Inbox ─── */
+async function loadInbox() {
+  document.getElementById('inbox-list').innerHTML = loadingHTML();
+  try {
+    var emails = await api.getInbox(state.currentUser.id);
+    state.inboxEmails = emails;
+    var unread = emails.filter(function(e) { return !e.is_read; }).length;
+    document.getElementById('inbox-subtitle').textContent =
+      emails.length + ' message' + (emails.length !== 1 ? 's' : '') + (unread ? ', ' + unread + ' unread' : '');
+    renderEmailList(emails, 'inbox-list', 'inbox-reader', false);
+    var badge = document.getElementById('inbox-badge');
+    if (unread > 0) { badge.textContent = unread; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+  } catch(e) {
+    setListError('inbox-list', 'Failed to load inbox.');
+  }
+}
+
+function updateInboxBadge(delta) {
+  delta = delta || 0;
+  var badge = document.getElementById('inbox-badge');
+  var current = parseInt(badge.textContent, 10) || 0;
+  var next = Math.max(0, current + delta);
+  if (next > 0) { badge.textContent = next; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+}
+
+/* ─── Sent ─── */
+async function loadSent() {
+  document.getElementById('sent-list').innerHTML = loadingHTML();
+  try {
+    var emails = await api.getSent(state.currentUser.id);
+    state.sentEmails = emails;
+    document.getElementById('sent-subtitle').textContent =
+      emails.length + ' sent message' + (emails.length !== 1 ? 's' : '');
+    renderEmailList(emails, 'sent-list', 'sent-reader', true);
+  } catch(e) {
+    setListError('sent-list', 'Failed to load sent mail.');
+  }
+}
+
+/* ─── Drafts ─── */
+async function loadDrafts() {
+  document.getElementById('drafts-grid').innerHTML = loadingHTML();
+  try {
+    var drafts = await api.getDrafts(state.currentUser.id);
+    renderDraftGrid(drafts);
+  } catch(e) {
+    document.getElementById('drafts-grid').innerHTML =
+      '<div class="email-empty"><span class="empty-icon">⚠️</span><p>Failed to load drafts.</p></div>';
+  }
+}
+
+/* ─── Admin: Course Emails ─── */
+var COURSE_KEYWORDS = [
+  'course', 'class', 'enrollment', 'enroll', 'training', 'lesson',
+  'tutorial', 'program', 'curriculum', 'workshop', 'lecture',
+  'python', 'data science', 'machine learning', 'ai', 'study',
+  'certificate', 'bootcamp', 'module', 'syllabus',
+];
+
+async function loadCourseEmails() {
+  document.getElementById('review-list').innerHTML = loadingHTML();
+  try {
+    var allEmails = await fetchAllUserEmails();
+    var filtered = allEmails.filter(function(e) {
+      var text = ((e.subject || '') + ' ' + (e.body || '')).toLowerCase();
+      return COURSE_KEYWORDS.some(function(kw) { return text.includes(kw); });
     });
+    renderReviewStats(filtered, allEmails);
+    renderEmailList(filtered, 'review-list', 'review-reader', false);
+    var badge = document.getElementById('course-badge');
+    if (filtered.length) { badge.textContent = filtered.length; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+  } catch(e) {
+    setListError('review-list', 'Failed to load emails.');
+  }
+}
 
-    document
-        .getElementById("user-select")
-        .addEventListener("change", async (event) => {
-            const userId = event.target.value;
-            if (!userId) return;
+async function loadAllEmails() {
+  document.getElementById('all-list').innerHTML = loadingHTML();
+  try {
+    var emails = await fetchAllUserEmails();
+    renderEmailList(emails, 'all-list', 'all-reader', false);
+  } catch(e) {
+    setListError('all-list', 'Failed to load emails.');
+  }
+}
 
-            const result = await callApi(`/api/auth/users/${userId}`);
+async function fetchAllUserEmails() {
+  var results = [];
+  await Promise.all(state.users.map(async function(user) {
+    try {
+      var inbox = await api.getInbox(user.id);
+      inbox.forEach(function(e) { results.push(Object.assign({}, e, { _ownerName: user.username })); });
+    } catch(e) {}
+  }));
+  return results;
+}
 
-            if (result.status === 200 && result.data && result.data.user) {
-                const user = result.data.user;
+/* ─── Rendering ─── */
+function renderEmailList(emails, listId, readerId, isSent) {
+  var list = document.getElementById(listId);
+  if (!emails || !emails.length) {
+    list.innerHTML = '<div class="email-empty"><span class="empty-icon">💭</span><p>No emails here</p></div>';
+    return;
+  }
+  var sorted = emails.slice().sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+  list.innerHTML = sorted.map(function(email) {
+    var isUnread = !email.is_read && !isSent;
+    var fromLabel = isSent
+      ? (email.recipient_email || String(email.recipient_id || 'Unknown'))
+      : (email.sender_email || String(email.sender_id || 'Unknown'));
+    return '<div class="email-item' + (isUnread ? ' unread' : '') + '" onclick="openEmail(' + email.id + ',\'' + readerId + '\',' + isSent + ')">'
+      + '<div class="email-item-top">'
+      + '<div style="display:flex;align-items:center;gap:6px;overflow:hidden;flex:1">'
+      + (isUnread ? '<div class="unread-dot"></div>' : '')
+      + '<span class="email-from">' + escHtml(trunc(fromLabel, 28)) + '</span>'
+      + '</div>'
+      + '<span class="email-date">' + formatDate(email.created_at) + '</span>'
+      + '</div>'
+      + '<div class="email-subject">' + escHtml(trunc(email.subject || '(no subject)', 45)) + '</div>'
+      + '<div class="email-preview">' + escHtml(trunc(email.body || '', 75)) + '</div>'
+      + '</div>';
+  }).join('');
+}
 
-                const authTab = document.getElementById("auth-tab");
-                if (!authTab) return;
+async function openEmail(emailId, readerId, isSent) {
+  document.querySelectorAll('.email-item').forEach(function(el) { el.classList.remove('active'); });
+  var clicked = document.querySelector('.email-item[onclick*="openEmail(' + emailId + '"]');
+  if (clicked) clicked.classList.add('active');
 
-                const inputs = authTab.querySelectorAll(".input-field");
+  var reader = document.getElementById(readerId);
+  reader.innerHTML = '<div class="reader-empty"><div class="spinner"></div></div>';
 
-                if (inputs.length >= 6) {
-                    inputs[3].value = user.username;
-                    inputs[4].value = user.email;
-                }
-            }
-        });
+  try {
+    await api.markRead(emailId);
+    updateInboxBadge(-1);
+    var email = await api.getEmail(emailId);
+    state.replyTargetEmailId = email.id;
+    reader.innerHTML = renderEmailFull(email, isSent);
+  } catch(e) {
+    reader.innerHTML = '<div class="reader-empty"><span class="empty-icon">⚠️</span><p>Could not load email.</p></div>';
+  }
+}
 
-    document.querySelectorAll(".tab-btn").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            document
-                .querySelectorAll(".tab-btn")
-                .forEach((b) => b.classList.remove("active"));
-            document
-                .querySelectorAll(".tab-pane")
-                .forEach((p) => p.classList.remove("active"));
-            btn.classList.add("active");
-            document
-                .getElementById(`${btn.dataset.tab}-tab`)
-                .classList.add("active");
-        });
-    });
+function renderEmailFull(email, isSent) {
+  var isAdmin = state.role === 'admin';
+  var actions = isAdmin
+    ? '<button class="btn btn-secondary btn-sm" onclick="api.markRead(' + email.id + ').then(function(){toast(\'Marked reviewed\',\'success\')})">&#x2713; Mark Reviewed</button>'
+    : '<button class="btn btn-primary btn-sm" onclick="openReplyModal()">↩ Reply</button>';
 
-    document.querySelectorAll(".section-title").forEach((title) => {
-        title.addEventListener("click", () => {
-            title.classList.toggle("collapsed");
-            const content = title.nextElementSibling;
-            content.classList.toggle("hidden");
-        });
-    });
+  return '<div class="email-full">'
+    + '<div class="email-full-card">'
+    + '<div class="email-full-header">'
+    + '<div class="email-full-subject">' + escHtml(email.subject || '(no subject)') + '</div>'
+    + '<div class="email-full-meta">'
+    + '<div class="meta-row"><span class="meta-key">From:</span>' + escHtml(email.sender_email || String(email.sender_id || '')) + '</div>'
+    + '<div class="meta-row"><span class="meta-key">To:</span>' + escHtml(email.recipient_email || String(email.recipient_id || '')) + '</div>'
+    + '<div class="meta-row"><span class="meta-key">Date:</span>' + (email.created_at ? new Date(email.created_at).toLocaleString() : '—') + '</div>'
+    + '</div>'
+    + '</div>'
+    + '<div class="email-full-body">' + escHtml(email.body || '') + '</div>'
+    + '<div class="email-full-actions">' + actions + '</div>'
+    + '</div>'
+    + '</div>';
+}
 
-    document.querySelectorAll(".test-btn").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-            const method = btn.dataset.method;
-            let endpoint = btn.dataset.endpoint;
-            let body = btn.dataset.body;
+function renderDraftGrid(drafts) {
+  var grid = document.getElementById('drafts-grid');
+  if (!drafts || !drafts.length) {
+    grid.innerHTML = '<div class="email-empty" style="grid-column:1/-1"><span class="empty-icon">📝</span><p>No AI drafts yet</p></div>';
+    return;
+  }
+  var sorted = drafts.slice().sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+  grid.innerHTML = sorted.map(function(d) {
+    var sendBtn = d.status === 'ready'
+      ? '<button class="btn btn-success btn-sm" onclick="sendExistingDraft(\'' + d.draft_id + '\')">📤 Send</button>' : '';
+    var discardBtn = d.status !== 'sent'
+      ? '<button class="btn btn-ghost btn-sm" onclick="cancelExistingDraft(\'' + d.draft_id + '\')">Discard</button>' : '';
+    return '<div class="draft-grid-card">'
+      + '<div class="draft-grid-header">'
+      + '<span class="draft-grid-status ' + d.status + '">' + escHtml(d.status) + '</span>'
+      + '<span class="draft-grid-date">' + formatDate(d.created_at) + '</span>'
+      + '</div>'
+      + '<div class="draft-grid-to">To: ' + escHtml((d.draft && d.draft.recipient) || '—') + '</div>'
+      + '<div class="draft-grid-subject">' + escHtml((d.draft && d.draft.subject) || '(no subject)') + '</div>'
+      + '<div class="draft-grid-body">' + escHtml(trunc((d.draft && d.draft.body) || '', 120)) + '</div>'
+      + '<div class="draft-grid-actions">' + sendBtn + discardBtn + '</div>'
+      + '</div>';
+  }).join('');
+}
 
-            const userSelect = document.getElementById("user-select");
-            const userId = userSelect.value;
+function renderReviewStats(courseEmails, allEmails) {
+  var unread = courseEmails.filter(function(e) { return !e.is_read; }).length;
+  var stats = [
+    { val: courseEmails.length, label: 'Course Emails' },
+    { val: unread, label: 'Unread' },
+    { val: allEmails.length, label: 'Total Emails' },
+    { val: state.users.length, label: 'Users' },
+  ];
+  document.getElementById('review-stats').innerHTML = stats.map(function(s) {
+    return '<div class="stat-card"><div class="stat-value">' + s.val + '</div><div class="stat-label">' + s.label + '</div></div>';
+  }).join('');
+}
 
-            if (endpoint === "/api/agent/health") {
-                const result = await callApi(endpoint);
-                displayResponse(result);
-                return;
-            }
+/* ─── Compose / AI Draft Flow ─── */
+async function generateDraft() {
+  var to      = document.getElementById('compose-to').value.trim();
+  var subject = document.getElementById('compose-subject').value.trim();
+  var context = document.getElementById('compose-context').value.trim();
 
-            if (!userId && endpoint.includes("{{user_id}}")) {
-                displayError("Please select a user first");
-                return;
-            }
+  if (!to)      { toast('Please enter a recipient email.', 'error'); return; }
+  if (!context) { toast('Please describe what you need.', 'error'); return; }
+  if (!state.currentUser) { toast('Please select a user first.', 'error'); return; }
 
-            const sectionContent = btn.closest(".section-content");
+  var btn = document.getElementById('compose-generate');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span> Generating…';
 
-            endpoint = interpolateEndpoint(endpoint, userId, sectionContent);
-            body = interpolateBody(body, userId, sectionContent);
+  document.getElementById('compose-empty-state').classList.add('hidden');
+  showDraftLoading();
 
-            const options = { method };
-            if (body && method !== "GET") {
-                options.body = body;
-            }
+  try {
+    var result = await api.createDraft(state.currentUser.id, to, subject, context);
+    state.currentDraft    = result;
+    state.currentThreadId = result.thread_id || null;
+    startDraftPolling(result.draft_id);
+  } catch(e) {
+    toast('Failed to create draft: ' + e.message, 'error');
+    resetGenerateBtn();
+    hideDraftPanel();
+  }
+}
 
-            displayResponse({
-                status: "...",
-                statusText: "Loading",
-                time: "...",
-                data: { loading: true },
-            });
+function showDraftLoading() {
+  document.getElementById('draft-panel').classList.remove('hidden');
+  document.getElementById('draft-status-badge').textContent = 'Generating…';
+  document.getElementById('draft-status-badge').className = 'draft-badge pending';
+  document.getElementById('draft-loading').classList.remove('hidden');
+  document.getElementById('draft-content').classList.add('hidden');
+  document.getElementById('meeting-card').classList.add('hidden');
+}
 
-            const result = await callApi(endpoint, options);
-            displayResponse(result);
+function hideDraftPanel() {
+  document.getElementById('draft-panel').classList.add('hidden');
+  document.getElementById('compose-empty-state').classList.remove('hidden');
+  state.currentDraft    = null;
+  state.currentThreadId = null;
+}
 
-            if (result.status >= 200 && result.status < 300) {
-                if (
-                    endpoint === "/api/auth/signup" ||
-                    (endpoint.includes("/api/auth/users/") &&
-                        (method === "PUT" || method === "DELETE"))
-                ) {
-                    loadUsers();
-                }
-            }
-        });
-    });
+function startDraftPolling(draftId) {
+  if (state.draftPollTimer) clearInterval(state.draftPollTimer);
+  var attempts = 0;
+  state.draftPollTimer = setInterval(async function() {
+    attempts++;
+    if (attempts > 60) {
+      clearInterval(state.draftPollTimer);
+      toast('Draft generation timed out.', 'error');
+      resetGenerateBtn();
+      return;
+    }
+    try {
+      var draft = await api.getDraft(draftId);
+      if (draft.status === 'ready') {
+        clearInterval(state.draftPollTimer);
+        showDraftContent(draft);
+        if (draft.thread_id) fetchMeetingInfo(draft.thread_id);
+      } else if (draft.status === 'sent') {
+        clearInterval(state.draftPollTimer);
+        toast('Email sent successfully!', 'success');
+        resetComposeForm();
+      } else if (draft.status === 'cancelled') {
+        clearInterval(state.draftPollTimer);
+        hideDraftPanel();
+        resetGenerateBtn();
+      }
+    } catch(e) {}
+  }, 2000);
+}
 
-    document.getElementById("clear-response").addEventListener("click", () => {
-        document.getElementById("response-output").textContent = "";
-    });
-});
+function showDraftContent(draft) {
+  state.currentDraft = draft;
+  document.getElementById('draft-status-badge').textContent = 'Ready to send';
+  document.getElementById('draft-status-badge').className = 'draft-badge ready';
+  document.getElementById('draft-loading').classList.add('hidden');
+  document.getElementById('draft-content').classList.remove('hidden');
+  document.getElementById('draft-to-display').textContent = (draft.draft && draft.draft.recipient) || '—';
+  document.getElementById('draft-subject-display').textContent = (draft.draft && draft.draft.subject) || '—';
+  document.getElementById('draft-body-edit').value = (draft.draft && draft.draft.body) || '';
+  resetGenerateBtn();
+  toast('Draft ready — review before sending.', 'success');
+}
+
+async function fetchMeetingInfo(threadId) {
+  try {
+    var thread = await api.getThread(threadId);
+    var meeting = thread && thread.meeting;
+    if (!meeting) return;
+    var hasMeeting = (meeting.participants && meeting.participants.length) || meeting.date || meeting.time;
+    if (!hasMeeting) return;
+
+    document.getElementById('meeting-card').classList.remove('hidden');
+    var rows = [
+      meeting.participants && meeting.participants.length && { key: 'Participants', val: meeting.participants.join(', ') },
+      meeting.date && { key: 'Date', val: meeting.date },
+      meeting.time && { key: 'Time', val: meeting.time },
+      meeting.missing_fields && meeting.missing_fields.length && { key: 'Missing', val: meeting.missing_fields.join(', ') },
+    ].filter(Boolean);
+
+    document.getElementById('meeting-details').innerHTML = rows.map(function(r) {
+      return '<div class="meeting-detail-row">'
+        + '<span class="meeting-detail-key">' + escHtml(r.key) + '</span>'
+        + '<span class="meeting-detail-val">' + escHtml(r.val) + '</span>'
+        + '</div>';
+    }).join('');
+
+    if (thread.status === 'interrupted') {
+      document.getElementById('meeting-actions').classList.remove('hidden');
+    }
+  } catch(e) {}
+}
+
+async function sendCurrentDraft() {
+  if (!state.currentDraft) return;
+  var editedBody = document.getElementById('draft-body-edit').value;
+  var btn = document.getElementById('draft-send-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span> Sending…';
+
+  try {
+    await api.sendDraft(state.currentDraft.draft_id, editedBody);
+    toast('Email sent successfully!', 'success');
+    resetComposeForm();
+    if (state.currentView === 'sent') loadSent();
+  } catch(e) {
+    toast('Failed to send: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<span class="btn-icon">📤</span> Send Email';
+  }
+}
+
+async function cancelCurrentDraft() {
+  if (!state.currentDraft) return;
+  try {
+    await api.cancelDraft(state.currentDraft.draft_id);
+    hideDraftPanel();
+    resetGenerateBtn();
+    toast('Draft discarded.', 'info');
+  } catch(e) {
+    toast('Could not discard: ' + e.message, 'error');
+  }
+}
+
+function resetGenerateBtn() {
+  var btn = document.getElementById('compose-generate');
+  btn.disabled = false;
+  btn.innerHTML = '<span class="btn-icon">✨</span> Generate Draft';
+}
+
+function resetComposeForm() {
+  document.getElementById('compose-to').value = '';
+  document.getElementById('compose-subject').value = '';
+  document.getElementById('compose-context').value = '';
+  hideDraftPanel();
+  resetGenerateBtn();
+}
+
+async function sendExistingDraft(draftId) {
+  try {
+    await api.sendDraft(draftId);
+    toast('Email sent!', 'success');
+    loadDrafts();
+  } catch(e) {
+    toast('Failed to send: ' + e.message, 'error');
+  }
+}
+
+async function cancelExistingDraft(draftId) {
+  try {
+    await api.cancelDraft(draftId);
+    toast('Draft discarded.', 'info');
+    loadDrafts();
+  } catch(e) {
+    toast('Failed to discard: ' + e.message, 'error');
+  }
+}
+
+async function confirmMeeting() {
+  if (!state.currentThreadId) return;
+  try {
+    await api.confirmMeeting(state.currentThreadId);
+    toast('Meeting confirmed! Email will be sent.', 'success');
+    document.getElementById('meeting-actions').classList.add('hidden');
+  } catch(e) {
+    toast('Failed to confirm: ' + e.message, 'error');
+  }
+}
+
+async function declineMeeting() {
+  if (!state.currentThreadId) return;
+  try {
+    await api.declineMeeting(state.currentThreadId);
+    toast('Meeting declined.', 'info');
+    document.getElementById('meeting-actions').classList.add('hidden');
+    hideDraftPanel();
+    resetGenerateBtn();
+  } catch(e) {
+    toast('Failed to decline: ' + e.message, 'error');
+  }
+}
+
+/* ─── Reply Modal ─── */
+function openReplyModal() {
+  document.getElementById('reply-body').value = '';
+  document.getElementById('reply-modal').classList.remove('hidden');
+  setTimeout(function() { document.getElementById('reply-body').focus(); }, 50);
+}
+
+function closeReplyModal() {
+  document.getElementById('reply-modal').classList.add('hidden');
+}
+
+async function sendReply() {
+  var body = document.getElementById('reply-body').value.trim();
+  if (!body) { toast('Please enter a message.', 'error'); return; }
+  if (!state.replyTargetEmailId) { toast('No email selected.', 'error'); return; }
+
+  var btn = document.getElementById('reply-send-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span> Sending…';
+
+  try {
+    await api.replyEmail(state.currentUser.id, state.replyTargetEmailId, body);
+    toast('Reply sent!', 'success');
+    closeReplyModal();
+    if (state.currentView === 'sent') loadSent();
+  } catch(e) {
+    toast('Failed to send reply: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Send Reply';
+  }
+}
+
+/* ─── Role Switching ─── */
+function setRole(role) {
+  state.role = role;
+  document.querySelectorAll('.role-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.role === role);
+  });
+  if (role === 'user') {
+    document.getElementById('user-nav').classList.remove('hidden');
+    document.getElementById('admin-nav').classList.add('hidden');
+    showView('compose');
+  } else {
+    document.getElementById('user-nav').classList.add('hidden');
+    document.getElementById('admin-nav').classList.remove('hidden');
+    showView('review');
+  }
+}
+
+/* ─── Example Chips ─── */
+var EXAMPLES = {
+  schedule: {
+    to: 'bob@example.com',
+    subject: 'Meeting Request',
+    context: 'Schedule a meeting with them next Monday at 2pm to discuss the Python programming course enrollment. Make it friendly and professional.',
+  },
+  followup: {
+    to: 'charlie@example.com',
+    subject: '',
+    context: "Write a follow-up email asking about the status of their course registration. We sent the initial email last week and haven't heard back.",
+  },
+  intro: {
+    to: 'alice@example.com',
+    subject: '',
+    context: "Write a professional introduction email for our new AI & Data Science training program. Highlight that it's beginner-friendly and starts next month.",
+  },
+};
+
+function fillExample(type) {
+  var ex = EXAMPLES[type];
+  if (!ex) return;
+  document.getElementById('compose-to').value = ex.to;
+  document.getElementById('compose-subject').value = ex.subject;
+  document.getElementById('compose-context').value = ex.context;
+  document.getElementById('compose-to').focus();
+}
+
+/* ─── Admin search ─── */
+function filterEmailList(listId, query) {
+  document.querySelectorAll('#' + listId + ' .email-item').forEach(function(el) {
+    el.style.display = el.textContent.toLowerCase().includes(query.toLowerCase()) ? '' : 'none';
+  });
+}
+
+/* ─── Helpers ─── */
+function loadingHTML() {
+  return '<div class="email-empty"><div class="spinner"></div></div>';
+}
+
+function setListError(listId, msg) {
+  document.getElementById(listId).innerHTML =
+    '<div class="email-empty"><span class="empty-icon">⚠️</span><p>' + escHtml(msg) + '</p></div>';
+}
+
+/* ─── Event Listeners ─── */
+function setupEventListeners() {
+  document.getElementById('user-select').addEventListener('change', function(e) { selectUser(e.target.value); });
+
+  document.querySelectorAll('.role-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() { setRole(btn.dataset.role); });
+  });
+
+  document.querySelectorAll('[data-view]').forEach(function(btn) {
+    btn.addEventListener('click', function() { showView(btn.dataset.view); });
+  });
+
+  document.getElementById('compose-generate').addEventListener('click', generateDraft);
+  document.getElementById('draft-send-btn').addEventListener('click', sendCurrentDraft);
+  document.getElementById('draft-cancel-btn').addEventListener('click', cancelCurrentDraft);
+  document.getElementById('meeting-confirm-btn').addEventListener('click', confirmMeeting);
+  document.getElementById('meeting-decline-btn').addEventListener('click', declineMeeting);
+
+  document.querySelectorAll('.example-chip').forEach(function(chip) {
+    chip.addEventListener('click', function() { fillExample(chip.dataset.example); });
+  });
+
+  document.getElementById('refresh-inbox').addEventListener('click', loadInbox);
+  document.getElementById('refresh-sent').addEventListener('click', loadSent);
+  document.getElementById('refresh-drafts').addEventListener('click', loadDrafts);
+  document.getElementById('refresh-review').addEventListener('click', loadCourseEmails);
+  document.getElementById('refresh-all').addEventListener('click', loadAllEmails);
+
+  document.getElementById('course-search').addEventListener('input', function(e) {
+    filterEmailList('review-list', e.target.value);
+  });
+
+  document.getElementById('reply-modal-close').addEventListener('click', closeReplyModal);
+  document.getElementById('reply-cancel-btn').addEventListener('click', closeReplyModal);
+  document.getElementById('reply-send-btn').addEventListener('click', sendReply);
+  document.getElementById('reply-modal').addEventListener('click', function(e) {
+    if (e.target === e.currentTarget) closeReplyModal();
+  });
+
+  document.getElementById('compose-context').addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generateDraft();
+  });
+}
+
+/* ─── Start ─── */
+document.addEventListener('DOMContentLoaded', init);
