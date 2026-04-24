@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Email Agent</title>
-    <link rel="stylesheet" href="/static/styles.css?v=3" />
+    <link rel="stylesheet" href="/static/styles.css?v=4" />
   </head>
   <body>
     <div class="app">
@@ -38,8 +38,8 @@
 
         <nav class="sidebar-nav">
           <div id="user-nav">
-            <button class="nav-item active" data-view="compose">
-              <span class="nav-label">Compose</span>
+            <button class="nav-item active" data-view="chat">
+              <span class="nav-label">Assistant</span>
             </button>
             <button class="nav-item" data-view="inbox">
               <span class="nav-label">Inbox</span>
@@ -74,118 +74,48 @@
       <!-- Main Content -->
       <main class="main-content">
 
-        <!-- ── Compose View ── -->
-        <div class="view" id="view-compose">
-          <div class="view-header">
-            <div>
-              <h1 class="view-title">AI Email Composer</h1>
-              <p class="view-subtitle">Describe what you need — AI drafts it for you</p>
-            </div>
-          </div>
-
-          <div class="compose-layout">
-            <!-- Left: form -->
-            <div class="compose-left">
-              <div class="card compose-card">
-                <div class="form-group">
-                  <label class="form-label">To <span class="required">*</span></label>
-                  <input type="email" id="compose-to" class="form-input" placeholder="recipient@example.com" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Subject <span class="optional">(optional)</span></label>
-                  <input type="text" id="compose-subject" class="form-input" placeholder="AI will suggest one if left blank" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">What do you need? <span class="required">*</span></label>
-                  <textarea
-                    id="compose-context"
-                    class="form-textarea"
-                    rows="6"
-                    placeholder="e.g. Schedule a meeting with them next Monday at 2pm to discuss the Python course enrollment…"
-                  ></textarea>
-                </div>
-                <div class="compose-footer">
-                  <button id="compose-generate" class="btn btn-primary btn-lg">
-                    Generate Draft
-                  </button>
+        <!-- ── Chat / Assistant View ── -->
+        <div class="view" id="view-chat">
+          <div class="chat-window">
+            <div class="chat-header">
+              <div class="chat-header-info">
+                <div class="chat-avatar">AI</div>
+                <div>
+                  <div class="chat-name">Email Assistant</div>
+                  <div class="chat-status" id="chat-status">Ready to help</div>
                 </div>
               </div>
+              <button class="btn btn-ghost btn-sm" id="chat-clear">Clear chat</button>
+            </div>
 
-              <div class="examples-section">
-                <p class="examples-label">Try an example</p>
-                <div class="examples-list">
-                  <button class="example-chip" data-example="schedule">Schedule meeting</button>
-                  <button class="example-chip" data-example="followup">Follow-up email</button>
-                  <button class="example-chip" data-example="intro">Introduction</button>
+            <div class="chat-messages" id="chat-messages">
+              <div class="msg msg-ai">
+                <div class="msg-avatar-wrap">
+                  <div class="msg-avatar ai-avatar">AI</div>
+                </div>
+                <div class="msg-bubble">
+                  Hi! I'm your email assistant. Tell me what you need — I can schedule meetings,
+                  write emails, or send follow-ups. Just describe your request naturally.
+                  <div class="msg-suggestions">
+                    <button class="suggestion-chip" data-text="Schedule a meeting with bob@example.com next Monday at 2pm to discuss the Python course">Schedule a meeting</button>
+                    <button class="suggestion-chip" data-text="Write a follow-up email to charlie@example.com about their course enrollment, we haven't heard back in a week">Follow-up email</button>
+                    <button class="suggestion-chip" data-text="Send an introduction email to alice@example.com about our new AI and Data Science program starting next month">Introduction email</button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- Right: draft preview or empty state -->
-            <div class="compose-right">
-              <div class="draft-panel hidden" id="draft-panel">
-                <div class="card draft-card">
-                  <div class="draft-card-header">
-                    <div class="draft-title-row">
-                      <h3 class="draft-title">AI Draft</h3>
-                      <span class="draft-badge pending" id="draft-status-badge">Generating…</span>
-                    </div>
-                    <p class="draft-hint">Review and edit before sending</p>
-                  </div>
-
-                  <div class="draft-loading" id="draft-loading">
-                    <div class="spinner"></div>
-                    <p>AI is crafting your email…</p>
-                  </div>
-
-                  <div class="draft-content hidden" id="draft-content">
-                    <div class="draft-meta-block">
-                      <div class="draft-meta-row">
-                        <span class="meta-key">To</span>
-                        <span class="meta-val" id="draft-to-display"></span>
-                      </div>
-                      <div class="draft-meta-row">
-                        <span class="meta-key">Subject</span>
-                        <span class="meta-val" id="draft-subject-display"></span>
-                      </div>
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Email body</label>
-                      <textarea id="draft-body-edit" class="form-textarea draft-body-textarea" rows="10"></textarea>
-                    </div>
-                    <div class="draft-actions">
-                      <button id="draft-send-btn" class="btn btn-primary">Send Email</button>
-                      <button id="draft-cancel-btn" class="btn btn-ghost">Discard</button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Meeting info card -->
-                <div class="card meeting-card hidden" id="meeting-card">
-                  <div class="meeting-header">
-                    <div>
-                      <h4 class="meeting-title">Meeting Detected</h4>
-                      <p class="meeting-subtitle">AI extracted these meeting details</p>
-                    </div>
-                  </div>
-                  <div class="meeting-details" id="meeting-details"></div>
-                  <div class="meeting-actions hidden" id="meeting-actions">
-                    <button id="meeting-confirm-btn" class="btn btn-success btn-sm">Confirm Meeting</button>
-                    <button id="meeting-decline-btn" class="btn btn-ghost btn-sm">Decline</button>
-                  </div>
-                </div>
+            <div class="chat-input-area">
+              <div class="chat-input-row">
+                <textarea
+                  id="chat-input"
+                  class="chat-input"
+                  placeholder="e.g. Book a meeting with bob@example.com next Monday at 2pm..."
+                  rows="1"
+                ></textarea>
+                <button id="chat-send" class="chat-send-btn">Send</button>
               </div>
-
-              <div class="compose-empty-state" id="compose-empty-state">
-                <h3>AI Assistant Ready</h3>
-                <p>Fill in the recipient and describe your request, then click Generate Draft.</p>
-                <ul class="feature-list">
-                  <li>Automatically schedules meetings</li>
-                  <li>Drafts professional emails</li>
-                  <li>Editable before sending</li>
-                  <li>Sends follow-ups automatically</li>
-                </ul>
-              </div>
+              <p class="chat-hint">Press Enter to send &nbsp;·&nbsp; Shift+Enter for new line</p>
             </div>
           </div>
         </div>
@@ -204,9 +134,7 @@
               <div class="email-empty"><p>Loading…</p></div>
             </div>
             <div class="email-reader-panel" id="inbox-reader">
-              <div class="reader-empty">
-                <p>Select an email to read</p>
-              </div>
+              <div class="reader-empty"><p>Select an email to read</p></div>
             </div>
           </div>
         </div>
@@ -225,9 +153,7 @@
               <div class="email-empty"><p>Loading…</p></div>
             </div>
             <div class="email-reader-panel" id="sent-reader">
-              <div class="reader-empty">
-                <p>Select an email to read</p>
-              </div>
+              <div class="reader-empty"><p>Select an email to read</p></div>
             </div>
           </div>
         </div>
@@ -264,9 +190,7 @@
               <div class="email-empty"><p>Loading…</p></div>
             </div>
             <div class="email-reader-panel" id="review-reader">
-              <div class="reader-empty">
-                <p>Select an email to review</p>
-              </div>
+              <div class="reader-empty"><p>Select an email to review</p></div>
             </div>
           </div>
         </div>
@@ -285,9 +209,7 @@
               <div class="email-empty"><p>Loading…</p></div>
             </div>
             <div class="email-reader-panel" id="all-reader">
-              <div class="reader-empty">
-                <p>Select an email to read</p>
-              </div>
+              <div class="reader-empty"><p>Select an email to read</p></div>
             </div>
           </div>
         </div>
@@ -316,7 +238,6 @@
     </div>
 
     <div id="toast-container" class="toast-container"></div>
-
-    <script src="/static/app.js?v=3"></script>
+    <script src="/static/app.js?v=4"></script>
   </body>
 </html>
