@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db, seed_data
 from backend.routes.auth import router as auth_router
@@ -30,8 +29,17 @@ app = FastAPI(
 )
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
-if os.path.isdir(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+
+@app.get("/static/{filename:path}")
+async def serve_static(filename: str):
+    file_path = os.path.join(static_dir, filename.split("?")[0])
+    if not os.path.isfile(file_path):
+        return Response(status_code=404)
+    return FileResponse(
+        file_path,
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -72,7 +80,7 @@ async def proxy_to_agent(path: str, request: Request):
         from httpx import AsyncClient, ConnectError, ReadTimeout
 
         try:
-            async with AsyncClient(timeout=10.0) as client:
+            async with AsyncClient(timeout=120.0) as client:
                 body = await request.body()
                 response = await client.request(
                     method=request.method,
@@ -106,7 +114,10 @@ async def health():
 
 @app.get("/")
 async def serve_index():
-    return FileResponse(os.path.join(static_dir, "index.html"))
+    return FileResponse(
+        os.path.join(static_dir, "index.html"),
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
 
 
 if __name__ == "__main__":

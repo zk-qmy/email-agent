@@ -25,7 +25,7 @@ const api = {
     if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
     return data;
   },
-  getUsers:       ()             => api.req('GET', '/api/auth/users'),
+  getUsers:       ()             => api.req('GET', '/api/auth/users').then(r => r.users || r),
   getInbox:       (uid)          => api.req('GET', `/api/emails/inbox?user_id=${uid}`),
   getSent:        (uid)          => api.req('GET', `/api/emails/sent?user_id=${uid}`),
   getEmail:       (eid)          => api.req('GET', `/api/emails/${eid}`),
@@ -86,7 +86,9 @@ function toast(msg, type) {
 function connectWS(userId) {
   if (state.ws) { state.ws.close(); state.ws = null; }
   var proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  var url = proto + '://' + location.host + '/api/agent/ws/' + userId;
+  // Connect directly to the agent port — the backend proxy cannot upgrade WebSocket connections
+  var agentHost = location.hostname + ':8000';
+  var url = proto + '://' + agentHost + '/api/agent/ws/' + userId;
   try {
     state.ws = new WebSocket(url);
     state.ws.onopen  = function() { setAgentStatus(true); };
@@ -245,7 +247,7 @@ async function loadDrafts() {
     renderDraftGrid(drafts);
   } catch(e) {
     document.getElementById('drafts-grid').innerHTML =
-      '<div class="email-empty"><span class="empty-icon">⚠️</span><p>Failed to load drafts.</p></div>';
+      '<div class="email-empty"><p>Failed to load drafts.</p></div>';
   }
 }
 
@@ -296,11 +298,26 @@ async function fetchAllUserEmails() {
   return results;
 }
 
+/* ─── Avatar helpers ─── */
+var AVATAR_COLORS = ['#e84b5a','#6366f1','#10b981','#f59e0b','#8b5cf6','#0ea5e9','#ec4899','#14b8a6'];
+
+function avatarColor(name) {
+  var n = 0;
+  for (var i = 0; i < (name || '').length; i++) n += name.charCodeAt(i);
+  return AVATAR_COLORS[n % AVATAR_COLORS.length];
+}
+
+function avatarInitials(label) {
+  var parts = String(label || '?').split(/[@.\s]+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return (parts[0] || '?')[0].toUpperCase();
+}
+
 /* ─── Rendering ─── */
 function renderEmailList(emails, listId, readerId, isSent) {
   var list = document.getElementById(listId);
   if (!emails || !emails.length) {
-    list.innerHTML = '<div class="email-empty"><span class="empty-icon">💭</span><p>No emails here</p></div>';
+    list.innerHTML = '<div class="email-empty"><p>No emails here</p></div>';
     return;
   }
   var sorted = emails.slice().sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
@@ -309,16 +326,19 @@ function renderEmailList(emails, listId, readerId, isSent) {
     var fromLabel = isSent
       ? (email.recipient_email || String(email.recipient_id || 'Unknown'))
       : (email.sender_email || String(email.sender_id || 'Unknown'));
+    var initials = avatarInitials(fromLabel);
+    var color = avatarColor(fromLabel);
     return '<div class="email-item' + (isUnread ? ' unread' : '') + '" onclick="openEmail(' + email.id + ',\'' + readerId + '\',' + isSent + ')">'
+      + '<div class="email-avatar" style="background:' + color + '">' + initials + '</div>'
+      + '<div class="email-item-body">'
       + '<div class="email-item-top">'
-      + '<div style="display:flex;align-items:center;gap:6px;overflow:hidden;flex:1">'
-      + (isUnread ? '<div class="unread-dot"></div>' : '')
-      + '<span class="email-from">' + escHtml(trunc(fromLabel, 28)) + '</span>'
-      + '</div>'
+      + '<span class="email-from">' + escHtml(trunc(fromLabel, 22)) + '</span>'
       + '<span class="email-date">' + formatDate(email.created_at) + '</span>'
       + '</div>'
-      + '<div class="email-subject">' + escHtml(trunc(email.subject || '(no subject)', 45)) + '</div>'
-      + '<div class="email-preview">' + escHtml(trunc(email.body || '', 75)) + '</div>'
+      + '<div class="email-subject">' + escHtml(trunc(email.subject || '(no subject)', 40)) + '</div>'
+      + '<div class="email-preview">' + escHtml(trunc(email.body || '', 60)) + '</div>'
+      + '</div>'
+      + (isUnread ? '<div class="unread-dot"></div>' : '')
       + '</div>';
   }).join('');
 }
@@ -338,42 +358,49 @@ async function openEmail(emailId, readerId, isSent) {
     state.replyTargetEmailId = email.id;
     reader.innerHTML = renderEmailFull(email, isSent);
   } catch(e) {
-    reader.innerHTML = '<div class="reader-empty"><span class="empty-icon">⚠️</span><p>Could not load email.</p></div>';
+    reader.innerHTML = '<div class="reader-empty"><p>Could not load email.</p></div>';
   }
 }
 
 function renderEmailFull(email, isSent) {
   var isAdmin = state.role === 'admin';
+  var senderLabel = email.sender_email || String(email.sender_id || 'Unknown');
+  var recipientLabel = email.recipient_email || String(email.recipient_id || 'Unknown');
+  var initials = avatarInitials(senderLabel);
+  var color = avatarColor(senderLabel);
+  var dateStr = email.created_at ? new Date(email.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+
   var actions = isAdmin
     ? '<button class="btn btn-secondary btn-sm" onclick="api.markRead(' + email.id + ').then(function(){toast(\'Marked reviewed\',\'success\')})">&#x2713; Mark Reviewed</button>'
     : '<button class="btn btn-primary btn-sm" onclick="openReplyModal()">↩ Reply</button>';
 
   return '<div class="email-full">'
-    + '<div class="email-full-card">'
     + '<div class="email-full-header">'
     + '<div class="email-full-subject">' + escHtml(email.subject || '(no subject)') + '</div>'
-    + '<div class="email-full-meta">'
-    + '<div class="meta-row"><span class="meta-key">From:</span>' + escHtml(email.sender_email || String(email.sender_id || '')) + '</div>'
-    + '<div class="meta-row"><span class="meta-key">To:</span>' + escHtml(email.recipient_email || String(email.recipient_id || '')) + '</div>'
-    + '<div class="meta-row"><span class="meta-key">Date:</span>' + (email.created_at ? new Date(email.created_at).toLocaleString() : '—') + '</div>'
+    + '<div class="email-sender-row">'
+    + '<div class="email-sender-avatar" style="background:' + color + '">' + initials + '</div>'
+    + '<div class="email-sender-info">'
+    + '<div class="email-sender-name">' + escHtml(senderLabel) + '</div>'
+    + '<div class="email-sender-addr">To: ' + escHtml(recipientLabel) + '</div>'
+    + '</div>'
+    + '<div class="email-sent-time">' + dateStr + '</div>'
     + '</div>'
     + '</div>'
     + '<div class="email-full-body">' + escHtml(email.body || '') + '</div>'
     + '<div class="email-full-actions">' + actions + '</div>'
-    + '</div>'
     + '</div>';
 }
 
 function renderDraftGrid(drafts) {
   var grid = document.getElementById('drafts-grid');
   if (!drafts || !drafts.length) {
-    grid.innerHTML = '<div class="email-empty" style="grid-column:1/-1"><span class="empty-icon">📝</span><p>No AI drafts yet</p></div>';
+    grid.innerHTML = '<div class="email-empty" style="grid-column:1/-1"><p>No AI drafts yet</p></div>';
     return;
   }
   var sorted = drafts.slice().sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
   grid.innerHTML = sorted.map(function(d) {
     var sendBtn = d.status === 'ready'
-      ? '<button class="btn btn-success btn-sm" onclick="sendExistingDraft(\'' + d.draft_id + '\')">📤 Send</button>' : '';
+      ? '<button class="btn btn-success btn-sm" onclick="sendExistingDraft(\'' + d.draft_id + '\')">Send</button>' : '';
     var discardBtn = d.status !== 'sent'
       ? '<button class="btn btn-ghost btn-sm" onclick="cancelExistingDraft(\'' + d.draft_id + '\')">Discard</button>' : '';
     return '<div class="draft-grid-card">'
@@ -393,12 +420,15 @@ function renderReviewStats(courseEmails, allEmails) {
   var unread = courseEmails.filter(function(e) { return !e.is_read; }).length;
   var stats = [
     { val: courseEmails.length, label: 'Course Emails' },
-    { val: unread, label: 'Unread' },
-    { val: allEmails.length, label: 'Total Emails' },
+    { val: unread,              label: 'Unread' },
+    { val: allEmails.length,   label: 'Total Emails' },
     { val: state.users.length, label: 'Users' },
   ];
   document.getElementById('review-stats').innerHTML = stats.map(function(s) {
-    return '<div class="stat-card"><div class="stat-value">' + s.val + '</div><div class="stat-label">' + s.label + '</div></div>';
+    return '<div class="stat-card">'
+      + '<div class="stat-value">' + s.val + '</div>'
+      + '<div class="stat-label">' + s.label + '</div>'
+      + '</div>';
   }).join('');
 }
 
@@ -534,7 +564,7 @@ async function sendCurrentDraft() {
   } catch(e) {
     toast('Failed to send: ' + e.message, 'error');
     btn.disabled = false;
-    btn.innerHTML = '<span class="btn-icon">📤</span> Send Email';
+    btn.innerHTML = 'Send Email';
   }
 }
 
@@ -700,7 +730,7 @@ function loadingHTML() {
 
 function setListError(listId, msg) {
   document.getElementById(listId).innerHTML =
-    '<div class="email-empty"><span class="empty-icon">⚠️</span><p>' + escHtml(msg) + '</p></div>';
+    '<div class="email-empty"><p>' + escHtml(msg) + '</p></div>';
 }
 
 /* ─── Event Listeners ─── */

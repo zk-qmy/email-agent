@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Email Agent</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=3" />
   </head>
   <body>
     <div class="app">
+
       <!-- Sidebar -->
       <aside class="sidebar">
         <div class="brand">
@@ -33,34 +34,30 @@
           </div>
         </div>
 
+        <div class="sidebar-divider"></div>
+
         <nav class="sidebar-nav">
           <div id="user-nav">
             <button class="nav-item active" data-view="compose">
-              <span class="nav-icon">✏️</span>
               <span class="nav-label">Compose</span>
             </button>
             <button class="nav-item" data-view="inbox">
-              <span class="nav-icon">📥</span>
               <span class="nav-label">Inbox</span>
               <span class="nav-badge hidden" id="inbox-badge">0</span>
             </button>
             <button class="nav-item" data-view="sent">
-              <span class="nav-icon">📤</span>
               <span class="nav-label">Sent</span>
             </button>
             <button class="nav-item" data-view="drafts">
-              <span class="nav-icon">📝</span>
               <span class="nav-label">AI Drafts</span>
             </button>
           </div>
           <div id="admin-nav" class="hidden">
             <button class="nav-item active" data-view="review">
-              <span class="nav-icon">📋</span>
               <span class="nav-label">Course Emails</span>
               <span class="nav-badge hidden" id="course-badge">0</span>
             </button>
             <button class="nav-item" data-view="all-emails">
-              <span class="nav-icon">📧</span>
               <span class="nav-label">All Emails</span>
             </button>
           </div>
@@ -77,15 +74,17 @@
       <!-- Main Content -->
       <main class="main-content">
 
-        <!-- Compose View -->
+        <!-- ── Compose View ── -->
         <div class="view" id="view-compose">
           <div class="view-header">
             <div>
               <h1 class="view-title">AI Email Composer</h1>
-              <p class="view-subtitle">Describe what you need — AI drafts it for you instantly</p>
+              <p class="view-subtitle">Describe what you need — AI drafts it for you</p>
             </div>
           </div>
+
           <div class="compose-layout">
+            <!-- Left: form -->
             <div class="compose-left">
               <div class="card compose-card">
                 <div class="form-group">
@@ -102,30 +101,28 @@
                     id="compose-context"
                     class="form-textarea"
                     rows="6"
-                    placeholder="Examples:&#10;• Schedule a meeting with them next Monday at 2pm to discuss the Python course&#10;• Write a follow-up about the course enrollment deadline&#10;• Send a professional intro for our new data science program"
+                    placeholder="e.g. Schedule a meeting with them next Monday at 2pm to discuss the Python course enrollment…"
                   ></textarea>
                 </div>
                 <div class="compose-footer">
                   <button id="compose-generate" class="btn btn-primary btn-lg">
-                    <span class="btn-icon">✨</span>
                     Generate Draft
                   </button>
                 </div>
               </div>
 
-              <!-- Quick examples -->
               <div class="examples-section">
-                <p class="examples-label">Try an example:</p>
+                <p class="examples-label">Try an example</p>
                 <div class="examples-list">
-                  <button class="example-chip" data-example="schedule">📅 Schedule meeting</button>
-                  <button class="example-chip" data-example="followup">📩 Follow-up email</button>
-                  <button class="example-chip" data-example="intro">🤝 Introduction</button>
+                  <button class="example-chip" data-example="schedule">Schedule meeting</button>
+                  <button class="example-chip" data-example="followup">Follow-up email</button>
+                  <button class="example-chip" data-example="intro">Introduction</button>
                 </div>
               </div>
             </div>
 
+            <!-- Right: draft preview or empty state -->
             <div class="compose-right">
-              <!-- Draft panel (hidden until draft is generated) -->
               <div class="draft-panel hidden" id="draft-panel">
                 <div class="card draft-card">
                   <div class="draft-card-header">
@@ -144,11 +141,11 @@
                   <div class="draft-content hidden" id="draft-content">
                     <div class="draft-meta-block">
                       <div class="draft-meta-row">
-                        <span class="meta-key">To:</span>
+                        <span class="meta-key">To</span>
                         <span class="meta-val" id="draft-to-display"></span>
                       </div>
                       <div class="draft-meta-row">
-                        <span class="meta-key">Subject:</span>
+                        <span class="meta-key">Subject</span>
                         <span class="meta-val" id="draft-subject-display"></span>
                       </div>
                     </div>
@@ -157,20 +154,15 @@
                       <textarea id="draft-body-edit" class="form-textarea draft-body-textarea" rows="10"></textarea>
                     </div>
                     <div class="draft-actions">
-                      <button id="draft-send-btn" class="btn btn-success">
-                        <span class="btn-icon">📤</span> Send Email
-                      </button>
-                      <button id="draft-cancel-btn" class="btn btn-ghost">
-                        Discard
-                      </button>
+                      <button id="draft-send-btn" class="btn btn-primary">Send Email</button>
+                      <button id="draft-cancel-btn" class="btn btn-ghost">Discard</button>
                     </div>
                   </div>
                 </div>
 
-                <!-- Meeting detected card -->
+                <!-- Meeting info card -->
                 <div class="card meeting-card hidden" id="meeting-card">
                   <div class="meeting-header">
-                    <span class="meeting-emoji">📅</span>
                     <div>
                       <h4 class="meeting-title">Meeting Detected</h4>
                       <p class="meeting-subtitle">AI extracted these meeting details</p>
@@ -178,128 +170,122 @@
                   </div>
                   <div class="meeting-details" id="meeting-details"></div>
                   <div class="meeting-actions hidden" id="meeting-actions">
-                    <button id="meeting-confirm-btn" class="btn btn-success btn-sm">✓ Confirm Meeting</button>
-                    <button id="meeting-decline-btn" class="btn btn-danger btn-sm">✕ Decline</button>
+                    <button id="meeting-confirm-btn" class="btn btn-success btn-sm">Confirm Meeting</button>
+                    <button id="meeting-decline-btn" class="btn btn-ghost btn-sm">Decline</button>
                   </div>
                 </div>
               </div>
 
-              <!-- Empty state when no draft yet -->
               <div class="compose-empty-state" id="compose-empty-state">
-                <div class="empty-state-icon">🤖</div>
                 <h3>AI Assistant Ready</h3>
-                <p>Fill in the recipient and describe your request, then click "Generate Draft" to let the AI compose your email.</p>
+                <p>Fill in the recipient and describe your request, then click Generate Draft.</p>
                 <ul class="feature-list">
-                  <li>✓ Automatically schedules meetings</li>
-                  <li>✓ Drafts professional emails</li>
-                  <li>✓ Editable before sending</li>
-                  <li>✓ Sends follow-ups automatically</li>
+                  <li>Automatically schedules meetings</li>
+                  <li>Drafts professional emails</li>
+                  <li>Editable before sending</li>
+                  <li>Sends follow-ups automatically</li>
                 </ul>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Inbox View -->
+        <!-- ── Inbox View ── -->
         <div class="view hidden" id="view-inbox">
           <div class="view-header">
             <div>
               <h1 class="view-title">Inbox</h1>
               <p class="view-subtitle" id="inbox-subtitle">Loading…</p>
             </div>
-            <button class="btn btn-secondary btn-sm" id="refresh-inbox">↻ Refresh</button>
+            <button class="btn btn-secondary btn-sm" id="refresh-inbox">Refresh</button>
           </div>
           <div class="email-split">
             <div class="email-list-panel" id="inbox-list">
-              <div class="email-empty"><span class="empty-icon">⏳</span><p>Loading…</p></div>
+              <div class="email-empty"><p>Loading…</p></div>
             </div>
             <div class="email-reader-panel" id="inbox-reader">
               <div class="reader-empty">
-                <span class="empty-icon">📬</span>
                 <p>Select an email to read</p>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Sent View -->
+        <!-- ── Sent View ── -->
         <div class="view hidden" id="view-sent">
           <div class="view-header">
             <div>
               <h1 class="view-title">Sent</h1>
               <p class="view-subtitle" id="sent-subtitle">Loading…</p>
             </div>
-            <button class="btn btn-secondary btn-sm" id="refresh-sent">↻ Refresh</button>
+            <button class="btn btn-secondary btn-sm" id="refresh-sent">Refresh</button>
           </div>
           <div class="email-split">
             <div class="email-list-panel" id="sent-list">
-              <div class="email-empty"><span class="empty-icon">⏳</span><p>Loading…</p></div>
+              <div class="email-empty"><p>Loading…</p></div>
             </div>
             <div class="email-reader-panel" id="sent-reader">
               <div class="reader-empty">
-                <span class="empty-icon">📤</span>
                 <p>Select an email to read</p>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Drafts View -->
+        <!-- ── AI Drafts View ── -->
         <div class="view hidden" id="view-drafts">
           <div class="view-header">
             <div>
               <h1 class="view-title">AI Drafts</h1>
               <p class="view-subtitle">Manage your AI-generated draft emails</p>
             </div>
-            <button class="btn btn-secondary btn-sm" id="refresh-drafts">↻ Refresh</button>
+            <button class="btn btn-secondary btn-sm" id="refresh-drafts">Refresh</button>
           </div>
           <div class="drafts-grid" id="drafts-grid">
-            <div class="email-empty"><span class="empty-icon">⏳</span><p>Loading…</p></div>
+            <div class="email-empty"><p>Loading…</p></div>
           </div>
         </div>
 
-        <!-- Admin: Course Emails View -->
+        <!-- ── Admin: Course Emails ── -->
         <div class="view hidden" id="view-review">
           <div class="view-header">
             <div>
               <h1 class="view-title">Course Email Review</h1>
-              <p class="view-subtitle">Incoming emails related to courses and training</p>
+              <p class="view-subtitle">Emails related to courses and training programs</p>
             </div>
             <div class="header-actions">
               <input type="text" id="course-search" class="form-input search-input" placeholder="Search…" />
-              <button class="btn btn-secondary btn-sm" id="refresh-review">↻ Refresh</button>
+              <button class="btn btn-secondary btn-sm" id="refresh-review">Refresh</button>
             </div>
           </div>
           <div class="stats-row" id="review-stats"></div>
           <div class="email-split">
             <div class="email-list-panel" id="review-list">
-              <div class="email-empty"><span class="empty-icon">⏳</span><p>Loading…</p></div>
+              <div class="email-empty"><p>Loading…</p></div>
             </div>
             <div class="email-reader-panel" id="review-reader">
               <div class="reader-empty">
-                <span class="empty-icon">📋</span>
                 <p>Select an email to review</p>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Admin: All Emails View -->
+        <!-- ── Admin: All Emails ── -->
         <div class="view hidden" id="view-all-emails">
           <div class="view-header">
             <div>
               <h1 class="view-title">All Emails</h1>
               <p class="view-subtitle">All emails across all users</p>
             </div>
-            <button class="btn btn-secondary btn-sm" id="refresh-all">↻ Refresh</button>
+            <button class="btn btn-secondary btn-sm" id="refresh-all">Refresh</button>
           </div>
           <div class="email-split">
             <div class="email-list-panel" id="all-list">
-              <div class="email-empty"><span class="empty-icon">⏳</span><p>Loading…</p></div>
+              <div class="email-empty"><p>Loading…</p></div>
             </div>
             <div class="email-reader-panel" id="all-reader">
               <div class="reader-empty">
-                <span class="empty-icon">📧</span>
                 <p>Select an email to read</p>
               </div>
             </div>
@@ -314,7 +300,7 @@
       <div class="modal">
         <div class="modal-header">
           <h3>Reply</h3>
-          <button class="modal-close" id="reply-modal-close">✕</button>
+          <button class="modal-close" id="reply-modal-close">&#x2715;</button>
         </div>
         <div class="modal-body">
           <div class="form-group">
@@ -323,15 +309,14 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button id="reply-send-btn" class="btn btn-primary">Send Reply</button>
           <button id="reply-cancel-btn" class="btn btn-ghost">Cancel</button>
+          <button id="reply-send-btn" class="btn btn-primary">Send Reply</button>
         </div>
       </div>
     </div>
 
-    <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=3"></script>
   </body>
 </html>
