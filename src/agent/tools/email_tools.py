@@ -1,63 +1,97 @@
 # tools/email_tools.py
 from src.integrations.llm.client import get_llm
 from src.agent.utils import extract_text
-
+from src.integrations.mail.sync_client import send_email_sync
 from config.prompts.email import meeting_prompts
 
-
-# def draft_email_tool(context: str) -> str:
-#     prompt = meeting_prompts.get("draft_email")
-
-#     messages = prompt.build_messages(
-#         context=context
-#     )
-#     response = get_llm().invoke(messages)
-#     return extract_text(response)
+from langchain_core.tools import tool
+from langgraph.types import interrupt
 
 
-def draft_email_tool(action_input: str) -> str:
-    llm = get_llm()
+def _refine_draft(rendered, current_draft: str, feedback: str) -> str:
+    """Ask LLM to refine the draft based on user feedback."""
+    return extract_text(get_llm().invoke(
+        f"{rendered.to_prompt()}\n\n"
+        f"Current draft:\n{current_draft}\n\n"
+        f"User feedback: {feedback}\n\n"
+        f"Rewrite the email applying the feedback. "
+        f"Keep 'Subject: <line>' as the very first line."
+    ))
+@tool
+def draft_email(recipient: str, date: str, time: str, purpose: str) -> str:
+    """Draft a professional meeting request email.
 
-    # Step 1 — extract structured fields from action_input via LLM
-    extraction_prompt = f"""
-                        Extract these fields from the text below. Reply ONLY with raw JSON, no fences.
-                        {{
-                        "recipient": "...",
-                        "date":      "...",
-                        "time":      "...",
-                        "purpose":   "..."
-                        }}
-
-                        If a field is missing, use "not specified".
-
-                        Text: {action_input}
-                        """
-    raw = extract_text(llm.invoke(extraction_prompt))
-
-    import json, re
-
-    raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip())
-    try:
-        fields = json.loads(raw)
-    except json.JSONDecodeError:
-        fields = {
-            "recipient": "not specified",
-            "date": "not specified",
-            "time": "not specified",
-            "purpose": action_input,
-        }
-
-    # Step 2 — render the prompt with extracted values
+    Args:
+        recipient: Full name or email address of the recipient
+        date:      Meeting date e.g. 'tomorrow', 'Monday', '2025-05-01'
+        time:      Meeting time e.g. '2pm', '14:00'
+        purpose:   Reason for the meeting
+    """
+    # NodePrompt handles the internal prompt structure
     rendered = meeting_prompts.draft_email.render(
-        recipient=fields["recipient"],
-        date=fields["date"],
-        time=fields["time"],
-        purpose=fields["purpose"],
+        recipient=recipient, date=date,
+        time=time,           purpose=purpose,
     )
+    # ── Initial draft ─────────────────────────────────────────
+    current_draft = extract_text(get_llm().invoke(rendered.to_prompt()))
+    
+    # ── Review loop ───────────────────────────────────────────
+    while True:
+        decision = interrupt({
+            "type":        "review_draft",
+            "question": (
+                f"\n📝 Draft email — review before sending:\n"
+                f"{'─' * 48}\n"
+                f"{current_draft}\n"
+                f"{'─' * 48}\n"
+                f"Type 'y' to approve, or give feedback to revise:"
+            ),
+            "draft": current_draft,
+        })
+        # ── Add debug print here temporarily ─────────────────────
+        print(f"DEBUG decision received: {decision}")
+        # ── decision must be a dict ───────────────────────────────
+        if not isinstance(decision, dict):
+            # Safety fallback if somehow a plain string came through
+            decision = {"approved": False, "action_input": str(decision)}
 
-    # Step 3 — call LLM with fully assembled prompt
-    return extract_text(llm.invoke(rendered.to_prompt()))
+        feedback = decision.get("action_input", "").strip()
+        approved = decision.get("approved", False)
+
+        if approved and not feedback:
+            break
+
+        current_draft = _refine_draft(rendered, current_draft, feedback)
+
+    return current_draft        
 
 
-def send_email_tool(content: str) -> str:
-    return f"Email sent successfully with content:\n{content}"
+@tool
+def send_email(user_id: str, recipient: str, subject: str, body: str) -> str:
+    """Send an email to a recipient.
+
+    Args:
+        user_id:   Sender identifier
+        recipient: Recipient email or name
+        subject:   Email subject line
+        body:      Full email body text
+    """
+    # Human-in-the-loop for irreversible action
+    decision = interrupt({
+        "question":   f"Approve sending email to {recipient}?",
+        "recipient":  recipient,
+        "subject":    subject,
+        "body":       body,
+    })
+    if not decision.get("approved", False):
+        return f"Cancelled — email to {recipient} was not sent."
+
+    result = send_email_sync(
+            sender_id=user_id,
+            recipient_email=recipient,
+            subject=subject,
+            body=body,
+        )
+    print(f"[send_email] sent: {result}")
+    # real send logic here (SMTP, Gmail API, etc.)
+    return f"Email sent to {recipient}. Subject: {subject}"

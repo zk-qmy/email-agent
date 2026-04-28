@@ -1,23 +1,16 @@
-from typing import TypedDict, Annotated
-import operator
-
+# state.py
+from typing import Annotated
+from typing import TypedDict
+from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages  # handles append + dedup
 
 class AgentState(TypedDict):
-    messages: Annotated[list, operator.add]  # append-only
-    next_action: str
+    messages:        Annotated[list[BaseMessage], add_messages]
     iteration_count: int
-    thought: str
-    action: str
-    action_input: str
-
 
 def initial_state(user_message: str) -> AgentState:
-    print(f"User input: {user_message}")
+    from langchain_core.messages import HumanMessage
     return {
-        "messages": [f"User: {user_message}"],
-        "next_action": "",
+        "messages":        [HumanMessage(content=user_message)],
         "iteration_count": 0,
-        "thought": "",
-        "action": "",
-        "action_input": "",
     }

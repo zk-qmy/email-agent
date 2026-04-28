@@ -1,74 +1,60 @@
-import json
+# nodes/reasoning.py
+from langchain_core.messages import SystemMessage, AIMessage
 from src.integrations.llm.client import get_llm
 from config.settings import settings
-from src.agent.tools.registry import TOOL_DESCRIPTIONS
-from src.agent.utils import extract_text
-import json
-import re
+from src.agent.tools.registry import ALL_TOOLS
 
+# Bind tools once — LLM now knows all schemas automatically
+llm_with_tools = get_llm().bind_tools(ALL_TOOLS)
 
-def parse_llm_json(text: str) -> dict:
-    # Strip ```json ... ``` or ``` ... ``` fences
-    text = re.sub(r"^```(?:json)?\s*", "", text.strip())
-    text = re.sub(r"\s*```$", "", text.strip())
+SYSTEM_PROMPT = """
+                You are an email assistant.
+                Use the available tools to complete the user's request.
+                Always use the exact tool arguments — never guess or omit required fields.
+                If you need more information from the user, ask clearly and wait for their response.
+                """
 
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        # Try extracting the first {...} block as a fallback
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                pass
+def extract_thought(response) -> str:
+    """Extract only the text content from an AIMessage."""
+    content = response.content
 
-    return {"thought": "parse failed", "action": "final", "action_input": text}
+    # Already a plain string
+    if isinstance(content, str):
+        return content.strip()
 
+    # List of blocks — grab only text blocks
+    if isinstance(content, list):
+        return " ".join(
+            block["text"]
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        ).strip()
 
-def build_prompt(history: str) -> str:
-    return f"""
-            You are an email assistant using ReAct reasoning.
-
-            Available tools:
-            {TOOL_DESCRIPTIONS}
-
-            Format STRICTLY in JSON:Respond with ONLY a raw JSON object
-            — no markdown, no code fences, no explanation.
-            {{
-            \"thought\": \"what you think\",
-            \"action\": \"tool name OR final\",
-            \"action_input\": \"input for tool OR final answer\"
-            }}
-
-            Conversation:
-            {history}
-            """
-
+    return ""
 
 def reasoning_node(state):
     iteration = state.get("iteration_count", 0)
+
     if iteration >= settings.MAX_ITERATIONS:
-        return {"messages": ["Final: Max iterations reached."], "next_action": "final"}
+        return {
+            "messages":    [AIMessage(content="Max iterations reached.")],
+            "iteration_count": iteration,
+        }
 
-    response = get_llm().invoke(build_prompt("\n".join(state["messages"])))
-    text = extract_text(response)
+    response = llm_with_tools.invoke(
+        [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
+    )
 
-    try:
-        decision = parse_llm_json(text)
-    except json.JSONDecodeError:
-        decision = {"thought": "fallback", "action": "final", "action_input": text}
+    # Print agent's thought
+    thought = extract_thought(response)
+    if thought:
+        print(f"Thought: {thought}")
 
-    print(f"Thought: {decision['thought']}")
-    print(f"Action:  {decision['action']}")
+    if hasattr(response, "tool_calls") and response.tool_calls:
+        for tc in response.tool_calls:
+            print(f"Action:  {tc['name']}({tc['args']})")
+
     return {
-        "messages": [
-            f"Thought: {decision['thought']}",
-            f"Action: {decision['action']}({decision['action_input']})",
-        ],
-        "thought": decision["thought"],
-        "action": decision["action"],
-        "action_input": decision["action_input"],
-        "next_action": decision["action"],
-        "iteration_count": iteration,
+        "messages":        [response],
+        "iteration_count": iteration + 1,
     }
