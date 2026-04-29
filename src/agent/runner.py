@@ -26,48 +26,66 @@ def run(app, user_message: str, thread_id: str = None) -> str:
 
     result = app.invoke(initial_state(user_message), config=thread_config)
 
+    # ── Keep handling interrupts until graph is done ──────────────
     while True:
         snapshot = app.get_state(thread_config)
-        messages = result.get("messages", [])
 
-        # ── Case 1: waiting for tool approval ──────────────────────
-        if snapshot.interrupts:
-            interrupt_data = snapshot.interrupts[0].value
-            print(f"\n⏸  {interrupt_data['question']}")
+        if not snapshot.interrupts:
+            break  # graph finished, no more interrupts
+
+        interrupt_data = snapshot.interrupts[0].value
+        interrupt_type = interrupt_data.get("type", "")
+        print(f"\n⏸  {interrupt_data['question']}")
+
+        if interrupt_type == "review_draft":
             user_input = input("Approve? (y/n) or type modified input: ").strip()
-
+            # Handle approval
             if user_input.lower() == "y":
                 resume = {"approved": True}
             elif user_input.lower() == "n":
                 resume = {"approved": False}
+                break
             else:
                 resume = {"approved": False, "action_input": user_input}
 
             result = app.invoke(Command(resume=resume), config=thread_config)
 
-        # ── Case 2: LLM asked a question, needs user reply ──────────
-        elif is_asking_user(messages):
-            # Print the agent's question
-            for m in reversed(messages):
-                s = str(m)
-                if s.startswith("Thought:") and "?" in s:
-                    print(f"\nAssistant: {s.replace('Thought: ', '')}")
-                    break
+        elif interrupt_type == "confirm_send":
+            user_input = input("Send? (y/n): ").strip()
+            approved = user_input.lower() == "y"
+            result = app.invoke(
+                Command(resume={"approved": approved}),
+                config=thread_config
+            )
+            if not approved:
+                break  # stop loop if not approved
+        else:
+            # fallback for unknown interrupt types
+            user_input = input("Your input: ").strip()
+            resume = {"input": user_input}
+            result = app.invoke(Command(resume=resume), config=thread_config)
 
-            user_input = input("You: ").strip()
-            if not user_input:
+        # result = app.invoke(Command(resume=resume), config=thread_config)
+    # ── LLM asked a question ──────────────────────────────────────
+    if result is None:  # ✅ guard against None result
+        return thread_id
+    # ── Case 2: LLM asked a question ─────────────────────────────
+    messages = result.get("messages", [])
+    if is_asking_user(messages):
+        for m in reversed(messages):
+            s = str(m)
+            if s.startswith("Thought:") and "?" in s:
+                print(f"\nAssistant: {s.replace('Thought: ', '')}")
                 break
 
-            # Append user reply and re-invoke
+        user_input = input("You: ").strip()
+        if user_input:
             result = app.invoke(
                 {"messages": messages + [f"User: {user_input}"]},
                 config=thread_config,
             )
 
-        # ── Case 3: agent finished ───────────────────────────────────
-        else:
-            break
-
+    # ── Final output ──────────────────────────────────────────────
     print("\n=== Final Output ===")
     for msg in result.get("messages", []):
         thought = extract_thought(msg)

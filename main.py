@@ -1,12 +1,13 @@
 from src.agent.graph import build_graph, save_graph
-from src.agent.runner import run
 import os
-#import sys
+from src.agent.runner import run
 
-print(os.getcwd())  # current working directory
-print(__file__)  # path to the current file
-# sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+print(os.getcwd())
+print(__file__)
+
 if __name__ == "__main__":
-    app = build_graph()  # one compiled graph, shared across sessions
+    app = build_graph()
     # save_graph(app)
-    run(app, "write an email to schedule a meeting with prof Linh tommorrow and sent to him.")
+    initial_prompt = "write an email to schedule a meeting with prof Linh (li@gmal.com) to discuss above a project tomorrow (31/04/2026 at 2pm) and send it to him."
+    run(app, initial_prompt)

@@ -1,13 +1,13 @@
 # nodes/reasoning.py
-from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
+from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 from src.integrations.llm.client import get_llm
-from config.settings import settings
-from src.agent.tools.registry import ALL_TOOLS
+from src.agent.tools.email_tools import ALL_TOOLS
+from langgraph.types import interrupt
 
 # Bind tools once — LLM now knows all schemas automatically
 llm_with_tools = get_llm().bind_tools(ALL_TOOLS)
 
-SYSTEM_PROMPT = """
+extra_prompt = """
 You are an intelligent email assistant using a ReAct loop.
 
 You must follow this format strictly:
@@ -31,6 +31,7 @@ You will receive tool results as observations in the conversation.
 Your goal is to iteratively act, observe, and improve until the task is complete.
 """
 
+
 def extract_thought(response) -> str:
     """Extract only the text content from an AIMessage."""
     content = response.content
@@ -49,21 +50,27 @@ def extract_thought(response) -> str:
 
     return ""
 
-def reasoning_node(state):
-    iteration = state.get("iteration_count", 0)
 
-    if iteration >= settings.MAX_ITERATIONS:
-        return {
-            "messages":    [AIMessage(content="Max iterations reached.")],
-            "iteration_count": iteration,
-        }
-    
-    messages = state["messages"]
-    if messages and isinstance(messages[-1], ToolMessage):
+def reasoning_node(state):
+    # ReAct system prompt
+    messages = state["messages"]  # get user messages, AI responses, tool outputs
+
+    draft_injection = ""
+    if state.get("draft_approved") and state.get("approved_draft"):
+        draft_injection = (
+            "The user has already approved this email draft. "
+            "Do NOT call draft_email again. Call send_email directly with this content:\n\n"
+            + state["approved_draft"]
+        )
+
+    if messages and isinstance(
+        messages[-1], ToolMessage
+    ):  # get Observation + Reflection
         last_tool_msg = messages[-1]
-        
+        print(f"Observation: {last_tool_msg.content}")
         messages = messages + [
-            SystemMessage(content=f'''
+            SystemMessage(
+                content=f"""
                           Observation:
                             {last_tool_msg.content}
 
@@ -72,23 +79,42 @@ def reasoning_node(state):
                             - If not, what should be corrected?
                             - What is the next best action?
                             Do NOT jump to another tool without reasoning.
-                          ''')
+                          """
+            )
         ]
 
-    response = llm_with_tools.invoke(
-        [SystemMessage(content=SYSTEM_PROMPT)] + messages
-    )
+    response = llm_with_tools.invoke([SystemMessage(content=draft_injection)] + messages)
 
     # Print agent's thought
     thought = extract_thought(response)
     if thought:
         print(f"Thought: {thought}")
 
+    # HIL
+    if not getattr(response, "tool_calls", None):
+        print("Reasoning Node: Getting user input...")
+        # Ask user
+        user_input = interrupt({"question": thought})
+        print(f"Reasoning Node - user_input: {user_input}")
+
+        return {
+            "messages": [
+                response,
+                HumanMessage(  # inject user reply
+                    content=(
+                        user_input
+                        if isinstance(user_input, str)
+                        else user_input.get("input", "")
+                    )
+                ),
+            ]
+        }
+    # Call tools
     if hasattr(response, "tool_calls") and response.tool_calls:
+        print("Reasoning node: calling tools")
         for tc in response.tool_calls:
             print(f"Action:  {tc['name']}({tc['args']})")
 
     return {
-        "messages":        [response],
-        "iteration_count": iteration + 1,
+        "messages": [response],
     }
