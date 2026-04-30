@@ -14,5 +14,5 @@ class AgentState(TypedDict):
 def initial_state(user_message: str) -> AgentState:
     from langchain_core.messages import HumanMessage
     return {
-        "messages":        [HumanMessage(content=user_message)],
+        "messages": [HumanMessage(content=user_message)],
     }

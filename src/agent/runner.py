@@ -48,22 +48,34 @@ def run(app, user_message: str, thread_id: str = None) -> str:
             else:
                 resume = {"approved": False, "action_input": user_input}
 
-            result = app.invoke(Command(resume=resume), config=thread_config)
+            result = app.invoke(
+                Command(resume=resume),
+                config=thread_config)
 
         elif interrupt_type == "confirm_send":
             user_input = input("Send? (y/n): ").strip()
-            approved = user_input.lower() == "y"
-            result = app.invoke(
-                Command(resume={"approved": approved}),
-                config=thread_config
-            )
-            if not approved:
+            if user_input.lower() == "y":
+                result = app.invoke(
+                    Command(resume={"approved": True}),
+                    config=thread_config
+                )
+            elif user_input.lower() == "n":
+                resume = {"approved": False}
                 break  # stop loop if not approved
+            else:
+                resume = {"approved": False, "action_input": user_input}
+                result = app.invoke(
+                    Command(resume=resume),
+                    config=thread_config
+                )
         else:
             # fallback for unknown interrupt types
             user_input = input("Your input: ").strip()
             resume = {"input": user_input}
-            result = app.invoke(Command(resume=resume), config=thread_config)
+            result = app.invoke(
+                Command(resume=resume),
+                config=thread_config
+            )
 
         # result = app.invoke(Command(resume=resume), config=thread_config)
     # ── LLM asked a question ──────────────────────────────────────

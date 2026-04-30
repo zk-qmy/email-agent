@@ -11,6 +11,7 @@ from langgraph.types import interrupt
 
 def _refine_draft(rendered, previous_draft: str, feedback: str) -> str:
     """Ask LLM to refine the draft based on user feedback."""
+    print(f"Previous draft: {previous_draft} \n Feedback: {feedback}")
     return extract_text(
         get_llm().invoke(
             f"{rendered.to_prompt()}\n\n"
@@ -97,6 +98,7 @@ def send_email(user_id: str, recipients: List[str], subject: str, body: str) -> 
         subject:   Email subject line
         body:      Full email body text
     """
+    print("Tools: using `send_email` ...")
     # Human-in-the-loop for irreversible action
     decision = _parse_decision(
         interrupt(
