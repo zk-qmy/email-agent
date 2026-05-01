@@ -1,12 +1,12 @@
 import uuid
 import asyncio
-from datetime import datetime
-from typing import Optional, cast, Any
+from datetime import datetime, timezone
+from typing import Optional, cast
 from collections import defaultdict
 
-from src.workflows.router import build_router
+from src.agent.graph import build_graph
 from src.integrations.mail.client import mail_client
-from src.core.states import AgentState
+from src.agent.state import AgentState
 from agent.services.draft_models import Draft, DraftContent
 
 
@@ -26,7 +26,7 @@ def _add_message(thread: dict, role: str, content: str, action: str | None = Non
     msg = {
         "role": role,
         "content": content,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     if action:
         msg["action"] = action
@@ -50,7 +50,7 @@ async def _process_reply(thread_id: str, reply: dict, user_id: int):
     thread["reply_email_id"] = reply["id"]
     thread["reply_body"] = reply["body"]
     thread["status"] = "reply_received"
-    thread["updated_at"] = datetime.utcnow().isoformat()
+    thread["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     try:
         await mail_client.mark_read(reply["id"])
@@ -71,7 +71,7 @@ async def _process_reply(thread_id: str, reply: dict, user_id: int):
     )
 
     try:
-        graph = build_router()
+        graph = build_graph()
         result = await graph.ainvoke(
             cast(
                 AgentState,
@@ -129,7 +129,7 @@ async def _poll_thread(thread_id: str):
                 background_tasks[thread_id].cancel()
                 del background_tasks[thread_id]
         else:
-            thread["last_check"] = datetime.utcnow().isoformat()
+            thread["last_check"] = datetime.now(timezone.utc).isoformat()
 
     except Exception as e:
         print(f"[poll] Error polling thread {thread_id}: {e}")
@@ -197,7 +197,7 @@ async def _auto_followup(thread_id: str):
 
 class AgentService:
     def __init__(self):
-        self.graph = build_router()
+        self.graph = build_graph()
 
     def add_websocket(self, user_id: int, websocket):
         ws_connections[user_id].append(websocket)
@@ -228,7 +228,7 @@ class AgentService:
             and t["recipient"] == sender_email
         ]
 
-        for thread_id, thread in matching:
+        for thread_id, _ in matching:
             try:
                 email = await mail_client.get_email(email_id)
                 if email and "email" in email:
@@ -251,7 +251,7 @@ class AgentService:
         context: str,
     ) -> dict:
         draft_id = f"draft-{uuid.uuid4().hex[:12]}"
-        created_at = datetime.utcnow().isoformat()
+        created_at = datetime.now(timezone.utc).isoformat()
 
         try:
             result = self.graph.invoke(
@@ -285,7 +285,7 @@ class AgentService:
         except Exception as e:
             return {"error": f"Failed to create draft: {str(e)}"}
 
-        created_at = datetime.utcnow().isoformat()
+        created_at = datetime.now(timezone.utc).isoformat()
 
         draft = Draft(
             draft_id=draft_id,
@@ -402,7 +402,7 @@ class AgentService:
             email_id = result.get("email_id")
 
             draft.status = "sent"
-            draft.sent_at = datetime.utcnow().isoformat()
+            draft.sent_at = datetime.now(timezone.utc).isoformat()
             draft.email_id = email_id
 
             thread_id = f"thread-{uuid.uuid4().hex[:12]}"
@@ -423,10 +423,10 @@ class AgentService:
                 "reply_email_id": None,
                 "reply_body": None,
                 "followup_count": 0,
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "messages": [],
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             }
 
             threads[thread_id] = thread
@@ -527,7 +527,7 @@ class AgentService:
             return {"error": "Thread already completed"}
 
         thread["status"] = "completed"
-        thread["updated_at"] = datetime.utcnow().isoformat()
+        thread["updated_at"] = datetime.now(timezone.utc).isoformat()
 
         _add_message(thread, "assistant", "Meeting confirmed")
 
@@ -561,7 +561,7 @@ class AgentService:
             return {"error": "Thread already declined"}
 
         thread["status"] = "declined"
-        thread["updated_at"] = datetime.utcnow().isoformat()
+        thread["updated_at"] = datetime.now(timezone.utc).isoformat()
 
         _add_message(thread, "assistant", "Meeting declined")
 

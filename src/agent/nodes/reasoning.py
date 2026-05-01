@@ -70,99 +70,6 @@ def extract_thought(response) -> str:
     return ""
 
 
-def _find_tool_name_for_message(messages, tool_msg: ToolMessage) -> str | None:
-    """Walk back through messages to find which tool was called for this ToolMessage."""
-    for msg in reversed(messages):
-        if hasattr(msg, "tool_calls"):
-            for tc in msg.tool_calls:
-                if tc["id"] == tool_msg.tool_call_id:
-                    return tc["name"]
-    return None
-
-
-'''
-def reasoning_node(state):
-    # ReAct system prompt
-    messages = state["messages"]  # get user messages, AI responses, tool outputs
-
-    extra_state = {}
-    draft_injection = ""
-    if state.get("draft_approved") and state.get("approved_draft"):
-        print("=== Email draft has been approved ... ")
-        draft_injection = (
-            "The user has already approved this email draft. "
-            "Do NOT call draft_email again. Call send_email directly with this content:\n\n"
-            + state["approved_draft"]
-        )
-
-    if messages and isinstance(
-        messages[-1], ToolMessage
-    ):  # get Observation + Reflection
-        last_tool_msg = messages[-1]
-
-        # ✅ Capture approved draft from draft_email result
-        # tool_name = _find_tool_name_for_message(messages[:-1], last_tool_msg)
-        # if tool_name == "draft_email":
-        #     extra_state["approved_draft"] = last_tool_msg.content
-        #     extra_state["draft_approved"] = True
-
-        print(f"=== Observation: {last_tool_msg.content} ===\n")
-        messages = messages + [
-            SystemMessage(
-                content=f"""
-                          Observation:
-                            {last_tool_msg.content}
-
-                            Reflection:
-                            - Was this successful?
-                            - If not, what should be corrected?
-                            - What is the next best action?
-                            Do NOT jump to another tool without reasoning.
-                          """
-            )
-        ]
-
-    response = llm_with_tools.invoke(
-        [SystemMessage(content=draft_injection)] + messages
-        if draft_injection
-        else messages
-    )
-    print(f"=== Reasoning raw response: {response}\n")
-    # Print agent's thought
-    thought = extract_thought(response)
-    if thought:
-        print(f"=== Thought: {thought} ===\n")
-
-    # HIL
-    if not getattr(response, "tool_calls", None):  # assume no tool call means ask user
-        print("=== Reasoning Node: Getting user input...")
-        # Ask user
-        user_input = interrupt({"question": thought})
-        print(f"=== Reasoning Node - user_input: {user_input}")
-
-        return {
-            "messages": [
-                response,
-                HumanMessage(  # inject user reply
-                    content=(
-                        user_input
-                        if isinstance(user_input, str)
-                        else user_input.get("input", "")
-                    )
-                ),
-            ],
-            **extra_state,
-        }
-    # Call tools
-    if hasattr(response, "tool_calls") and response.tool_calls:
-        print("=== Reasoning node: calling tools ===")
-        for tc in response.tool_calls:
-            print(f"Action:  {tc['name']}({tc['args']})")
-
-    return {"messages": [response], **extra_state}
-'''
-
-
 def reasoning_node(state):
     messages = state["messages"]
 
@@ -193,15 +100,14 @@ def reasoning_node(state):
 
     if not getattr(response, "tool_calls", None):
         print("=== Reasoning Node: Getting user input...")
-        # user_input = 
-        interrupt({"question": thought})
-        # user_content = (
-        #     user_input if isinstance(user_input, str) else user_input.get("input", "")
-        # )
+        user_input = interrupt({"question": thought})
+        user_content = (
+            user_input if isinstance(user_input, str) else user_input.get("input", "")
+        )
         return {
             "messages": [
-                response
-                # HumanMessage(content=f"User provided: {user_content}"),
+                response,
+                HumanMessage(content=user_content),
             ]
         }
 
