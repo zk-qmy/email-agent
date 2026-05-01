@@ -7,7 +7,7 @@ from langgraph.types import interrupt
 # Bind tools once — LLM now knows all schemas automatically
 llm_with_tools = get_llm().bind_tools(ALL_TOOLS)
 
-extra_prompt = """
+system_prompt = """
 You are an intelligent email assistant using a ReAct loop.
 
 You must follow this format strictly:
@@ -25,6 +25,16 @@ Rules:
 - If a tool fails, DO NOT repeat the same action blindly
 - If required information is missing, ask the user clearly
 - Be precise with tool arguments — do not guess
+- If draft_email tool is used, only call send_email tool after user approve the draft
+from draft_email tool.
+Draft email protocol:
+- Call draft_email to generate and show a draft to the user
+- If the result has "approved": false and "feedback" is non-empty:
+  call draft_email AGAIN with previous_draft=<last draft> and user_feedback=<feedback>
+- If the result has "approved": false and "feedback" is empty:
+  the user cancelled — stop and confirm cancellation
+- Only call send_email when "approved": true
+- When calling send_email after an approved draft, always pass draft_approved=true
 
 You will receive tool results as observations in the conversation.
 
@@ -51,12 +61,24 @@ def extract_thought(response) -> str:
     return ""
 
 
+def _find_tool_name_for_message(messages, tool_msg: ToolMessage) -> str | None:
+    """Walk back through messages to find which tool was called for this ToolMessage."""
+    for msg in reversed(messages):
+        if hasattr(msg, "tool_calls"):
+            for tc in msg.tool_calls:
+                if tc["id"] == tool_msg.tool_call_id:
+                    return tc["name"]
+    return None
+
+'''
 def reasoning_node(state):
     # ReAct system prompt
     messages = state["messages"]  # get user messages, AI responses, tool outputs
 
+    extra_state = {}
     draft_injection = ""
     if state.get("draft_approved") and state.get("approved_draft"):
+        print("=== Email draft has been approved ... ")
         draft_injection = (
             "The user has already approved this email draft. "
             "Do NOT call draft_email again. Call send_email directly with this content:\n\n"
@@ -67,7 +89,14 @@ def reasoning_node(state):
         messages[-1], ToolMessage
     ):  # get Observation + Reflection
         last_tool_msg = messages[-1]
-        print(f"Observation: {last_tool_msg.content}")
+
+        # ✅ Capture approved draft from draft_email result
+        # tool_name = _find_tool_name_for_message(messages[:-1], last_tool_msg)
+        # if tool_name == "draft_email":
+        #     extra_state["approved_draft"] = last_tool_msg.content
+        #     extra_state["draft_approved"] = True
+
+        print(f"=== Observation: {last_tool_msg.content} ===\n")
         messages = messages + [
             SystemMessage(
                 content=f"""
@@ -83,19 +112,23 @@ def reasoning_node(state):
             )
         ]
 
-    response = llm_with_tools.invoke([SystemMessage(content=draft_injection)] + messages)
-
+    response = llm_with_tools.invoke(
+        [SystemMessage(content=draft_injection)] + messages
+        if draft_injection
+        else messages
+    )
+    print(f"=== Reasoning raw response: {response}\n")
     # Print agent's thought
     thought = extract_thought(response)
     if thought:
-        print(f"Thought: {thought}")
+        print(f"=== Thought: {thought} ===\n")
 
     # HIL
-    if not getattr(response, "tool_calls", None):
-        print("Reasoning Node: Getting user input...")
+    if not getattr(response, "tool_calls", None):  # assume no tool call means ask user
+        print("=== Reasoning Node: Getting user input...")
         # Ask user
         user_input = interrupt({"question": thought})
-        print(f"Reasoning Node - user_input: {user_input}")
+        print(f"=== Reasoning Node - user_input: {user_input}")
 
         return {
             "messages": [
@@ -107,14 +140,58 @@ def reasoning_node(state):
                         else user_input.get("input", "")
                     )
                 ),
-            ]
+            ],
+            **extra_state,
         }
     # Call tools
     if hasattr(response, "tool_calls") and response.tool_calls:
-        print("Reasoning node: calling tools")
+        print("=== Reasoning node: calling tools ===")
         for tc in response.tool_calls:
             print(f"Action:  {tc['name']}({tc['args']})")
 
-    return {
-        "messages": [response],
-    }
+    return {"messages": [response], **extra_state}
+'''
+def reasoning_node(state):
+    messages = state["messages"]
+
+    if messages and isinstance(messages[-1], ToolMessage):
+        last_tool_msg = messages[-1]
+        print(f"=== Observation: {last_tool_msg.content} ===\n")
+        messages = messages + [
+            SystemMessage(
+                content=f"""
+                Observation:
+                  {last_tool_msg.content}
+
+                Reflection:
+                - Was this successful?
+                - If not, what should be corrected?
+                - What is the next best action?
+                Do NOT jump to another tool without reasoning.
+                """
+            )
+        ]
+
+    response = llm_with_tools.invoke(
+        [SystemMessage(content=system_prompt)] + messages
+    )
+    print(f"=== Reasoning raw response: {response}\n")
+
+    thought = extract_thought(response)
+    if thought:
+        print(f"=== Thought: {thought} ===\n")
+
+    if not getattr(response, "tool_calls", None):
+        print("=== Reasoning Node: Getting user input...")
+        user_input = interrupt({"question": thought})
+        return {
+            "messages": [
+                response,
+                HumanMessage(content=user_input if isinstance(user_input, str) else user_input.get("input", "")),
+            ]
+        }
+
+    for tc in response.tool_calls:
+        print(f"Action:  {tc['name']}({tc['args']})")
+
+    return {"messages": [response]}

@@ -10,16 +10,16 @@ def action_node(state):
     for tool_call in state["messages"][-1].tool_calls:
         tool = ALL_TOOLS_BY_NAME[tool_call["name"]]
         observation = tool.invoke(tool_call["args"])
-
-        # Save approved draft to state so reasoning node can access it
+        
+        # draft and send handle
         if tool_call["name"] == "draft_email":
-            state_updates["approved_draft"] = observation
-            state_updates["draft_approved"] = True
+            if isinstance(observation, dict) and observation.get("approved"):
+                state_updates["draft_approved"] = True
+            else:
+                state_updates["draft_approved"] = False
 
-        # Clear approval flag after send attempt
         if tool_call["name"] == "send_email":
-            state_updates["draft_approved"] = False
-            state_updates["approved_draft"] = ""
+            state_updates["draft_approved"] = False  # reset after send
 
         result.append(
             ToolMessage(
