@@ -93,16 +93,16 @@ def draft_meeting_email(
 
 @tool
 def send_email(
-    user_id: str,
-    recipients: List[str],
+    user_id: int,
+    recipient: str,
     subject: str,
     body: str,
     draft_approved: bool = False,
 ) -> str:
     """Send an email to a recipient.
     Args:
-        user_id:   Sender identifier
-        recipient: Recipients' emails
+        user_id:   Sender's user ID (integer)
+        recipient: Recipient's email address
         subject:   Email subject line
         body:      Full email body text
         draft_approved: Flag to skip confirmation if draft was already approved
@@ -114,25 +114,25 @@ def send_email(
             interrupt(
                 {
                     "type": "confirm_send",
-                    "question": f"Approve sending email to {recipients}?",
-                    "recipient": recipients,
+                    "question": f"Approve sending email to {recipient}?",
+                    "recipient": recipient,
                     "subject": subject,
                     "body": body,
                 }
             )
         )
         if not decision.get("approved", False):
-            return f"=== Cancelled — email to {recipients} was not sent. ==="
+            return f"=== Cancelled — email to {recipient} was not sent. ==="
 
     result = send_email_sync(
         sender_id=user_id,
-        recipient_email=recipients,
+        recipient_email=recipient,
         subject=subject,
         body=body,
     )
     print(f"=== [send_email] sent: {result}")
     # real send logic here (SMTP, Gmail API, etc.)
-    return f"Email sent to {recipients}. Subject: {subject}"
+    return f"Email sent to {recipient}. Subject: {subject}"
 
 
 # GENERAL EMAIL TOOLS
