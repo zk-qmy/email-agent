@@ -4,7 +4,7 @@ from langgraph.prebuilt import ToolNode  # ← replaces action_node entirely
 from langchain_core.messages import HumanMessage
 from src.agent.state import AgentState
 from src.agent.nodes.reasoning import reasoning_node
-from src.agent.tools.email_tools import ALL_TOOLS
+from src.agent.tools.registry import ALL_TOOLS
 from src.agent.config import get_checkpointer
 import os
 from datetime import datetime

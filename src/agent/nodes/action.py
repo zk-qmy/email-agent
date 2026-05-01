@@ -1,4 +1,4 @@
-from src.agent.tools.email_tools import ALL_TOOLS_BY_NAME
+from src.agent.tools.registry import ALL_TOOLS_BY_NAME
 from langchain_core.messages import ToolMessage
 
 

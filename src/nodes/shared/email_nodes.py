@@ -11,7 +11,7 @@ from src.integrations.mail.sync_client import (
 )
 from datetime import datetime
 from config.prompts.base import PromptConfig
-from config.prompts.email import meeting_prompts
+from config.prompts.email import email_prompts
 
 
 def format_time(time_str: str) -> str:
@@ -33,7 +33,7 @@ def format_time(time_str: str) -> str:
         return time_str
 
 
-def draft_email(state: AgentState, prompts: PromptConfig = meeting_prompts) -> dict:
+def draft_email(state: AgentState, prompts: PromptConemail) -> dict:
     meeting = state.meeting
 
     # --- resolve runtime values ---

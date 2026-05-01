@@ -2,13 +2,14 @@
 from src.integrations.llm.client import get_llm
 from src.agent.utils import extract_text
 from src.integrations.mail.sync_client import send_email_sync
-from config.prompts.email import meeting_prompts
+from config.prompts.email import email_prompts
 
 from typing import List
 from langchain_core.tools import tool
 from langgraph.types import interrupt
 
 
+# PRIVATE FUNCs
 def _refine_draft(rendered, previous_draft: str, feedback: str) -> str:
     """Ask LLM to refine the draft based on user feedback."""
     print("=== Feed back to LLM to refine draft ... === ")
@@ -31,36 +32,8 @@ def _parse_decision(raw) -> dict:
     return {"approved": False, "action_input": str(raw)}
 
 
-@tool
-def draft_email(
-    recipients: List[str],
-    date: str,
-    time: str,
-    purpose: str,
-    previous_draft: str = "",
-    user_feedback: str = "",
-) -> str:
-    """Draft a professional meeting request email and present it to the user for review.
-
-    Args:
-        recipients:     List of recipient names
-        date:           Meeting date e.g. '2025-05-02', 'Monday'
-        time:           Meeting time e.g. '2pm', '14:00'
-        purpose:        Reason for the meeting
-        previous_draft: Prior draft to show instead of generating a new one
-        user_feedback:  Feedback from user to guide the next revision
-    """
-    rendered = meeting_prompts.draft_email.render(
-        recipients=recipients, date=date, time=time, purpose=purpose
-    )
-
-    if user_feedback and previous_draft:
-        draft = _refine_draft(rendered, previous_draft, user_feedback)
-    elif previous_draft:
-        draft = previous_draft.strip()
-    else:
-        draft = extract_text(get_llm().invoke(rendered.to_prompt()))
-
+def _review_draft(draft: str) -> dict:
+    """Single interrupt for draft review — shared by all draft tools."""
     decision = _parse_decision(
         interrupt(
             {
@@ -82,63 +55,40 @@ def draft_email(
     }
 
 
-'''
+# EMAIL TOOLS
+
+
 @tool
-def draft_email(
+def draft_meeting_email(
     recipients: List[str],
     date: str,
     time: str,
     purpose: str,
     previous_draft: str = "",
-    user_feedback: str = ""
+    user_feedback: str = "",
 ) -> str:
-    """Draft a professional meeting request email, with human review + revision loop.
+    """Draft a professional meeting request email and present it to the user for review.
 
     Args:
-        recipient: Full name(s)
-        date:      Meeting date e.g. 'tomorrow', 'Monday', '2025-05-01'
-        time:      Meeting time e.g. '2pm', '14:00'
-        purpose:   Reason for the meeting
-        previous_draft: Prior draft to refine instead of generating from scratch
+        recipients:     List of recipient names
+        date:           Meeting date e.g. '2025-05-02', 'Monday'
+        time:           Meeting time e.g. '2pm', '14:00'
+        purpose:        Reason for the meeting
+        previous_draft: Prior draft to show instead of generating a new one
+        user_feedback:  Feedback from user to guide the next revision
     """
-    rendered = meeting_prompts.draft_email.render(
-        recipients=recipients,
-        date=date,
-        time=time,
-        purpose=purpose,
+    rendered = email_prompts.draft_meeting_email.render(
+        recipients=recipients, date=date, time=time, purpose=purpose
     )
 
-    # Use previous_draft if provided (revision loop), otherwise generate fresh
-    draft = previous_draft.strip() or extract_text(
-        get_llm().invoke(rendered.to_prompt())
-    )
+    if user_feedback and previous_draft:
+        draft = _refine_draft(rendered, previous_draft, user_feedback)
+    elif previous_draft:
+        draft = previous_draft.strip()
+    else:
+        draft = extract_text(get_llm().invoke(rendered.to_prompt()))
 
-    # Single interrupt — one review per tool call
-    decision = _parse_decision(
-        interrupt(
-            {
-                "type": "review_draft",
-                "question": (
-                    f"\n📝 Draft email — review before sending:\n"
-                    f"{'─' * 48}\n{draft}\n{'─' * 48}\n"
-                    f"Type 'y' to approve, or give feedback to revise:"
-                ),
-                "draft": draft,
-            }
-        )
-    )
-
-    return {
-            "draft": draft,
-            "email": {
-                "recipients": recipients,
-                "subject": "Meeting Request: Project Discussion", # TODO: extract subject
-                "body": draft,
-                "date": date,
-                "time": time,
-            }
-        }
-'''
+    return _review_draft(draft)
 
 
 @tool
@@ -147,7 +97,7 @@ def send_email(
     recipients: List[str],
     subject: str,
     body: str,
-    draft_approved: bool = False
+    draft_approved: bool = False,
 ) -> str:
     """Send an email to a recipient.
     Args:
@@ -185,5 +135,40 @@ def send_email(
     return f"Email sent to {recipients}. Subject: {subject}"
 
 
-ALL_TOOLS = [draft_email, send_email]  # , schedule_meeting]
-ALL_TOOLS_BY_NAME = {tool.name: tool for tool in ALL_TOOLS}
+# GENERAL EMAIL TOOLS
+
+
+@tool
+def draft_general_email(
+    recipients: List[str],
+    key_points: List[str],
+    purpose: str,
+    tone: str = "professional",
+    previous_draft: str = "",
+    user_feedback: str = "",
+) -> str:
+    """Draft a email and present it to the user for review.
+
+    Args:
+        recipients:     List of recipient names
+        key_points:     List of main ideas
+        purpose:        Reason for the meeting
+        tone:           Tone of the email e.g 'friendly', 'professional'
+        previous_draft: Prior draft to show instead of generating a new one
+        user_feedback:  Feedback from user to guide the next revision
+    """
+    rendered = email_prompts.draft_general_email.render(
+        recipients=recipients,
+        key_points=key_points,
+        purpose=purpose,
+        tone=tone
+    )
+
+    if user_feedback and previous_draft:
+        draft = _refine_draft(rendered, previous_draft, user_feedback)
+    elif previous_draft:
+        draft = previous_draft.strip()
+    else:
+        draft = extract_text(get_llm().invoke(rendered.to_prompt()))
+
+    return _review_draft(draft)

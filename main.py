@@ -9,5 +9,5 @@ print(__file__)
 if __name__ == "__main__":
     app = build_graph()
     # save_graph(app)
-    initial_prompt = "write an email to schedule a meeting with prof Linh (li@gmal.com) to discuss above a project tomorrow (31/04/2026 at 2pm) and send it to him."
+    initial_prompt = "help me write an email to prof linh to schedule a meeting 2nd may"
     run(app, initial_prompt)

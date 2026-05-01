@@ -1,7 +1,7 @@
 # nodes/reasoning.py
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 from src.integrations.llm.client import get_llm
-from src.agent.tools.email_tools import ALL_TOOLS
+from src.agent.tools.registry import ALL_TOOLS
 from langgraph.types import interrupt
 
 # Bind tools once — LLM now knows all schemas automatically
@@ -36,6 +36,15 @@ Draft email protocol:
 - Only call send_email when "approved": true
 - When calling send_email after an approved draft, always pass draft_approved=true
 
+Email types:
+- Use email_type='meeting' when user wants to schedule a meeting — requires date and time
+- Use email_type='general' for all other emails — use key_points to capture what to say
+
+Important:
+- When calling send_general_email or send_meeting_email, use user_id='default_user' if not provided
+- Extract recipient email from the conversation if mentioned, otherwise ask ONCE and remember the answer
+- Never ask for the same information twice
+
 You will receive tool results as observations in the conversation.
 
 Your goal is to iteratively act, observe, and improve until the task is complete.
@@ -69,6 +78,7 @@ def _find_tool_name_for_message(messages, tool_msg: ToolMessage) -> str | None:
                 if tc["id"] == tool_msg.tool_call_id:
                     return tc["name"]
     return None
+
 
 '''
 def reasoning_node(state):
@@ -151,6 +161,8 @@ def reasoning_node(state):
 
     return {"messages": [response], **extra_state}
 '''
+
+
 def reasoning_node(state):
     messages = state["messages"]
 
@@ -172,10 +184,8 @@ def reasoning_node(state):
             )
         ]
 
-    response = llm_with_tools.invoke(
-        [SystemMessage(content=system_prompt)] + messages
-    )
-    print(f"=== Reasoning raw response: {response}\n")
+    response = llm_with_tools.invoke([SystemMessage(content=system_prompt)] + messages)
+    # print(f"=== Reasoning raw response: {response}\n")
 
     thought = extract_thought(response)
     if thought:
@@ -183,11 +193,15 @@ def reasoning_node(state):
 
     if not getattr(response, "tool_calls", None):
         print("=== Reasoning Node: Getting user input...")
-        user_input = interrupt({"question": thought})
+        # user_input = 
+        interrupt({"question": thought})
+        # user_content = (
+        #     user_input if isinstance(user_input, str) else user_input.get("input", "")
+        # )
         return {
             "messages": [
-                response,
-                HumanMessage(content=user_input if isinstance(user_input, str) else user_input.get("input", "")),
+                response
+                # HumanMessage(content=f"User provided: {user_content}"),
             ]
         }
 

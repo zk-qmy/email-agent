@@ -1,8 +1,21 @@
-from src.agent.tools.email_tools import draft_email, send_email
-from src.agent.tools.meeting_tools import schedule_meeting
-from langchain.tools import tool
+from src.agent.tools.email_tools import (
+    draft_meeting_email,
+    draft_general_email,
+    send_email,
+)
+from src.agent.tools.schedule_tools import schedule_meeting
 
 
+ALL_TOOLS = [
+    # Meeting tools
+    draft_meeting_email,
+    send_email,
+    # General Email tools
+    draft_general_email,
+    # Book calendar
+    schedule_meeting
+]
+ALL_TOOLS_BY_NAME = {tool.name: tool for tool in ALL_TOOLS}
 
 # TOOLS: dict[str, callable] = {
 #     "draft_email": draft_email_tool,

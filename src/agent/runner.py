@@ -3,7 +3,7 @@ import uuid
 from langgraph.types import Command
 from src.agent.state import initial_state
 from src.agent.nodes.reasoning import extract_thought
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage
 
 
 def is_asking_user(messages: list) -> bool:
@@ -12,7 +12,7 @@ def is_asking_user(messages: list) -> bool:
         return False
     last = str(messages[-1])
     # Agent replied with plain text thought but no Action → it's asking
-    has_thought = last.startswith("Thought:")
+    # has_thought = last.startswith("Thought:")
     has_action = any(str(m).startswith("Action:") for m in messages[-2:])
     return "?" in last and not has_action
 
@@ -48,16 +48,13 @@ def run(app, user_message: str, thread_id: str = None) -> str:
             else:
                 resume = {"approved": False, "action_input": user_input}
 
-            result = app.invoke(
-                Command(resume=resume),
-                config=thread_config)
+            result = app.invoke(Command(resume=resume), config=thread_config)
 
         elif interrupt_type == "confirm_send":
             user_input = input("Send? (y/n): ").strip()
             if user_input.lower() == "y":
                 result = app.invoke(
-                    Command(resume={"approved": True}),
-                    config=thread_config
+                    Command(resume={"approved": True}), config=thread_config
                 )
             elif user_input.lower() == "n":
                 resume = {"approved": False}
@@ -71,15 +68,18 @@ def run(app, user_message: str, thread_id: str = None) -> str:
         else:
             # fallback for unknown interrupt types
             user_input = input("Your input: ").strip()
-            resume = {"input": user_input}
+            app.update_state(
+                thread_config,
+                {"messages": [HumanMessage(content=user_input)]},
+            )
             result = app.invoke(
-                Command(resume=resume),
+                Command(resume=user_input),
                 config=thread_config
             )
 
         # result = app.invoke(Command(resume=resume), config=thread_config)
     # ── LLM asked a question ──────────────────────────────────────
-    if result is None:  # ✅ guard against None result
+    if result is None:  # guard against None result
         return thread_id
     # ── Case 2: LLM asked a question ─────────────────────────────
     messages = result.get("messages", [])

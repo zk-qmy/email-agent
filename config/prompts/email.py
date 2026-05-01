@@ -15,7 +15,7 @@ from datetime import datetime
 
 
 @dataclass
-class MeetingSchedulerPrompts(PromptConfig):
+class EmailPrompts(PromptConfig):
     """
     Prompts for the meeting scheduler workflow.
     Each field corresponds to one node's prompt.
@@ -23,46 +23,46 @@ class MeetingSchedulerPrompts(PromptConfig):
     The NodePrompt parts (system/context/task/critic) can use $variable substitution.
     """
 
-    classify: NodePrompt = field(
-        default_factory=lambda: NodePrompt(
-            system=SystemPrompt.system_prompt,
-            task=(
-                """
-        """
-            ),
-            critic=("""        """),
-        )
-    )
+    # classify: NodePrompt = field(
+    #     default_factory=lambda: NodePrompt(
+    #         system=SystemPrompt.system_prompt,
+    #         task=(
+    #             """
+    #     """
+    #         ),
+    #         critic=("""        """),
+    #     )
+    # )
 
-    extract_meeting_info: NodePrompt = field(
-        default_factory=lambda: NodePrompt(
-            system=SystemPrompt.system_prompt,
-            context=(
-                "Today's date is: $today\n"
-                "Already extracted so far:\n"
-                "  Date: $date\n"
-                "  Time: $time\n"
-                "  Participants: $participants\n"
-                "Only extract fields that are missing or updated in the new message."
-            ),
-            task=(
-                "Extract meeting information from the conversation.\n"
-                "- Return date as YYYY-MM-DD format.\n"
-                "- If the date is relative (like 'next Monday', 'this Friday', 'tomorrow'), "
-                "interpret it relative to today's date provided in CONTEXT.\n"
-                "- Time should be in HH:MM format.\n"
-                "- Participants should be names or emails."
-            ),
-            critic=(
-                "Verify:\n"
-                "- No invented values not stated by the user\n"
-                "- participants is a list, not a string\n"
-                "- Null fields are truly null, not empty string"
-            ),
-        )
-    )
+    # extract_meeting_info: NodePrompt = field(
+    #     default_factory=lambda: NodePrompt(
+    #         system=SystemPrompt.system_prompt,
+    #         context=(
+    #             "Today's date is: $today\n"
+    #             "Already extracted so far:\n"
+    #             "  Date: $date\n"
+    #             "  Time: $time\n"
+    #             "  Participants: $participants\n"
+    #             "Only extract fields that are missing or updated in the new message."
+    #         ),
+    #         task=(
+    #             "Extract meeting information from the conversation.\n"
+    #             "- Return date as YYYY-MM-DD format.\n"
+    #             "- If the date is relative (like 'next Monday', 'this Friday', 'tomorrow'), "
+    #             "interpret it relative to today's date provided in CONTEXT.\n"
+    #             "- Time should be in HH:MM format.\n"
+    #             "- Participants should be names or emails."
+    #         ),
+    #         critic=(
+    #             "Verify:\n"
+    #             "- No invented values not stated by the user\n"
+    #             "- participants is a list, not a string\n"
+    #             "- Null fields are truly null, not empty string"
+    #         ),
+    #     )
+    # )
 
-    draft_email: NodePrompt = field(
+    draft_meeting_email: NodePrompt = field(
         default_factory=lambda: NodePrompt(
             system=SystemPrompt.system_prompt,
             context=(
@@ -95,6 +95,41 @@ class MeetingSchedulerPrompts(PromptConfig):
             ),
         )
     )
+    draft_general_email: NodePrompt = field(
+        default_factory=lambda: NodePrompt(
+            system=SystemPrompt.system_prompt,
+            context=(
+                "Email details:\n"
+                "  Recipients:  $recipients\n"
+                "  Purpose:     $purpose\n"
+                "  Key points:  $key_points\n"
+                "  Tone:        $tone"
+            ),
+            task=(
+                "Draft a professional email using the details in CONTEXT.\n"
+                "Format:\n"
+                "  Subject: <subject line>\n\n"
+                "  <body — 3 to 5 sentences max>\n\n"
+                "  Best regards\n\n"
+                "Rules:\n"
+                "- Write the subject line as the first line, prefixed with 'Subject:'\n"
+                "- Cover all key points from CONTEXT naturally in the body\n"
+                "- Match the tone specified in CONTEXT\n"
+                "- No placeholder text like [Name] or [Details] or $recipient, $date, or $time\n"
+                "- If the user has specified requirements, follow them (e.g., tone, length, specific phrases)"
+            ),
+            critic=(
+                "Verify:\n"
+                "- Subject line is present and starts with 'Subject:'\n"
+                "- All key points from CONTEXT are addressed in the body\n"
+                "- Tone matches what was specified\n"
+                "- No placeholder text\n"
+                "- Sign-off is included\n"
+                "- Body is 3 to 5 sentences, not longer\n"
+                "- Any specific user requirements are followed"
+            ),
+        )
+    )
 
     reply_intent: NodePrompt = field(
         default_factory=lambda: NodePrompt(
@@ -108,17 +143,8 @@ class MeetingSchedulerPrompts(PromptConfig):
         )
     )
 
-    """
-    check_missing_fields???
-    ask_for _missing _info?
-    draft
-    followup
-    extract_intent
-    write_notification
-    """
 
-
-meeting_prompts = MeetingSchedulerPrompts()
+email_prompts = EmailPrompts()
 
 """
 Example usage:
