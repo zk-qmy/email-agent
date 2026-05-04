@@ -28,6 +28,12 @@ def _refine_draft(rendered, previous_draft: str, feedback: str) -> str:
 def _parse_decision(raw) -> dict:
     """Normalise interrupt() return value to a plain dict."""
     if isinstance(raw, dict):
+        if "response" in raw:
+            response = raw.get("response", "").strip().lower()
+            if response == "y":
+                return {"approved": True, "action_input": ""}
+            else:
+                return {"approved": False, "action_input": raw.get("response", "")}
         return raw
     return {"approved": False, "action_input": str(raw)}
 

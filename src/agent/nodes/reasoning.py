@@ -102,7 +102,9 @@ def reasoning_node(state):
         print("=== Reasoning Node: Getting user input...")
         user_input = interrupt({"question": thought})
         user_content = (
-            user_input if isinstance(user_input, str) else user_input.get("input", "")
+            user_input
+            if isinstance(user_input, str)
+            else user_input.get("input") or user_input.get("response") or ""
         )
         return {
             "messages": [
