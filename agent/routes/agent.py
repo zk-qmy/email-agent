@@ -41,18 +41,7 @@ async def get_draft(draft_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get draft: {str(e)}")
 
 
-async def send_draft(draft_id: str):
-    try:
-        result = await agent_service.send_draft(
-            draft_id=draft_id,
-        )
-        if "error" in result:
-            raise HTTPException(status_code=400, detail=result["error"])
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send draft: {str(e)}")
+
 
 
 async def cancel_draft(draft_id: str):

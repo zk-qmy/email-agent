@@ -476,19 +476,65 @@ class AgentService:
                                 if isinstance(block, dict)
                             )
                         draft.draft.body = content
-                        draft.status = "completed"
                         draft.updated_at = datetime.now(timezone.utc).isoformat()
 
-                        return {
-                            "draft_id": draft_id,
-                            "draft": {
+                        sent_content = content.lower() if content else ""
+                        email_sent = "sent" in sent_content and draft.draft.recipient
+
+                        if email_sent:
+                            draft.status = "sent"
+                            draft.sent_at = datetime.now(timezone.utc).isoformat()
+
+                            thread_id = f"thread-{uuid.uuid4().hex[:12]}"
+                            thread = {
+                                "thread_id": thread_id,
+                                "draft_id": draft_id,
+                                "email_id": None,
+                                "user_id": draft.user_id,
                                 "recipient": draft.draft.recipient,
-                                "subject": draft.draft.subject,
-                                "body": draft.draft.body,
-                            },
-                            "status": "completed",
-                            "message": content,
-                        }
+                                "meeting": {
+                                    "subject": draft.draft.subject,
+                                    "date": None,
+                                    "time": None,
+                                    "participants": [draft.draft.recipient],
+                                },
+                                "status": "waiting_reply",
+                                "reply_intent": None,
+                                "reply_email_id": None,
+                                "reply_body": None,
+                                "followup_count": 0,
+                                "last_check": datetime.now(timezone.utc).isoformat(),
+                                "messages": [],
+                                "created_at": datetime.now(timezone.utc).isoformat(),
+                                "updated_at": datetime.now(timezone.utc).isoformat(),
+                            }
+
+                            threads[thread_id] = thread
+                            draft.thread_id = thread_id
+
+                            return {
+                                "draft_id": draft_id,
+                                "draft": {
+                                    "recipient": draft.draft.recipient,
+                                    "subject": draft.draft.subject,
+                                    "body": draft.draft.body,
+                                },
+                                "status": "sent",
+                                "thread_id": thread_id,
+                                "message": content,
+                            }
+                        else:
+                            draft.status = "completed"
+                            return {
+                                "draft_id": draft_id,
+                                "draft": {
+                                    "recipient": draft.draft.recipient,
+                                    "subject": draft.draft.subject,
+                                    "body": draft.draft.body,
+                                },
+                                "status": "completed",
+                                "message": content,
+                            }
 
                 return {
                     "draft_id": draft_id,
@@ -550,6 +596,23 @@ class AgentService:
         if draft.status not in ("pending", "awaiting_input"):
             return {"error": f"Cannot send draft with status: {draft.status}"}
 
+        recipient = draft.draft.recipient
+
+        if "@" not in recipient:
+            from src.agent.tools.email_tools import resolve_recipient
+
+            result = resolve_recipient(recipient)
+            import json
+
+            try:
+                data = json.loads(result)
+                if "email" in data:
+                    recipient = data["email"]
+                else:
+                    return {"error": result}
+            except json.JSONDecodeError:
+                return {"error": result}
+
         final_body = draft.draft.body
 
         try:
@@ -572,12 +635,12 @@ class AgentService:
                 "draft_id": draft_id,
                 "email_id": email_id,
                 "user_id": draft.user_id,
-                "recipient": draft.draft.recipient,
+                "recipient": recipient,
                 "meeting": {
                     "subject": draft.draft.subject,
                     "date": None,
                     "time": None,
-                    "participants": [draft.draft.recipient],
+                    "participants": [recipient],
                 },
                 "status": "waiting_reply",
                 "reply_intent": None,

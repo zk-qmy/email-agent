@@ -8,7 +8,6 @@ from agent.routes.agent import (
     DraftReplyRequest,
     create_draft,
     get_draft,
-    send_draft,
     cancel_draft,
     reply_to_draft,
     get_user_drafts,
@@ -40,11 +39,6 @@ async def agent_create_draft(request: CreateDraftRequest):
 @app.get("/api/agent/draft/{draft_id}")
 async def agent_get_draft(draft_id: str):
     return await get_draft(draft_id)
-
-
-@app.post("/api/agent/draft/{draft_id}/send")
-async def agent_send_draft(draft_id: str):
-    return await send_draft(draft_id)
 
 
 @app.delete("/api/agent/draft/{draft_id}")
