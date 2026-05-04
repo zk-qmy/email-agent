@@ -71,6 +71,44 @@ class MailService:
         finally:
             session.close()
 
+    def search_users(self, query: str) -> List[dict]:
+        from sqlalchemy import or_
+
+        tokens = query.lower().split()
+        if not tokens:
+            return []
+
+        session = self._get_session()
+        try:
+            conditions = [
+                or_(
+                    User.username.ilike(f"%{t}%"),
+                    User.email.ilike(f"%{t}%")
+                ) for t in tokens if t
+            ]
+
+            if not conditions:
+                return []
+
+            users = session.query(User).filter(or_(*conditions)).all()
+
+            scored = []
+            for u in users:
+                match_count = sum(
+                    1 for t in tokens
+                    if t in u.username.lower() or t in u.email.lower()
+                )
+                scored.append((match_count, u))
+
+            scored.sort(key=lambda x: -x[0])
+
+            return [
+                {"id": u.id, "username": u.username, "email": u.email}
+                for _, u in scored
+            ]
+        finally:
+            session.close()
+
     def send_email(
         self,
         sender_id: int,

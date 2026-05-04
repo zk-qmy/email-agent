@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.database import init_db, seed_data
 from backend.routes.auth import router as auth_router
 from backend.routes.email import router as email_router
+from backend.routes.users import router as users_router
 from backend.routes.ws_notifications import router as ws_router, connection_manager
 
 AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://127.0.0.1:8000")
@@ -42,6 +43,7 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(email_router, prefix="/api/emails", tags=["emails"])
+app.include_router(users_router, prefix="/api/auth", tags=["users"])
 app.include_router(ws_router, tags=["websocket"])
 
 

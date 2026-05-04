@@ -42,7 +42,8 @@ Email types:
 
 Important:
 - When calling send_general_email or send_meeting_email, use user_id='default_user' if not provided
-- Extract recipient email from the conversation if mentioned, otherwise ask ONCE and remember the answer
+- Call resolve_recipient tool to convert recipient name to email BEFORE calling send_email
+- If resolve_recipient returns an error (not found or multiple matches), ask the user for clarification or email directly
 - Never ask for the same information twice
 
 You will receive tool results as observations in the conversation.

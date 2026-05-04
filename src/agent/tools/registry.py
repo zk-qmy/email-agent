@@ -2,6 +2,7 @@ from src.agent.tools.email_tools import (
     draft_meeting_email,
     draft_general_email,
     send_email,
+    resolve_recipient,
 )
 from src.agent.tools.schedule_tools import schedule_meeting
 
@@ -10,6 +11,7 @@ ALL_TOOLS = [
     # Meeting tools
     draft_meeting_email,
     send_email,
+    resolve_recipient,
     # General Email tools
     draft_general_email,
     # Book calendar

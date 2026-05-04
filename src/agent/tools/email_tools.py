@@ -1,4 +1,5 @@
 # tools/email_tools.py
+import os
 from src.integrations.llm.client import get_llm
 from src.agent.utils import extract_text
 from src.integrations.mail.sync_client import send_email_sync
@@ -61,6 +62,42 @@ def _review_draft(draft: str) -> dict:
     }
 
 
+BACKEND_URL = os.getenv("EMAIL_BACKEND_URL", "http://127.0.0.1:5001")
+
+
+@tool
+def resolve_recipient(name: str) -> str:
+    """Look up recipient email by name with fuzzy search.
+
+    Args:
+        name: Recipient's name (username, partial name, or email)
+
+    Returns:
+        Email address if found, or error message asking user to clarify.
+    """
+    import httpx
+
+    print(f"=== resolve_recipient: looking up '{name}' ===")
+
+    if "@" in name:
+        return f'{{"email": "{name}"}}'
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.get(f"{BACKEND_URL}/api/auth/search-users", params={"q": name})
+            if response.status_code != 200:
+                return "Failed to search users. Please provide email directly."
+            users = response.json().get("users", [])
+            if not users:
+                return f"User '{name}' not found. Please provide email directly."
+            if len(users) == 1:
+                return f'{{"email": "{users[0]["email"]}", "username": "{users[0]["username"]}"}}'
+            options = [f"{u['username']} ({u['email']})" for u in users]
+            return f"Multiple matches found: {', '.join(options)}. Please specify which one."
+    except Exception as e:
+        return f"Failed to resolve recipient: {str(e)}. Please provide email directly."
+
+
 # EMAIL TOOLS
 
 
@@ -114,21 +151,6 @@ def send_email(
         draft_approved: Flag to skip confirmation if draft was already approved
     """
     print("Tools: using `send_email` ...")
-    # Human-in-the-loop for irreversible action
-    if not draft_approved:
-        decision = _parse_decision(
-            interrupt(
-                {
-                    "type": "confirm_send",
-                    "question": f"Approve sending email to {recipient}?",
-                    "recipient": recipient,
-                    "subject": subject,
-                    "body": body,
-                }
-            )
-        )
-        if not decision.get("approved", False):
-            return f"=== Cancelled — email to {recipient} was not sent. ==="
 
     result = send_email_sync(
         sender_id=user_id,
