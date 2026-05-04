@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -72,7 +71,7 @@ async def proxy_to_agent(path: str, request: Request):
         from httpx import AsyncClient, ConnectError, ReadTimeout
 
         try:
-            async with AsyncClient(timeout=10.0) as client:
+            async with AsyncClient(timeout=30.0) as client:
                 body = await request.body()
                 response = await client.request(
                     method=request.method,
