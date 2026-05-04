@@ -85,6 +85,10 @@ function interpolateBody(body, userId, sectionContent) {
         /\{\{message\}\}/g,
         getInputValue(sectionContent, "message"),
     );
+    result = result.replace(
+        /\{\{response\}\}/g,
+        getInputValue(sectionContent, "response"),
+    );
     return result;
 }
 

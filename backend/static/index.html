@@ -333,7 +333,7 @@
                                         class="test-btn"
                                         data-method="POST"
                                         data-endpoint="/api/agent/draft"
-                                        data-body='{"user_id": {{user_id}}, "recipient": "{{recipient_email}}", "subject": "{{subject}}", "context": "{{context}}"}'
+                                        data-body='{"user_id": {{user_id}}, "prompt": "{{context}}"}'
                                     >
                                         Create Draft
                                     </button>
@@ -359,6 +359,14 @@
                                     >
                                         Cancel Draft
                                     </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/agent/draft/{{draft_id}}/reply"
+                                        data-body='{"user_id": {{user_id}}, "response": "{{response}}"}'
+                                    >
+                                        Reply to Draft
+                                    </button>
                                 </div>
                                 <div class="input-row">
                                     <input
@@ -371,23 +379,16 @@
                                     <input
                                         type="text"
                                         class="input-field"
-                                        data-var="recipient_email"
-                                        placeholder="recipient"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="subject"
-                                        placeholder="subject"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
                                         data-var="context"
-                                        placeholder="context"
+                                        placeholder="prompt"
                                         value=""
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="response"
+                                        placeholder="response (y to approve or feedback)"
+                                        value="y"
                                     />
                                 </div>
                             </div>
