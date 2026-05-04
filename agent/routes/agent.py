@@ -16,7 +16,7 @@ class DraftReplyRequest(BaseModel):
 
 async def create_draft(request: CreateDraftRequest):
     try:
-        result = agent_service.create_draft(
+        result = await agent_service.create_draft_async(
             user_id=request.user_id,
             prompt=request.prompt,
         )
@@ -29,37 +29,37 @@ async def create_draft(request: CreateDraftRequest):
         raise HTTPException(status_code=500, detail=f"Failed to create draft: {str(e)}")
 
 
-async def get_draft(draft_id: str):
+async def get_thread(thread_id: str):
     try:
-        result = agent_service.get_draft(draft_id)
+        result = agent_service.get_draft(thread_id)
         if not result:
-            raise HTTPException(status_code=404, detail="Draft not found")
+            raise HTTPException(status_code=404, detail="Thread not found")
         return result
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get draft: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get thread: {str(e)}")
 
 
 
 
 
-async def cancel_draft(draft_id: str):
+async def cancel_thread(thread_id: str):
     try:
-        result = agent_service.cancel_draft(draft_id)
+        result = agent_service.cancel_draft(thread_id)
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
         return result
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to cancel draft: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to cancel thread: {str(e)}")
 
 
-async def reply_to_draft(draft_id: str, request: DraftReplyRequest):
+async def reply_to_draft(thread_id: str, request: DraftReplyRequest):
     try:
-        result = agent_service.reply_to_draft(
-            draft_id=draft_id,
+        result = await agent_service.reply_to_draft_async(
+            thread_id=thread_id,
             user_id=request.user_id,
             response=request.response,
         )
@@ -69,7 +69,7 @@ async def reply_to_draft(draft_id: str, request: DraftReplyRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to reply to draft: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to reply to thread: {str(e)}")
 
 
 async def get_user_drafts(user_id: int, status: Optional[str] = None):

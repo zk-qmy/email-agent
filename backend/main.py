@@ -61,6 +61,12 @@ async def check_agent_health():
         return {"status": "offline", "error": str(e)}
 
 
+@app.post("/api/agent/notify/{user_id}")
+async def notify_user(user_id: int, event: dict):
+    await connection_manager.send_to_user(user_id, event)
+    return {"status": "sent"}
+
+
 @app.api_route(
     "/api/agent/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
 )

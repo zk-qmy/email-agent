@@ -301,13 +301,6 @@
                                     <button
                                         class="test-btn"
                                         data-method="GET"
-                                        data-endpoint="/api/agent/drafts?user_id={{user_id}}"
-                                    >
-                                        Get Drafts
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
                                         data-endpoint="/api/agent/threads?user_id={{user_id}}"
                                     >
                                         Get Threads
@@ -319,53 +312,53 @@
                         <div class="api-section">
                             <h2
                                 class="section-title"
-                                data-section="agent-draft"
+                                data-section="agent-thread"
                             >
-                                <span>Draft</span>
+                                <span>Thread</span>
                                 <span class="toggle">▼</span>
                             </h2>
                             <div
                                 class="section-content"
-                                id="agent-draft-section"
+                                id="agent-thread-section"
                             >
                                 <div class="test-group">
                                     <button
                                         class="test-btn"
                                         data-method="POST"
-                                        data-endpoint="/api/agent/draft"
+                                        data-endpoint="/api/agent/thread"
                                         data-body='{"user_id": {{user_id}}, "prompt": "{{context}}"}'
                                     >
-                                        Create Draft
+                                        Create Thread
                                     </button>
                                     <button
                                         class="test-btn"
                                         data-method="GET"
-                                        data-endpoint="/api/agent/draft/{{draft_id}}"
+                                        data-endpoint="/api/agent/thread/{{thread_id}}"
                                     >
-                                        Get Draft
+                                        Get Thread
                                     </button>
                                     <button
                                         class="test-btn"
                                         data-method="DELETE"
-                                        data-endpoint="/api/agent/draft/{{draft_id}}"
+                                        data-endpoint="/api/agent/thread/{{thread_id}}"
                                     >
-                                        Cancel Draft
+                                        Cancel Thread
                                     </button>
                                     <button
                                         class="test-btn"
                                         data-method="POST"
-                                        data-endpoint="/api/agent/draft/{{draft_id}}/reply"
+                                        data-endpoint="/api/agent/thread/{{thread_id}}/reply"
                                         data-body='{"user_id": {{user_id}}, "response": "{{response}}"}'
                                     >
-                                        Reply to Draft
+                                        Reply to Thread
                                     </button>
                                 </div>
                                 <div class="input-row">
                                     <input
                                         type="text"
                                         class="input-field"
-                                        data-var="draft_id"
-                                        placeholder="draft_id"
+                                        data-var="thread_id"
+                                        placeholder="thread_id"
                                         value=""
                                     />
                                     <input
@@ -389,23 +382,16 @@
                         <div class="api-section">
                             <h2
                                 class="section-title"
-                                data-section="agent-thread"
+                                data-section="agent-status"
                             >
-                                <span>Thread</span>
+                                <span>Status</span>
                                 <span class="toggle">▼</span>
                             </h2>
                             <div
                                 class="section-content"
-                                id="agent-thread-section"
+                                id="agent-status-section"
                             >
                                 <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/agent/thread/{{thread_id}}"
-                                    >
-                                        Get Thread
-                                    </button>
                                     <button
                                         class="test-btn"
                                         data-method="GET"

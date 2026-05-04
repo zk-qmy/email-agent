@@ -1,5 +1,6 @@
 import uuid
 import asyncio
+import os
 from datetime import datetime, timezone
 from typing import Optional, cast
 from collections import defaultdict
@@ -10,6 +11,9 @@ from src.agent.state import AgentState
 from agent.services.draft_models import Draft, DraftContent
 from langgraph.types import Command
 from langchain_core.messages import HumanMessage
+
+
+AGENT_BACKEND_URL = os.getenv("EMAIL_BACKEND_URL", "http://localhost:5001")
 
 
 drafts: dict[str, Draft] = {}
@@ -56,6 +60,17 @@ async def _notify_client(user_id: int, event: dict):
                 await websocket.send_json(event)
             except Exception as e:
                 print(f"[notify] Failed to send to client: {e}")
+
+    try:
+        from httpx import AsyncClient
+
+        async with AsyncClient(timeout=5.0) as client:
+            await client.post(
+                f"{AGENT_BACKEND_URL}/api/agent/notify/{user_id}",
+                json=event,
+            )
+    except Exception as e:
+        print(f"[notify] Forward to backend failed: {e}")
 
 
 async def _process_reply(thread_id: str, reply: dict, user_id: int):
@@ -362,6 +377,119 @@ class AgentService:
         except Exception as e:
             return {"error": f"Failed to create draft: {str(e)}"}
 
+    async def _run_create_draft(self, thread_id: str, user_id: int, prompt: str):
+        try:
+            result = self.graph.invoke(
+                cast(
+                    AgentState,
+                    {"messages": [{"role": "user", "content": prompt}]},
+                ),
+                {"configurable": {"thread_id": thread_id, "user_id": user_id}},
+            )
+
+            draft = drafts.get(thread_id)
+            if not draft:
+                await _notify_client(
+                    user_id,
+                    {"event": "create_error", "message": "Thread not found"},
+                )
+                return
+
+            if "__interrupt__" not in result or not result["__interrupt__"]:
+                await _notify_client(
+                    user_id,
+                    {"event": "create_error", "message": "Workflow did not produce expected interrupt"},
+                )
+                return
+
+            interrupt_data = result["__interrupt__"][0].value
+            interrupt_type = interrupt_data.get("type", "question")
+
+            if interrupt_type in ("review_draft", "confirm_send"):
+                draft_body = interrupt_data.get("email_draft") or interrupt_data.get("draft")
+                subject = interrupt_data.get("subject")
+                recipient = interrupt_data.get("recipient")
+
+                if not subject and draft_body:
+                    subject, draft_body = _extract_subject_and_clean_body(draft_body)
+
+                draft.draft.recipient = recipient or ""
+                draft.draft.subject = subject or ""
+                draft.draft.body = draft_body or ""
+                draft.status = "awaiting_input"
+                draft.updated_at = datetime.now(timezone.utc).isoformat()
+
+                await _notify_client(
+                    user_id,
+                    {
+                        "event": "create_complete",
+                        "thread_id": thread_id,
+                        "draft": {
+                            "recipient": recipient or "",
+                            "subject": subject or "",
+                            "body": draft_body or "",
+                        },
+                        "interrupt": {
+                            "type": interrupt_type,
+                            "question": interrupt_data.get("question", ""),
+                        },
+                    },
+                )
+            else:
+                draft.status = "awaiting_input"
+                draft.updated_at = datetime.now(timezone.utc).isoformat()
+
+                await _notify_client(
+                    user_id,
+                    {
+                        "event": "create_complete",
+                        "thread_id": thread_id,
+                        "interrupt": {
+                            "type": interrupt_type,
+                            "question": interrupt_data.get("question", ""),
+                        },
+                    },
+                )
+
+        except Exception as e:
+            draft = drafts.get(thread_id)
+            if draft:
+                draft.status = "error"
+            await _notify_client(
+                user_id,
+                {"event": "create_error", "message": str(e)},
+            )
+
+    async def create_draft_async(self, user_id: int, prompt: str) -> dict:
+        thread_id = f"thread-{uuid.uuid4().hex[:12]}"
+        created_at = datetime.now(timezone.utc).isoformat()
+
+        draft = Draft(
+            draft_id=thread_id,
+            user_id=user_id,
+            draft=DraftContent(recipient="", subject="", body=""),
+            context=prompt,
+            status="processing",
+            thread_id=thread_id,
+            email_id=None,
+            created_at=created_at,
+            sent_at=None,
+            updated_at=None,
+        )
+        drafts[thread_id] = draft
+
+        await _notify_client(
+            user_id,
+            {"event": "create_processing", "thread_id": thread_id},
+        )
+
+        asyncio.create_task(self._run_create_draft(thread_id, user_id, prompt))
+
+        return {
+            "status": "processing",
+            "thread_id": thread_id,
+        }
+
     def get_draft(self, draft_id: str) -> Optional[dict]:
         draft = drafts.get(draft_id)
         if not draft:
@@ -545,18 +673,219 @@ class AgentService:
         except Exception as e:
             return {"error": f"Failed to process reply: {str(e)}"}
 
-    def cancel_draft(self, draft_id: str) -> dict:
-        draft = drafts.get(draft_id)
+    async def _run_reply_to_draft(self, thread_id: str, user_id: int, response: str):
+        thread_config = {"configurable": {"thread_id": thread_id, "user_id": user_id}}
+
+        try:
+            while True:
+                snapshot = self.graph.get_state(thread_config)
+
+                if not snapshot.interrupts:
+                    await _notify_client(
+                        user_id,
+                        {"event": "reply_error", "message": "No pending interrupt to resume from"},
+                    )
+                    return
+
+                interrupt_data = snapshot.interrupts[0].value
+                interrupt_type = interrupt_data.get("type", "question")
+
+                if interrupt_type == "question":
+                    self.graph.update_state(
+                        thread_config,
+                        {"messages": [HumanMessage(content=response)]},
+                    )
+                    result = self.graph.invoke(
+                        Command(resume=response),
+                        config=thread_config,
+                    )
+                else:
+                    result = self.graph.invoke(
+                        Command(resume={"response": response}),
+                        config=thread_config,
+                    )
+
+                draft = drafts.get(thread_id)
+                if not draft:
+                    await _notify_client(
+                        user_id,
+                        {"event": "reply_error", "message": "Thread not found"},
+                    )
+                    return
+
+                if "__interrupt__" in result and result["__interrupt__"]:
+                    interrupt_data = result["__interrupt__"][0].value
+                    interrupt_type = interrupt_data.get("type", "question")
+
+                    if interrupt_type in ("review_draft", "confirm_send"):
+                        draft_body = interrupt_data.get("email_draft") or interrupt_data.get("draft")
+                        subject = interrupt_data.get("subject")
+                        recipient = interrupt_data.get("recipient")
+
+                        if not subject and draft_body:
+                            subject, draft_body = _extract_subject_and_clean_body(draft_body)
+
+                        draft.draft.recipient = recipient or ""
+                        draft.draft.subject = subject or ""
+                        draft.draft.body = draft_body or ""
+                        draft.status = "awaiting_input"
+                        draft.updated_at = datetime.now(timezone.utc).isoformat()
+
+                        await _notify_client(
+                            user_id,
+                            {
+                                "event": "reply_complete",
+                                "thread_id": thread_id,
+                                "draft": {
+                                    "recipient": recipient or "",
+                                    "subject": subject or "",
+                                    "body": draft_body or "",
+                                },
+                                "interrupt": {
+                                    "type": interrupt_type,
+                                    "question": interrupt_data.get("question", ""),
+                                },
+                            },
+                        )
+                    else:
+                        draft.status = "awaiting_input"
+                        draft.updated_at = datetime.now(timezone.utc).isoformat()
+
+                        await _notify_client(
+                            user_id,
+                            {
+                                "event": "reply_complete",
+                                "thread_id": thread_id,
+                                "interrupt": {
+                                    "type": interrupt_type,
+                                    "question": interrupt_data.get("question", ""),
+                                },
+                            },
+                        )
+                    return
+
+                messages = result.get("messages", [])
+                if messages:
+                    last_msg = messages[-1]
+                    if hasattr(last_msg, "content"):
+                        content = last_msg.content
+                        if isinstance(content, list):
+                            content = " ".join(
+                                block.get("text", "") for block in content if isinstance(block, dict)
+                            )
+                        draft.draft.body = content
+                        draft.updated_at = datetime.now(timezone.utc).isoformat()
+
+                        sent_content = content.lower() if content else ""
+                        email_sent = "sent" in sent_content and draft.draft.recipient
+
+                        if email_sent:
+                            draft.status = "sent"
+                            draft.sent_at = datetime.now(timezone.utc).isoformat()
+
+                            new_thread_id = f"thread-{uuid.uuid4().hex[:12]}"
+                            thread = {
+                                "thread_id": new_thread_id,
+                                "draft_id": thread_id,
+                                "email_id": None,
+                                "user_id": draft.user_id,
+                                "recipient": draft.draft.recipient,
+                                "meeting": {
+                                    "subject": draft.draft.subject,
+                                    "date": None,
+                                    "time": None,
+                                    "participants": [draft.draft.recipient],
+                                },
+                                "status": "waiting_reply",
+                                "reply_intent": None,
+                                "reply_email_id": None,
+                                "reply_body": None,
+                                "followup_count": 0,
+                                "last_check": datetime.now(timezone.utc).isoformat(),
+                                "messages": [],
+                                "created_at": datetime.now(timezone.utc).isoformat(),
+                                "updated_at": datetime.now(timezone.utc).isoformat(),
+                            }
+
+                            threads[new_thread_id] = thread
+                            draft.thread_id = new_thread_id
+
+                            await _notify_client(
+                                user_id,
+                                {
+                                    "event": "reply_complete",
+                                    "thread_id": thread_id,
+                                    "new_thread_id": new_thread_id,
+                                    "status": "sent",
+                                    "message": content,
+                                },
+                            )
+                        else:
+                            draft.status = "completed"
+                            await _notify_client(
+                                user_id,
+                                {
+                                    "event": "reply_complete",
+                                    "thread_id": thread_id,
+                                    "status": "completed",
+                                    "message": content,
+                                },
+                            )
+                    return
+
+                await _notify_client(
+                    user_id,
+                    {
+                        "event": "reply_complete",
+                        "thread_id": thread_id,
+                        "status": "completed",
+                    },
+                )
+
+        except Exception as e:
+            draft = drafts.get(thread_id)
+            if draft:
+                draft.status = "error"
+            await _notify_client(
+                user_id,
+                {"event": "reply_error", "message": str(e)},
+            )
+
+    async def reply_to_draft_async(self, thread_id: str, user_id: int, response: str) -> dict:
+        draft = drafts.get(thread_id)
         if not draft:
-            return {"error": "Draft not found"}
+            return {"error": "Thread not found"}
+
+        if draft.status not in ("awaiting_input", "pending"):
+            return {"error": f"Cannot reply to thread with status: {draft.status}"}
+
+        draft.status = "processing"
+        draft.updated_at = datetime.now(timezone.utc).isoformat()
+
+        await _notify_client(
+            user_id,
+            {"event": "reply_processing", "thread_id": thread_id},
+        )
+
+        asyncio.create_task(self._run_reply_to_draft(thread_id, user_id, response))
+
+        return {
+            "status": "processing",
+            "thread_id": thread_id,
+        }
+
+    def cancel_draft(self, thread_id: str) -> dict:
+        draft = drafts.get(thread_id)
+        if not draft:
+            return {"error": "Thread not found"}
 
         if draft.status == "sent":
-            return {"error": "Cannot cancel a sent draft"}
+            return {"error": "Cannot cancel a sent thread"}
 
         draft.status = "cancelled"
 
         return {
-            "draft_id": draft_id,
+            "thread_id": thread_id,
             "draft": {
                 "recipient": draft.draft.recipient,
                 "subject": draft.draft.subject,

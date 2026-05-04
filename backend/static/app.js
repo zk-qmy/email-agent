@@ -19,14 +19,10 @@ function interpolateEndpoint(endpoint, userId, sectionContent) {
         getInputValue(sectionContent, "email_id"),
     );
     result = result.replace(
-        /\{\{draft_id\}\}/g,
-        getInputValue(sectionContent, "draft_id"),
-    );
-    result = result.replace(
         /\{\{thread_id\}\}/g,
         getInputValue(sectionContent, "thread_id"),
     );
-    return result;
+    return result
 }
 
 function interpolateBody(body, userId, sectionContent) {
@@ -60,10 +56,6 @@ function interpolateBody(body, userId, sectionContent) {
     result = result.replace(
         /\{\{body\}\}/g,
         getInputValue(sectionContent, "body"),
-    );
-    result = result.replace(
-        /\{\{draft_id\}\}/g,
-        getInputValue(sectionContent, "draft_id"),
     );
     result = result.replace(
         /\{\{thread_id\}\}/g,
@@ -214,6 +206,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const userId = event.target.value;
             if (!userId) return;
 
+            // Connect to WebSocket for this user
+            connectWebSocket(userId);
+
             const result = await callApi(`/api/auth/users/${userId}`);
 
             if (result.status === 200 && result.data && result.data.user) {
@@ -230,6 +225,56 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
         });
+
+    let ws = null;
+    let currentUserId = null;
+
+    function connectWebSocket(userId) {
+        if (ws && ws.readyState === WebSocket.OPEN && currentUserId === userId) {
+            return;
+        }
+
+        if (ws) {
+            ws.close();
+        }
+
+        currentUserId = userId;
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        ws = new WebSocket(`${protocol}//${window.location.host}/ws/push/${userId}`);
+
+        ws.onopen = () => {
+            console.log("[ws] Connected");
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log("[ws] Received:", data);
+                displayWsEvent(data);
+            } catch (e) {
+                console.error("[ws] Parse error:", e);
+            }
+        };
+
+        ws.onclose = () => {
+            console.log("[ws] Disconnected");
+            // Reconnect after 3 seconds
+            if (currentUserId) {
+                setTimeout(() => connectWebSocket(currentUserId), 3000);
+            }
+        };
+
+        ws.onerror = (error) => {
+            console.error("[ws] Error:", error);
+        };
+    }
+
+    function displayWsEvent(data) {
+        const output = document.getElementById("response-output");
+        const color = data.event?.includes("_error") ? "#ef4444" : "#10b981";
+        const eventInfo = `<span style="color: ${color}">[${data.event}]</span>`;
+        output.innerHTML = `${eventInfo}\n\n${formatJson(data)}`;
+    }
 
     document.querySelectorAll(".tab-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
