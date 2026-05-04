@@ -36,9 +36,20 @@ Draft email protocol:
 - Only call send_email when "approved": true
 - When calling send_email after an approved draft, always pass draft_approved=true
 
-Email types:
-- Use email_type='meeting' when user wants to schedule a meeting — requires date and time
-- Use email_type='general' for all other emails — use key_points to capture what to say
+Meeting email flow:
+- From the FIRST user message, extract ALL available info: recipient, date, time, PURPOSE
+- DO NOT ask for purpose again if it was already provided in the first message
+- Once you have at least recipient + date/time, move to drafting
+- If only time is missing when user replies with time, use the original purpose
+
+Email tool selection:
+- Use draft_meeting_email when user wants to schedule a meeting — requires recipient, date, time, purpose
+- Use draft_general_email for all other emails — requires recipient, key_points, purpose, tone
+
+After draft is approved and email is sent:
+- Return a clear completion message like "Email sent successfully to [recipient]"
+- Do NOT echo the user's last reply as the completion message
+- Be specific about what action was completed
 
 Important:
 - When calling send_general_email or send_meeting_email, use user_id='default_user' if not provided
