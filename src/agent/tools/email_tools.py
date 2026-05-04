@@ -39,7 +39,7 @@ def _parse_decision(raw) -> dict:
     return {"approved": False, "action_input": str(raw)}
 
 
-def _review_draft(draft: str) -> dict:
+def _review_draft(draft: str, recipient: str) -> dict:
     """Single interrupt for draft review — shared by all draft tools."""
     decision = _parse_decision(
         interrupt(
@@ -51,6 +51,7 @@ def _review_draft(draft: str) -> dict:
                     f"Type 'y' to approve, or give feedback to revise:"
                 ),
                 "draft": draft,
+                "recipient": recipient,
             }
         )
     )
@@ -103,7 +104,7 @@ def resolve_recipient(name: str) -> str:
 
 @tool
 def draft_meeting_email(
-    recipients: List[str],
+    recipient: str,
     date: str,
     time: str,
     purpose: str,
@@ -113,7 +114,7 @@ def draft_meeting_email(
     """Draft a professional meeting request email and present it to the user for review.
 
     Args:
-        recipients:     List of recipient names
+        recipient:     Recipient's name
         date:           Meeting date e.g. '2025-05-02', 'Monday'
         time:           Meeting time e.g. '2pm', '14:00'
         purpose:        Reason for the meeting
@@ -121,7 +122,7 @@ def draft_meeting_email(
         user_feedback:  Feedback from user to guide the next revision
     """
     rendered = email_prompts.draft_meeting_email.render(
-        recipients=recipients, date=date, time=time, purpose=purpose
+        recipient=recipient, date=date, time=time, purpose=purpose
     )
 
     if user_feedback and previous_draft:
@@ -131,7 +132,7 @@ def draft_meeting_email(
     else:
         draft = extract_text(get_llm().invoke(rendered.to_prompt()))
 
-    return _review_draft(draft)
+    return _review_draft(draft, recipient)
 
 
 @tool
@@ -168,7 +169,7 @@ def send_email(
 
 @tool
 def draft_general_email(
-    recipients: List[str],
+    recipient: str,
     key_points: List[str],
     purpose: str,
     tone: str = "professional",
@@ -178,7 +179,7 @@ def draft_general_email(
     """Draft a email and present it to the user for review.
 
     Args:
-        recipients:     List of recipient names
+        recipient:     Recipient's name
         key_points:     List of main ideas
         purpose:        Reason for the meeting
         tone:           Tone of the email e.g 'friendly', 'professional'
@@ -186,7 +187,7 @@ def draft_general_email(
         user_feedback:  Feedback from user to guide the next revision
     """
     rendered = email_prompts.draft_general_email.render(
-        recipients=recipients,
+        recipient=recipient,
         key_points=key_points,
         purpose=purpose,
         tone=tone
@@ -199,4 +200,4 @@ def draft_general_email(
     else:
         draft = extract_text(get_llm().invoke(rendered.to_prompt()))
 
-    return _review_draft(draft)
+    return _review_draft(draft, recipient)

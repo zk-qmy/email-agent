@@ -100,7 +100,7 @@ class EmailPrompts(PromptConfig):
             system=SystemPrompt.system_prompt,
             context=(
                 "Email details:\n"
-                "  Recipients:  $recipients\n"
+                "  Recipient:   $recipient\n"
                 "  Purpose:     $purpose\n"
                 "  Key points:  $key_points\n"
                 "  Tone:        $tone"
