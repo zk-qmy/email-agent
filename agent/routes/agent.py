@@ -6,18 +6,19 @@ from agent.services.agent_service import agent_service
 
 class CreateDraftRequest(BaseModel):
     user_id: int
-    recipient: str
-    subject: str
-    context: str
+    prompt: str
+
+
+class DraftReplyRequest(BaseModel):
+    user_id: int
+    response: str
 
 
 async def create_draft(request: CreateDraftRequest):
     try:
         result = agent_service.create_draft(
             user_id=request.user_id,
-            recipient=request.recipient,
-            subject=request.subject,
-            context=request.context,
+            prompt=request.prompt,
         )
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
@@ -64,6 +65,22 @@ async def cancel_draft(draft_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to cancel draft: {str(e)}")
+
+
+async def reply_to_draft(draft_id: str, request: DraftReplyRequest):
+    try:
+        result = agent_service.reply_to_draft(
+            draft_id=draft_id,
+            user_id=request.user_id,
+            response=request.response,
+        )
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reply to draft: {str(e)}")
 
 
 async def get_user_drafts(user_id: int, status: Optional[str] = None):

@@ -8,6 +8,8 @@ from src.agent.graph import build_graph
 from src.integrations.mail.client import mail_client
 from src.agent.state import AgentState
 from agent.services.draft_models import Draft, DraftContent
+from langgraph.types import Command
+from langchain_core.messages import HumanMessage
 
 
 drafts: dict[str, Draft] = {}
@@ -31,6 +33,20 @@ def _add_message(thread: dict, role: str, content: str, action: str | None = Non
     if action:
         msg["action"] = action
     thread["messages"].append(msg)
+
+
+def _extract_subject_and_clean_body(draft_body: str) -> tuple[str, str]:
+    if not draft_body:
+        return "", ""
+    lines = draft_body.strip().split("\n")
+    subject = ""
+    cleaned_lines = []
+    for line in lines:
+        if line.startswith("Subject:"):
+            subject = line[len("Subject:"):].strip()
+        else:
+            cleaned_lines.append(line)
+    return subject, "\n".join(cleaned_lines).strip()
 
 
 async def _notify_client(user_id: int, event: dict):
@@ -246,9 +262,7 @@ class AgentService:
     def create_draft(
         self,
         user_id: int,
-        recipient: str,
-        subject: str,
-        context: str,
+        prompt: str,
     ) -> dict:
         draft_id = f"draft-{uuid.uuid4().hex[:12]}"
         created_at = datetime.now(timezone.utc).isoformat()
@@ -258,13 +272,7 @@ class AgentService:
                 cast(
                     AgentState,
                     {  # type: ignore[arg-type]
-                        "messages": [{"role": "user", "content": context}],
-                        "meeting": {
-                            "participants": [recipient],
-                            "date": subject,
-                            "context": context,
-                        },
-                        "email": {},
+                        "messages": [{"role": "user", "content": prompt}],
                     },
                 ),
                 {"configurable": {"thread_id": draft_id, "user_id": user_id}},
@@ -276,46 +284,83 @@ class AgentService:
                 }
 
             interrupt_data = result["__interrupt__"][0].value
-            draft_body = interrupt_data.get("email_draft")
+            interrupt_type = interrupt_data.get("type", "question")
 
-            if not draft_body:
-                return {"error": "Workflow did not produce an email draft."}
+            if interrupt_type in ("review_draft", "confirm_send"):
+                draft_body = interrupt_data.get("email_draft") or interrupt_data.get("draft")
+                subject = interrupt_data.get("subject")
+                recipient = interrupt_data.get("recipient")
+
+                if not subject and draft_body:
+                    subject, draft_body = _extract_subject_and_clean_body(draft_body)
+
+                draft = Draft(
+                    draft_id=draft_id,
+                    user_id=user_id,
+                    draft=DraftContent(
+                        recipient=recipient or "",
+                        subject=subject or "",
+                        body=draft_body or "",
+                    ),
+                    context=prompt,
+                    status="awaiting_input",
+                    thread_id=None,
+                    email_id=None,
+                    created_at=created_at,
+                    sent_at=None,
+                    updated_at=None,
+                )
+
+                drafts[draft_id] = draft
+
+                return {
+                    "draft_id": draft_id,
+                    "draft": {
+                        "recipient": recipient or "",
+                        "subject": subject or "",
+                        "body": draft_body or "",
+                    },
+                    "status": "awaiting_input",
+                    "interrupt": {
+                        "type": interrupt_type,
+                        "question": interrupt_data.get("question", ""),
+                    },
+                    "created_at": created_at,
+                }
+            else:
+                draft = Draft(
+                    draft_id=draft_id,
+                    user_id=user_id,
+                    draft=DraftContent(
+                        recipient="",
+                        subject="",
+                        body="",
+                    ),
+                    context=prompt,
+                    status="awaiting_input",
+                    thread_id=None,
+                    email_id=None,
+                    created_at=created_at,
+                    sent_at=None,
+                    updated_at=None,
+                )
+
+                drafts[draft_id] = draft
+
+                return {
+                    "draft_id": draft_id,
+                    "status": "awaiting_input",
+                    "interrupt": {
+                        "type": interrupt_type,
+                        "question": interrupt_data.get("question", ""),
+                    },
+                    "created_at": created_at,
+                }
+
         except KeyError as e:
             return {"error": f"Unexpected workflow response format: missing key {e}"}
         except Exception as e:
             return {"error": f"Failed to create draft: {str(e)}"}
-
-        created_at = datetime.now(timezone.utc).isoformat()
-
-        draft = Draft(
-            draft_id=draft_id,
-            user_id=user_id,
-            draft=DraftContent(
-                recipient=recipient,
-                subject=subject,
-                body=draft_body,
-            ),
-            context=context,
-            status="pending",
-            thread_id=None,
-            email_id=None,
-            created_at=created_at,
-            sent_at=None,
-            updated_at=None,
-        )
-
-        drafts[draft_id] = draft
-
-        return {
-            "draft_id": draft_id,
-            "draft": {
-                "recipient": recipient,
-                "subject": subject,
-                "body": draft_body,
-            },
-            "status": "pending",
-            "created_at": created_at,
-        }
 
     def get_draft(self, draft_id: str) -> Optional[dict]:
         draft = drafts.get(draft_id)
@@ -337,6 +382,122 @@ class AgentService:
             "sent_at": draft.sent_at,
             "email_id": draft.email_id,
         }
+
+    def reply_to_draft(
+        self,
+        draft_id: str,
+        user_id: int,
+        response: str,
+    ) -> dict:
+        draft = drafts.get(draft_id)
+        if not draft:
+            return {"error": "Draft not found"}
+
+        if draft.status not in ("awaiting_input", "pending"):
+            return {"error": f"Cannot reply to draft with status: {draft.status}"}
+
+        thread_config = {"configurable": {"thread_id": draft_id, "user_id": user_id}}
+
+        try:
+            while True:
+                snapshot = self.graph.get_state(thread_config)
+
+                if not snapshot.interrupts:
+                    return {"error": "No pending interrupt to resume from"}
+
+                interrupt_data = snapshot.interrupts[0].value
+                interrupt_type = interrupt_data.get("type", "question")
+
+                if interrupt_type == "question":
+                    self.graph.update_state(
+                        thread_config,
+                        {"messages": [HumanMessage(content=response)]},
+                    )
+                    result = self.graph.invoke(
+                        Command(resume=response),
+                        config=thread_config,
+                    )
+                else:
+                    result = self.graph.invoke(
+                        Command(resume={"response": response}),
+                        config=thread_config,
+                    )
+
+                if "__interrupt__" in result and result["__interrupt__"]:
+                    interrupt_data = result["__interrupt__"][0].value
+                    interrupt_type = interrupt_data.get("type", "question")
+
+                    if interrupt_type in ("review_draft", "confirm_send"):
+                        draft_body = interrupt_data.get("email_draft") or interrupt_data.get("draft")
+                        subject = interrupt_data.get("subject")
+                        recipient = interrupt_data.get("recipient")
+
+                        if not subject and draft_body:
+                            subject, draft_body = _extract_subject_and_clean_body(draft_body)
+
+                        draft.draft.recipient = recipient or ""
+                        draft.draft.subject = subject or ""
+                        draft.draft.body = draft_body or ""
+                        draft.status = "awaiting_input"
+                        draft.updated_at = datetime.now(timezone.utc).isoformat()
+
+                        return {
+                            "draft_id": draft_id,
+                            "draft": {
+                                "recipient": recipient or "",
+                                "subject": subject or "",
+                                "body": draft_body or "",
+                            },
+                            "status": "awaiting_input",
+                            "interrupt": {
+                                "type": interrupt_type,
+                                "question": interrupt_data.get("question", ""),
+                            },
+                        }
+                    else:
+                        return {
+                            "draft_id": draft_id,
+                            "status": "awaiting_input",
+                            "interrupt": {
+                                "type": interrupt_type,
+                                "question": interrupt_data.get("question", ""),
+                            },
+                        }
+
+                messages = result.get("messages", [])
+                if messages:
+                    last_msg = messages[-1]
+                    if hasattr(last_msg, "content"):
+                        content = last_msg.content
+                        if isinstance(content, list):
+                            content = " ".join(
+                                block.get("text", "")
+                                for block in content
+                                if isinstance(block, dict)
+                            )
+                        draft.draft.body = content
+                        draft.status = "completed"
+                        draft.updated_at = datetime.now(timezone.utc).isoformat()
+
+                        return {
+                            "draft_id": draft_id,
+                            "draft": {
+                                "recipient": draft.draft.recipient,
+                                "subject": draft.draft.subject,
+                                "body": draft.draft.body,
+                            },
+                            "status": "completed",
+                            "message": content,
+                        }
+
+                return {
+                    "draft_id": draft_id,
+                    "status": "completed",
+                    "message": "Draft processing completed",
+                }
+
+        except Exception as e:
+            return {"error": f"Failed to process reply: {str(e)}"}
 
     def cancel_draft(self, draft_id: str) -> dict:
         draft = drafts.get(draft_id)
@@ -386,7 +547,7 @@ class AgentService:
         if not draft:
             return {"error": "Draft not found"}
 
-        if draft.status != "pending":
+        if draft.status not in ("pending", "awaiting_input"):
             return {"error": f"Cannot send draft with status: {draft.status}"}
 
         final_body = draft.draft.body
