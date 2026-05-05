@@ -270,7 +270,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function displayWsEvent(data) {
-        const output = document.getElementById("response-output");
+        const output = document.getElementById("agent-response-output");
         const color = data.event?.includes("_error") ? "#ef4444" : "#10b981";
         const eventInfo = `<span style="color: ${color}">[${data.event}]</span>`;
         output.innerHTML = `${eventInfo}\n\n${formatJson(data)}`;
@@ -353,5 +353,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("clear-response").addEventListener("click", () => {
         document.getElementById("response-output").textContent = "";
+    });
+
+    document.getElementById("clear-agent-response").addEventListener("click", () => {
+        document.getElementById("agent-response-output").textContent = "";
     });
 });

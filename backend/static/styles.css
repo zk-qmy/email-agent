@@ -146,15 +146,19 @@ h3 {
     min-width: 0;
 }
 
-.response-panel {
+.response-column {
     width: 400px;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.response-panel {
     background: var(--card-bg);
     border-radius: 8px;
     border: 1px solid var(--border);
     overflow: hidden;
-    position: sticky;
-    top: 20px;
 }
 
 .section {
@@ -263,7 +267,8 @@ h3 {
     margin: 0;
 }
 
-#response-output {
+#response-output,
+#agent-response-output {
     padding: 16px;
     margin: 0;
     min-height: 200px;

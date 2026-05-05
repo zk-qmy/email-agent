@@ -419,6 +419,13 @@ class AgentService:
                 draft.status = "awaiting_input"
                 draft.updated_at = datetime.now(timezone.utc).isoformat()
 
+                thread = threads.get(thread_id)
+                if thread:
+                    thread["recipient"] = recipient or ""
+                    thread["meeting"]["subject"] = subject or ""
+                    thread["status"] = "awaiting_input"
+                    thread["updated_at"] = datetime.now(timezone.utc).isoformat()
+
                 await _notify_client(
                     user_id,
                     {
@@ -438,6 +445,11 @@ class AgentService:
             else:
                 draft.status = "awaiting_input"
                 draft.updated_at = datetime.now(timezone.utc).isoformat()
+
+                thread = threads.get(thread_id)
+                if thread:
+                    thread["status"] = "awaiting_input"
+                    thread["updated_at"] = datetime.now(timezone.utc).isoformat()
 
                 await _notify_client(
                     user_id,
@@ -477,6 +489,30 @@ class AgentService:
             updated_at=None,
         )
         drafts[thread_id] = draft
+
+        thread = {
+            "thread_id": thread_id,
+            "draft_id": thread_id,
+            "email_id": None,
+            "user_id": user_id,
+            "recipient": "",
+            "meeting": {
+                "subject": "",
+                "date": None,
+                "time": None,
+                "participants": [],
+            },
+            "status": "processing",
+            "reply_intent": None,
+            "reply_email_id": None,
+            "reply_body": None,
+            "followup_count": 0,
+            "last_check": created_at,
+            "messages": [],
+            "created_at": created_at,
+            "updated_at": created_at,
+        }
+        threads[thread_id] = thread
 
         await _notify_client(
             user_id,
@@ -606,39 +642,19 @@ class AgentService:
                         draft.draft.body = content
                         draft.updated_at = datetime.now(timezone.utc).isoformat()
 
-                        sent_content = content.lower() if content else ""
-                        email_sent = "sent" in sent_content and draft.draft.recipient
+                        email_sent = draft.draft.recipient and draft.draft.subject and draft.draft.body
 
                         if email_sent:
                             draft.status = "sent"
                             draft.sent_at = datetime.now(timezone.utc).isoformat()
 
-                            thread_id = f"thread-{uuid.uuid4().hex[:12]}"
-                            thread = {
-                                "thread_id": thread_id,
-                                "draft_id": draft_id,
-                                "email_id": None,
-                                "user_id": draft.user_id,
-                                "recipient": draft.draft.recipient,
-                                "meeting": {
-                                    "subject": draft.draft.subject,
-                                    "date": None,
-                                    "time": None,
-                                    "participants": [draft.draft.recipient],
-                                },
-                                "status": "waiting_reply",
-                                "reply_intent": None,
-                                "reply_email_id": None,
-                                "reply_body": None,
-                                "followup_count": 0,
-                                "last_check": datetime.now(timezone.utc).isoformat(),
-                                "messages": [],
-                                "created_at": datetime.now(timezone.utc).isoformat(),
-                                "updated_at": datetime.now(timezone.utc).isoformat(),
-                            }
-
-                            threads[thread_id] = thread
-                            draft.thread_id = thread_id
+                            thread = threads.get(draft_id)
+                            if thread:
+                                thread["recipient"] = draft.draft.recipient
+                                thread["meeting"]["subject"] = draft.draft.subject
+                                thread["meeting"]["participants"] = [draft.draft.recipient]
+                                thread["status"] = "waiting_reply"
+                                thread["updated_at"] = datetime.now(timezone.utc).isoformat()
 
                             return {
                                 "draft_id": draft_id,
@@ -648,7 +664,7 @@ class AgentService:
                                     "body": draft.draft.body,
                                 },
                                 "status": "sent",
-                                "thread_id": thread_id,
+                                "thread_id": draft_id,
                                 "message": content,
                             }
                         else:
@@ -776,8 +792,7 @@ class AgentService:
                         draft.draft.body = content
                         draft.updated_at = datetime.now(timezone.utc).isoformat()
 
-                        sent_content = content.lower() if content else ""
-                        email_sent = "sent" in sent_content and draft.draft.recipient
+                        email_sent = draft.draft.recipient and draft.draft.subject and draft.draft.body
 
                         if email_sent:
                             draft.status = "sent"
@@ -958,32 +973,41 @@ class AgentService:
             draft.sent_at = datetime.now(timezone.utc).isoformat()
             draft.email_id = email_id
 
-            thread_id = f"thread-{uuid.uuid4().hex[:12]}"
-            thread = {
-                "thread_id": thread_id,
-                "draft_id": draft_id,
-                "email_id": email_id,
-                "user_id": draft.user_id,
-                "recipient": recipient,
-                "meeting": {
-                    "subject": draft.draft.subject,
-                    "date": None,
-                    "time": None,
-                    "participants": [recipient],
-                },
-                "status": "waiting_reply",
-                "reply_intent": None,
-                "reply_email_id": None,
-                "reply_body": None,
-                "followup_count": 0,
-                "last_check": datetime.now(timezone.utc).isoformat(),
-                "messages": [],
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-
-            threads[thread_id] = thread
-            draft.thread_id = thread_id
+            thread_id = draft.thread_id
+            thread = threads.get(thread_id)
+            if thread:
+                thread["email_id"] = email_id
+                thread["recipient"] = recipient
+                thread["meeting"]["subject"] = draft.draft.subject
+                thread["meeting"]["participants"] = [recipient]
+                thread["status"] = "waiting_reply"
+                thread["updated_at"] = datetime.now(timezone.utc).isoformat()
+            else:
+                thread_id = f"thread-{uuid.uuid4().hex[:12]}"
+                thread = {
+                    "thread_id": thread_id,
+                    "draft_id": draft_id,
+                    "email_id": email_id,
+                    "user_id": draft.user_id,
+                    "recipient": recipient,
+                    "meeting": {
+                        "subject": draft.draft.subject,
+                        "date": None,
+                        "time": None,
+                        "participants": [recipient],
+                    },
+                    "status": "waiting_reply",
+                    "reply_intent": None,
+                    "reply_email_id": None,
+                    "reply_body": None,
+                    "followup_count": 0,
+                    "last_check": datetime.now(timezone.utc).isoformat(),
+                    "messages": [],
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+                threads[thread_id] = thread
+                draft.thread_id = thread_id
 
             from agent.services.ws_client import backend_ws_client
 
@@ -1137,36 +1161,40 @@ class AgentService:
             "message": "Meeting declined",
         }
 
-    def get_status(self, thread_id: str, active_workflows: dict) -> dict:
-        if thread_id not in active_workflows:
+    def get_status(self, thread_id: str, active_workflows: dict = None) -> dict:
+        thread = threads.get(thread_id)
+        if not thread:
             return {"error": "Thread not found", "status": "error"}
 
-        workflow = active_workflows[thread_id]
-
         return {
-            "thread_id": thread_id,
-            "status": workflow["status"],
-            "current_step": workflow.get("current_step", "unknown"),
-            "email_context": workflow.get("email_context"),
-            "interrupt": workflow.get("interrupt", {}),
-            "messages": workflow.get("messages", []),
+            "thread_id": thread["thread_id"],
+            "status": thread["status"],
+            "recipient": thread["recipient"],
+            "meeting": thread.get("meeting"),
+            "reply_intent": thread.get("reply_intent"),
+            "messages": thread.get("messages", []),
+            "followup_count": thread["followup_count"],
+            "created_at": thread["created_at"],
+            "updated_at": thread["updated_at"],
         }
 
-    def get_history(self, thread_id: str, active_workflows: dict) -> dict:
-        if thread_id not in active_workflows:
+    def get_history(self, thread_id: str, active_workflows: dict = None) -> dict:
+        thread = threads.get(thread_id)
+        if not thread:
             return {"error": "Thread not found", "status": "error"}
 
-        workflow = active_workflows[thread_id]
-
         return {
-            "thread_id": thread_id,
-            "status": workflow["status"],
-            "user_id": workflow["user_id"],
-            "email_id": workflow["email_id"],
-            "email_context": workflow.get("email_context"),
-            "messages": workflow["messages"],
-            "total_messages": len(workflow["messages"]),
-            "created_at": workflow.get("created_at"),
+            "thread_id": thread["thread_id"],
+            "status": thread["status"],
+            "user_id": thread["user_id"],
+            "email_id": thread.get("email_id"),
+            "draft_id": thread.get("draft_id"),
+            "recipient": thread["recipient"],
+            "meeting": thread.get("meeting"),
+            "messages": thread.get("messages", []),
+            "total_messages": len(thread.get("messages", [])),
+            "created_at": thread["created_at"],
+            "updated_at": thread["updated_at"],
         }
 
     def _handle_error(
