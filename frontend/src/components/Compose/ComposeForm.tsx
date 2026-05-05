@@ -43,9 +43,12 @@ export function ComposeForm() {
   const handleAIDraft = () => {
     const text = [to && `to ${to}`, subject && `about "${subject}"`].filter(Boolean).join(' ');
     if (text) {
-      useStore.getState().addChatMessage({
+      const threadId = 'thread-' + Date.now();
+      useStore.getState().createThread(threadId);
+      useStore.getState().addMessageToThread(threadId, {
         id: 'temp-' + Date.now(),
         role: 'user',
+        threadId,
         content: text
       });
     }
