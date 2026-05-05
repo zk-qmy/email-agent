@@ -22,7 +22,7 @@ function interpolateEndpoint(endpoint, userId, sectionContent) {
         /\{\{thread_id\}\}/g,
         getInputValue(sectionContent, "thread_id"),
     );
-    return result
+    return result;
 }
 
 function interpolateBody(body, userId, sectionContent) {
@@ -175,8 +175,7 @@ async function loadUsers() {
                             `<option value="${u.id}">${u.username} (${u.email})</option>`,
                     )
                     .join("");
-                
-                // Auto-select first user and fill fields
+
                 select.selectedIndex = 0;
                 if (select.value) {
                     select.dispatchEvent(new Event("change"));
@@ -206,7 +205,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const userId = event.target.value;
             if (!userId) return;
 
-            // Connect to WebSocket for this user
             connectWebSocket(userId);
 
             const result = await callApi(`/api/auth/users/${userId}`);
@@ -258,7 +256,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         ws.onclose = () => {
             console.log("[ws] Disconnected");
-            // Reconnect after 3 seconds
             if (currentUserId) {
                 setTimeout(() => connectWebSocket(currentUserId), 3000);
             }
@@ -311,11 +308,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (endpoint === "/api/agent/health") {
                 const result = await callApi(endpoint);
                 displayResponse(result);
-                return;
-            }
-
-            if (!userId && endpoint.includes("{{user_id}}")) {
-                displayError("Please select a user first");
                 return;
             }
 

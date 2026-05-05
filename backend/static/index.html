@@ -288,71 +288,71 @@
                     </div>
 
                     <div id="agent-tab" class="tab-pane">
-                        <div class="api-section">
-                            <h2 class="section-title" data-section="agent-list">
-                                <span>List</span>
-                                <span class="toggle">▼</span>
-                            </h2>
-                            <div
-                                class="section-content"
-                                id="agent-list-section"
-                            >
-                                <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/agent/threads?user_id={{user_id}}"
-                                    >
-                                        Get Threads
-                                    </button>
+<div class="api-section">
+                                <h2 class="section-title" data-section="agent-list">
+                                    <span>List</span>
+                                    <span class="toggle">▼</span>
+                                </h2>
+                                <div
+                                    class="section-content"
+                                    id="agent-list-section"
+                                >
+                                    <div class="test-group">
+                                        <button
+                                            class="test-btn"
+                                            data-method="GET"
+                                            data-endpoint="/api/agent/threads?user_id={{user_id}}"
+                                        >
+                                            Get Threads
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="api-section">
-                            <h2
-                                class="section-title"
-                                data-section="agent-thread"
-                            >
-                                <span>Thread</span>
-                                <span class="toggle">▼</span>
-                            </h2>
-                            <div
-                                class="section-content"
-                                id="agent-thread-section"
-                            >
-                                <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="POST"
-                                        data-endpoint="/api/agent/thread"
-                                        data-body='{"user_id": {{user_id}}, "prompt": "{{context}}"}'
-                                    >
-                                        Create Thread
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/agent/thread/{{thread_id}}"
-                                    >
-                                        Get Thread
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="DELETE"
-                                        data-endpoint="/api/agent/thread/{{thread_id}}"
-                                    >
-                                        Cancel Thread
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="POST"
-                                        data-endpoint="/api/agent/thread/{{thread_id}}/reply"
-                                        data-body='{"user_id": {{user_id}}, "response": "{{response}}"}'
-                                    >
-                                        Reply to Thread
-                                    </button>
-                                </div>
+                            <div class="api-section">
+                                <h2
+                                    class="section-title"
+                                    data-section="agent-thread"
+                                >
+                                    <span>Thread</span>
+                                    <span class="toggle">▼</span>
+                                </h2>
+                                <div
+                                    class="section-content"
+                                    id="agent-thread-section"
+                                >
+                                    <div class="test-group">
+                                        <button
+                                            class="test-btn"
+                                            data-method="POST"
+                                            data-endpoint="/api/agent/thread"
+                                            data-body='{"user_id": {{user_id}}, "prompt": "{{context}}"}'
+                                        >
+                                            Create Thread
+                                        </button>
+                                        <button
+                                            class="test-btn"
+                                            data-method="GET"
+                                            data-endpoint="/api/agent/thread/{{thread_id}}"
+                                        >
+                                            Get Thread
+                                        </button>
+                                        <button
+                                            class="test-btn"
+                                            data-method="DELETE"
+                                            data-endpoint="/api/agent/thread/{{thread_id}}"
+                                        >
+                                            Cancel Thread
+                                        </button>
+                                        <button
+                                            class="test-btn"
+                                            data-method="POST"
+                                            data-endpoint="/api/agent/thread/{{thread_id}}/reply"
+                                            data-body='{"user_id": {{user_id}}, "response": "{{response}}"}'
+                                        >
+                                            Reply to Thread
+                                        </button>
+                                    </div>
                                 <div class="input-row">
                                     <input
                                         type="text"
