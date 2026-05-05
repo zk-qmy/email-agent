@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -28,7 +27,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+static_dir = os.path.join(os.path.dirname(__file__), "static")
 
 
 @app.get("/static/{filename:path}")
