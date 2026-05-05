@@ -2,20 +2,22 @@
 
 /* ─── State ─── */
 const state = {
-  currentUser: null,
-  users: [],
-  role: 'user',
-  currentView: 'chat',
-  ws: null,
-  inboxEmails: [],
-  sentEmails: [],
-  replyTargetEmailId: null,
-  // Chat-specific
-  pendingContext: null,
-  awaitingRecipient: false,
-  activeDraftId: null,
-  activeThreadId: null,
-  draftPollTimer: null,
+  currentUser:      null,
+  users:            [],
+  role:             'user',
+  currentTab:       'inbox',
+  inboxFilter:      'inbox',
+  ws:               null,
+  replyTargetId:    null,
+  // Chat
+  chatOpen:         false,
+  pendingContext:   null,
+  awaitingRecipient:false,
+  activeDraftId:    null,
+  activeThreadId:   null,
+  // Calendar
+  calYear:          new Date().getFullYear(),
+  calMonth:         new Date().getMonth(),
 };
 
 /* ─── API ─── */
@@ -29,20 +31,20 @@ const api = {
     return data;
   },
   getUsers:       ()                   => api.req('GET', '/api/auth/users').then(r => r.users || r),
-  getInbox:       (uid)                => api.req('GET', `/api/emails/inbox?user_id=${uid}`),
-  getSent:        (uid)                => api.req('GET', `/api/emails/sent?user_id=${uid}`),
-  getEmail:       (eid)                => api.req('GET', `/api/emails/${eid}`),
+  getInbox:       (uid)                => api.req('GET', `/api/emails/inbox?user_id=${uid}`).then(r => (r.emails || []).map(e => e.email || e)),
+  getSent:        (uid)                => api.req('GET', `/api/emails/sent?user_id=${uid}`).then(r => (r.emails || []).map(e => e.email || e)),
+  getEmail:       (eid)                => api.req('GET', `/api/emails/${eid}`).then(r => r.email || r),
+  sendEmail:      (sid, to, sub, body) => api.req('POST', '/api/emails/send', { sender_id: sid, recipient_email: to, subject: sub, body }),
   markRead:       (eid)                => api.req('PUT', '/api/emails/mark_read', { email_id: eid }),
   replyEmail:     (sid, pid, body)     => api.req('POST', '/api/emails/reply', { sender_id: sid, parent_email_id: pid, body }),
   createDraft:    (uid, to, sub, ctx)  => api.req('POST', '/api/agent/draft', { user_id: uid, recipient: to, subject: sub, context: ctx }),
   getDraft:       (did)                => api.req('GET', `/api/agent/draft/${did}`),
-  getDrafts:      (uid)                => api.req('GET', `/api/agent/drafts?user_id=${uid}`),
   sendDraft:      (did, body)          => api.req('POST', `/api/agent/draft/${did}/send`, body !== undefined ? { body } : {}),
   cancelDraft:    (did)                => api.req('DELETE', `/api/agent/draft/${did}`),
   getThread:      (tid)                => api.req('GET', `/api/agent/thread/${tid}`),
+  getThreads:     (uid)                => api.req('GET', `/api/agent/threads?user_id=${uid}`).then(r => r.threads || []),
   confirmMeeting: (tid)                => api.req('POST', `/api/agent/thread/${tid}/confirm`, {}),
   declineMeeting: (tid)                => api.req('POST', `/api/agent/thread/${tid}/decline`, {}),
-  agentHealth:    ()                   => api.req('GET', '/health'),
 };
 
 /* ─── Utilities ─── */
@@ -72,7 +74,6 @@ function extractEmail(text) {
   return m ? m[0] : null;
 }
 
-/* ─── Avatar ─── */
 const AVATAR_COLORS = ['#e84b5a','#6366f1','#10b981','#f59e0b','#8b5cf6','#0ea5e9','#ec4899','#14b8a6'];
 
 function avatarColor(name) {
@@ -104,33 +105,37 @@ function connectWS(userId) {
   const url = `${proto}://${location.hostname}:8000/api/agent/ws/${userId}`;
   try {
     state.ws = new WebSocket(url);
-    state.ws.onopen  = () => setAgentStatus(true);
-    state.ws.onclose = () => { setAgentStatus(false); setTimeout(() => { if (state.currentUser) connectWS(state.currentUser.id); }, 5000); };
-    state.ws.onerror = () => setAgentStatus(false);
+    state.ws.onopen    = () => setAgentStatus(true);
+    state.ws.onclose   = () => { setAgentStatus(false); setTimeout(() => { if (state.currentUser) connectWS(state.currentUser.id); }, 5000); };
+    state.ws.onerror   = () => setAgentStatus(false);
     state.ws.onmessage = (ev) => { try { handleWsEvent(JSON.parse(ev.data)); } catch {} };
   } catch { setAgentStatus(false); }
 }
 
 function handleWsEvent(data) {
   const ev = data && data.event;
-  if (ev === 'new_email')       { toast('New email received!', 'info'); updateInboxBadge(1); if (state.currentView === 'inbox') loadInbox(); }
+  if (ev === 'new_email')        { toast('New email received!', 'info'); updateInboxBadge(1); if (state.currentTab === 'inbox') refreshTab('inbox'); }
   if (ev === 'workflow_complete') toast('Workflow completed!', 'success');
-  if (ev === 'followup_sent')   addSystemMsg('Follow-up email sent automatically.');
-  if (ev === 'reply_received')  { addSystemMsg('Reply received!'); if (state.currentView === 'inbox') loadInbox(); }
+  if (ev === 'followup_sent')    addSystemMsg('Follow-up email sent automatically.');
+  if (ev === 'reply_received')   { addSystemMsg('Reply received!'); if (state.currentTab === 'inbox') refreshTab('inbox'); }
 }
 
 function setAgentStatus(online) {
-  document.getElementById('agent-dot').className = `status-dot ${online ? 'online' : 'offline'}`;
+  document.getElementById('agent-dot').className    = `status-dot ${online ? 'online' : 'offline'}`;
   document.getElementById('agent-text').textContent = online ? 'Agent online' : 'Agent offline';
-  document.getElementById('chat-status').textContent = online ? 'Ready to help' : 'Agent offline';
-  document.getElementById('chat-status').style.color = online ? 'var(--success)' : 'var(--danger)';
+  const cs = document.getElementById('chat-status');
+  if (cs) {
+    cs.textContent = online ? 'Ready to help' : 'Agent offline';
+    cs.style.color = '';
+  }
 }
 
 /* ─── Init ─── */
 async function init() {
   setupEventListeners();
-  showView('chat');
+  showTab('inbox');
   await loadUsers();
+  setAgentStatus(false);
   checkAgentHealth();
 }
 
@@ -151,50 +156,173 @@ function selectUser(userId) {
   if (!user) return;
   state.currentUser = user;
   connectWS(user.id);
-  refreshCurrentView();
+  refreshTab(state.currentTab);
 }
 
 async function checkAgentHealth() {
-  try { await api.agentHealth(); setAgentStatus(true); }
-  catch { setAgentStatus(false); }
+  try {
+    const r = await fetch('/health');
+    if (r.ok) setAgentStatus(true);
+  } catch { setAgentStatus(false); }
 }
 
-/* ─── View Management ─── */
-function showView(viewName) {
-  state.currentView = viewName;
-  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-  const view = document.getElementById(`view-${viewName}`);
-  if (view) view.classList.remove('hidden');
-  document.querySelectorAll('[data-view]').forEach(btn =>
-    btn.classList.toggle('active', btn.dataset.view === viewName)
-  );
-  refreshCurrentView();
+/* ─── Tab Management ─── */
+function showTab(name) {
+  state.currentTab = name;
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+  document.getElementById(`tab-${name}`)?.classList.remove('hidden');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  refreshTab(name);
 }
 
-function refreshCurrentView() {
+function refreshTab(name) {
   if (!state.currentUser) return;
-  switch (state.currentView) {
-    case 'inbox':      loadInbox(); break;
-    case 'sent':       loadSent(); break;
-    case 'drafts':     loadDrafts(); break;
-    case 'review':     loadCourseEmails(); break;
-    case 'all-emails': loadAllEmails(); break;
+  switch (name) {
+    case 'inbox':        state.inboxFilter === 'sent' ? loadSent() : loadInbox(); break;
+    case 'calendar':     loadCalendar(); break;
+    case 'all-emails':   loadAllEmails(); break;
+    case 'course-emails':loadCourseEmails(); break;
   }
 }
 
-/* ─── Chat Logic ─── */
-function getUserInitials() {
-  if (!state.currentUser) return '?';
-  return avatarInitials(state.currentUser.username);
+/* ─── Inbox / Sent ─── */
+async function loadInbox() {
+  document.getElementById('inbox-list').innerHTML = '<div class="email-empty"><p>Loading…</p></div>';
+  try {
+    const emails = await api.getInbox(state.currentUser.id);
+    const unread = emails.filter(e => !e.is_read).length;
+    document.getElementById('inbox-subtitle').textContent =
+      `${emails.length} message${emails.length !== 1 ? 's' : ''}${unread ? `, ${unread} unread` : ''}`;
+    renderEmailList(emails, 'inbox-list', 'inbox-reader', false);
+    updateInboxBadge(0, unread);
+  } catch { setListError('inbox-list', 'Failed to load inbox.'); }
 }
 
+async function loadSent() {
+  document.getElementById('inbox-list').innerHTML = '<div class="email-empty"><p>Loading…</p></div>';
+  try {
+    const emails = await api.getSent(state.currentUser.id);
+    document.getElementById('inbox-subtitle').textContent = `${emails.length} sent message${emails.length !== 1 ? 's' : ''}`;
+    renderEmailList(emails, 'inbox-list', 'inbox-reader', true);
+    updateInboxBadge(0, 0);
+  } catch { setListError('inbox-list', 'Failed to load sent mail.'); }
+}
+
+function updateInboxBadge(delta = 0, forceCount = null) {
+  const badge = document.getElementById('inbox-badge');
+  const next = forceCount !== null ? forceCount : Math.max(0, (parseInt(badge.textContent, 10) || 0) + delta);
+  if (next > 0) { badge.textContent = next; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+}
+
+/* ─── Compose ─── */
+async function sendCompose() {
+  const to      = document.getElementById('compose-to').value.trim();
+  const subject = document.getElementById('compose-subject').value.trim();
+  const body    = document.getElementById('compose-body').value.trim();
+
+  if (!to || !body) { toast('Please fill in To and Message fields.', 'error'); return; }
+  if (!state.currentUser) { toast('Please select a user first.', 'error'); return; }
+
+  const btn = document.getElementById('compose-send');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  try {
+    await api.sendEmail(state.currentUser.id, to, subject || '(no subject)', body);
+    toast('Email sent!', 'success');
+    document.getElementById('compose-to').value      = '';
+    document.getElementById('compose-subject').value = '';
+    document.getElementById('compose-body').value    = '';
+  } catch (e) {
+    toast(`Failed: ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send Email';
+  }
+}
+
+function populateCompose(to, subject, body) {
+  document.getElementById('compose-to').value      = to || '';
+  document.getElementById('compose-subject').value = subject || '';
+  document.getElementById('compose-body').value    = body || '';
+  showTab('compose');
+}
+
+/* ─── Calendar ─── */
+function loadCalendar() {
+  renderCalendarGrid();
+  loadMeetings();
+}
+
+function renderCalendarGrid() {
+  const { calYear: year, calMonth: month } = state;
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month-title').textContent = `${MONTHS[month]} ${year}`;
+
+  const today     = new Date();
+  const firstDay  = new Date(year, month, 1).getDay();
+  const daysCount = new Date(year, month + 1, 0).getDate();
+  const isNow     = today.getFullYear() === year && today.getMonth() === month;
+
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += '<div class="cal-day empty"></div>';
+  for (let d = 1; d <= daysCount; d++) {
+    const isToday = isNow && d === today.getDate();
+    html += `<div class="cal-day${isToday ? ' today' : ''}">${d}</div>`;
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+async function loadMeetings() {
+  if (!state.currentUser) return;
+  const el = document.getElementById('meetings-list');
+  try {
+    const threads = await api.getThreads(state.currentUser.id);
+    if (!threads.length) {
+      el.innerHTML = '<div class="email-empty"><p>No scheduled meetings yet.<br>Use the AI assistant to schedule one.</p></div>';
+      return;
+    }
+    el.innerHTML = threads.map(t => {
+      const statusClass = t.status || 'sent';
+      const statusLabel = (t.status || '').replace(/_/g, ' ');
+      return `
+        <div class="meeting-card">
+          <div class="meeting-card-recipient">${escHtml(t.recipient || '—')}</div>
+          <div class="meeting-card-detail">Sent ${formatDate(t.created_at)}</div>
+          <span class="meeting-status-badge ${statusClass}">${escHtml(statusLabel)}</span>
+        </div>`;
+    }).join('');
+  } catch {
+    el.innerHTML = '<div class="email-empty"><p>Could not load meetings.</p></div>';
+  }
+}
+
+/* ─── Chat Widget ─── */
+function toggleChat() {
+  const w = document.getElementById('chat-widget');
+  state.chatOpen = !state.chatOpen;
+  w.classList.toggle('hidden', !state.chatOpen);
+  if (state.chatOpen) setTimeout(() => document.getElementById('chat-input')?.focus(), 80);
+}
+
+function openChat() {
+  const w = document.getElementById('chat-widget');
+  state.chatOpen = true;
+  w.classList.remove('hidden');
+  setTimeout(() => document.getElementById('chat-input')?.focus(), 80);
+}
+
+/* ─── Chat Messages ─── */
 function addUserMsg(text) {
   const msgs = document.getElementById('chat-messages');
-  const div = document.createElement('div');
+  const div  = document.createElement('div');
   div.className = 'msg msg-user';
+  const initials = state.currentUser ? avatarInitials(state.currentUser.username) : '?';
+  const color    = state.currentUser ? avatarColor(state.currentUser.username) : '#9ca3af';
   div.innerHTML = `
     <div class="msg-avatar-wrap">
-      <div class="msg-avatar user-avatar" style="background:${avatarColor(state.currentUser?.username || '')}">${getUserInitials()}</div>
+      <div class="msg-avatar user-avatar" style="background:${color}">${initials}</div>
     </div>
     <div class="msg-bubble">${escHtml(text)}</div>`;
   msgs.appendChild(div);
@@ -203,7 +331,7 @@ function addUserMsg(text) {
 
 function addAiMsg(html) {
   const msgs = document.getElementById('chat-messages');
-  const div = document.createElement('div');
+  const div  = document.createElement('div');
   div.className = 'msg msg-ai';
   div.innerHTML = `
     <div class="msg-avatar-wrap">
@@ -217,28 +345,23 @@ function addAiMsg(html) {
 
 function addThinkingMsg() {
   const msgs = document.getElementById('chat-messages');
-  const div = document.createElement('div');
-  div.className = 'msg msg-ai';
+  const div  = document.createElement('div');
+  div.className = 'msg msg-ai msg-thinking';
   div.id = 'msg-thinking';
   div.innerHTML = `
-    <div class="msg-avatar-wrap">
-      <div class="msg-avatar ai-avatar">AI</div>
-    </div>
-    <div class="msg-bubble msg-thinking">
-      <span></span><span></span><span></span>
-    </div>`;
+    <div class="msg-avatar-wrap"><div class="msg-avatar ai-avatar">AI</div></div>
+    <div class="msg-bubble msg-thinking"><span></span><span></span><span></span></div>`;
   msgs.appendChild(div);
   scrollChat();
 }
 
 function removeThinkingMsg() {
-  const el = document.getElementById('msg-thinking');
-  if (el) el.remove();
+  document.getElementById('msg-thinking')?.remove();
 }
 
 function addSystemMsg(text, isError = false) {
   const msgs = document.getElementById('chat-messages');
-  const div = document.createElement('div');
+  const div  = document.createElement('div');
   div.className = `msg msg-system${isError ? ' error' : ''}`;
   div.innerHTML = `<div class="msg-bubble">${escHtml(text)}</div>`;
   msgs.appendChild(div);
@@ -247,19 +370,19 @@ function addSystemMsg(text, isError = false) {
 
 function scrollChat() {
   const msgs = document.getElementById('chat-messages');
-  msgs.scrollTop = msgs.scrollHeight;
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
 }
 
+/* ─── Chat Send Logic ─── */
 async function sendChatMessage() {
   const input = document.getElementById('chat-input');
-  const text = input.value.trim();
+  const text  = input.value.trim();
   if (!text || !state.currentUser) return;
 
   input.value = '';
   autoResizeInput(input);
   addUserMsg(text);
 
-  // If we're waiting for the user to supply a recipient
   if (state.awaitingRecipient) {
     const email = extractEmail(text);
     if (email) {
@@ -269,7 +392,7 @@ async function sendChatMessage() {
       addThinkingMsg();
       await processDraft(email, ctx);
     } else {
-      addAiMsg('I need a valid email address. Please include it in your message (e.g. <code>bob@example.com</code>).');
+      addAiMsg('I need a valid email address — please include it, e.g. <code>bob@example.com</code>.');
     }
     return;
   }
@@ -279,96 +402,71 @@ async function sendChatMessage() {
     addThinkingMsg();
     await processDraft(recipient, text);
   } else {
-    // No email found — ask for it
-    state.pendingContext = text;
+    state.pendingContext    = text;
     state.awaitingRecipient = true;
-    addAiMsg(`Got it! Who should I send this to? Please reply with the recipient's email address.`);
+    addAiMsg('Got it! Who should I send this to? Please provide the recipient\'s email address.');
   }
 }
 
 async function processDraft(recipient, context) {
   try {
     const result = await api.createDraft(state.currentUser.id, recipient, '', context);
-    state.activeDraftId   = result.draft_id;
-    state.activeThreadId  = result.thread_id || null;
-    pollDraft(result.draft_id);
+    state.activeDraftId  = result.draft_id;
+    state.activeThreadId = result.thread_id || null;
+    removeThinkingMsg();
+    showDraftInChat(result);
+    if (result.thread_id) showMeetingInChat(result.thread_id);
   } catch (e) {
     removeThinkingMsg();
-    addAiMsg(`Sorry, I couldn't process that request: ${escHtml(e.message)}`);
+    addAiMsg(`Sorry, I couldn't process that: ${escHtml(e.message)}`);
   }
-}
-
-function pollDraft(draftId) {
-  if (state.draftPollTimer) clearInterval(state.draftPollTimer);
-  let attempts = 0;
-  state.draftPollTimer = setInterval(async () => {
-    attempts++;
-    if (attempts > 60) {
-      clearInterval(state.draftPollTimer);
-      removeThinkingMsg();
-      addAiMsg('Draft generation timed out. Please try again.');
-      return;
-    }
-    try {
-      const draft = await api.getDraft(draftId);
-      if (draft.status === 'ready') {
-        clearInterval(state.draftPollTimer);
-        removeThinkingMsg();
-        showDraftInChat(draft);
-        if (draft.thread_id) showMeetingInChat(draft.thread_id);
-      } else if (draft.status === 'sent') {
-        clearInterval(state.draftPollTimer);
-        removeThinkingMsg();
-        addSystemMsg('Email sent successfully!');
-      } else if (draft.status === 'cancelled') {
-        clearInterval(state.draftPollTimer);
-        removeThinkingMsg();
-      }
-    } catch {}
-  }, 2000);
 }
 
 function showDraftInChat(draft) {
   const draftId = draft.draft_id;
   const to      = escHtml(draft.draft?.recipient || '—');
   const subject = escHtml(draft.draft?.subject   || '—');
-  const body    = escHtml(draft.draft?.body      || '');
   const rawBody = draft.draft?.body || '';
 
   const msgEl = addAiMsg(`
-    Here's the draft I've prepared for you:
+    Here's the draft I've prepared:
     <div class="msg-draft-card">
       <div class="msg-draft-header">
         <span class="msg-draft-label">Email Draft</span>
         <span class="msg-draft-badge">Ready</span>
       </div>
       <div class="msg-draft-meta">
-        <div class="msg-draft-meta-row">
-          <span class="msg-draft-key">To</span>
-          <span class="msg-draft-val">${to}</span>
-        </div>
-        <div class="msg-draft-meta-row">
-          <span class="msg-draft-key">Subject</span>
-          <span class="msg-draft-val">${subject}</span>
-        </div>
+        <div class="msg-draft-meta-row"><span class="msg-draft-key">To</span><span class="msg-draft-val">${to}</span></div>
+        <div class="msg-draft-meta-row"><span class="msg-draft-key">Subject</span><span class="msg-draft-val">${subject}</span></div>
       </div>
       <div class="msg-draft-body">
-        <textarea id="draft-body-${draftId}" rows="6">${body}</textarea>
+        <textarea id="draft-body-${draftId}" rows="5"></textarea>
       </div>
       <div class="msg-draft-actions">
         <button class="btn btn-primary btn-sm" onclick="sendDraftFromChat('${draftId}')">Send Email</button>
+        <button class="btn btn-secondary btn-sm" onclick="editDraftInCompose('${draftId}')">Open in Compose</button>
         <button class="btn btn-ghost btn-sm" onclick="discardDraftFromChat('${draftId}')">Discard</button>
       </div>
     </div>`);
 
-  // Set raw (unescaped) body value to the textarea
   const ta = msgEl.querySelector(`#draft-body-${draftId}`);
   if (ta) ta.value = rawBody;
 }
 
+function editDraftInCompose(draftId) {
+  const ta      = document.getElementById(`draft-body-${draftId}`);
+  const card    = ta?.closest('.msg-draft-card');
+  const to      = card?.querySelector('.msg-draft-val')?.textContent || '';
+  const subject = card?.querySelectorAll('.msg-draft-val')[1]?.textContent || '';
+  const body    = ta?.value || '';
+
+  populateCompose(to, subject, body);
+  toggleChat();
+}
+
 async function showMeetingInChat(threadId) {
   try {
-    const thread = await api.getThread(threadId);
+    const thread  = await api.getThread(threadId);
     const meeting = thread?.meeting;
     if (!meeting) return;
     const hasMeeting = meeting.participants?.length || meeting.date || meeting.time;
@@ -383,12 +481,12 @@ async function showMeetingInChat(threadId) {
     const confirmBtns = thread.status === 'interrupted'
       ? `<div style="margin-top:10px;display:flex;gap:8px;">
            <button class="btn btn-success btn-sm" onclick="confirmMeetingFromChat('${threadId}')">Confirm Meeting</button>
-           <button class="btn btn-ghost btn-sm" onclick="declineMeetingFromChat('${threadId}')">Decline</button>
+           <button class="btn btn-ghost btn-sm"   onclick="declineMeetingFromChat('${threadId}')">Decline</button>
          </div>` : '';
 
     addAiMsg(`
       <div class="msg-meeting-card">
-        <div class="msg-meeting-title">Meeting Details Extracted</div>
+        <div class="msg-meeting-title">Meeting Details</div>
         ${rows}
       </div>
       ${confirmBtns}`);
@@ -396,15 +494,16 @@ async function showMeetingInChat(threadId) {
 }
 
 async function sendDraftFromChat(draftId) {
-  const ta = document.getElementById(`draft-body-${draftId}`);
+  const ta  = document.getElementById(`draft-body-${draftId}`);
   const body = ta ? ta.value : undefined;
-  const btn = ta?.closest('.msg-draft-card')?.querySelector('.btn-primary');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-sm"></span> Sending…'; }
+  const btn  = ta?.closest('.msg-draft-card')?.querySelector('.btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
   try {
     await api.sendDraft(draftId, body);
     addSystemMsg('Email sent successfully!');
-    if (btn) btn.closest('.msg-draft-card').innerHTML = '<div style="padding:10px 14px;font-size:13px;color:var(--success)">Sent!</div>';
-    if (state.currentView === 'sent') loadSent();
+    const card = ta?.closest('.msg-draft-card');
+    if (card) card.innerHTML = '<div style="padding:10px 14px;font-size:12px;color:var(--success)">Sent successfully</div>';
+    if (state.inboxFilter === 'sent' && state.currentTab === 'inbox') loadSent();
   } catch (e) {
     toast(`Failed to send: ${e.message}`, 'error');
     if (btn) { btn.disabled = false; btn.textContent = 'Send Email'; }
@@ -415,117 +514,48 @@ async function discardDraftFromChat(draftId) {
   try {
     await api.cancelDraft(draftId);
     addSystemMsg('Draft discarded.');
-    const card = document.getElementById(`draft-body-${draftId}`)?.closest('.msg-draft-card');
-    if (card) card.remove();
-  } catch (e) {
-    toast(`Could not discard: ${e.message}`, 'error');
-  }
+    document.getElementById(`draft-body-${draftId}`)?.closest('.msg-draft-card')?.remove();
+  } catch (e) { toast(`Could not discard: ${e.message}`, 'error'); }
 }
 
 async function confirmMeetingFromChat(threadId) {
-  try {
-    await api.confirmMeeting(threadId);
-    addSystemMsg('Meeting confirmed! The email will be sent.');
-  } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+  try { await api.confirmMeeting(threadId); addSystemMsg('Meeting confirmed! The email will be sent.'); }
+  catch (e) { toast(`Failed: ${e.message}`, 'error'); }
 }
 
 async function declineMeetingFromChat(threadId) {
-  try {
-    await api.declineMeeting(threadId);
-    addSystemMsg('Meeting declined.');
-  } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+  try { await api.declineMeeting(threadId); addSystemMsg('Meeting declined.'); }
+  catch (e) { toast(`Failed: ${e.message}`, 'error'); }
 }
 
-function clearChat() {
-  const msgs = document.getElementById('chat-messages');
-  msgs.innerHTML = `
-    <div class="msg msg-ai">
-      <div class="msg-avatar-wrap"><div class="msg-avatar ai-avatar">AI</div></div>
-      <div class="msg-bubble">
-        Chat cleared. What would you like to do?
-        <div class="msg-suggestions">
-          <button class="suggestion-chip" data-text="Schedule a meeting with bob@example.com next Monday at 2pm to discuss the Python course">Schedule a meeting</button>
-          <button class="suggestion-chip" data-text="Write a follow-up email to charlie@example.com about their course enrollment, we haven't heard back in a week">Follow-up email</button>
-          <button class="suggestion-chip" data-text="Send an introduction email to alice@example.com about our new AI and Data Science program starting next month">Introduction email</button>
-        </div>
-      </div>
-    </div>`;
-  bindSuggestionChips();
-  state.pendingContext    = null;
-  state.awaitingRecipient = false;
-  if (state.draftPollTimer) { clearInterval(state.draftPollTimer); state.draftPollTimer = null; }
-}
-
-/* ─── Inbox ─── */
-async function loadInbox() {
-  document.getElementById('inbox-list').innerHTML = '<div class="email-empty"><p>Loading…</p></div>';
-  try {
-    const emails = await api.getInbox(state.currentUser.id);
-    state.inboxEmails = emails;
-    const unread = emails.filter(e => !e.is_read).length;
-    document.getElementById('inbox-subtitle').textContent =
-      `${emails.length} message${emails.length !== 1 ? 's' : ''}${unread ? `, ${unread} unread` : ''}`;
-    renderEmailList(emails, 'inbox-list', 'inbox-reader', false);
-    const badge = document.getElementById('inbox-badge');
-    if (unread > 0) { badge.textContent = unread; badge.classList.remove('hidden'); }
-    else badge.classList.add('hidden');
-  } catch { setListError('inbox-list', 'Failed to load inbox.'); }
-}
-
-function updateInboxBadge(delta = 0) {
-  const badge = document.getElementById('inbox-badge');
-  const next = Math.max(0, (parseInt(badge.textContent, 10) || 0) + delta);
-  if (next > 0) { badge.textContent = next; badge.classList.remove('hidden'); }
-  else badge.classList.add('hidden');
-}
-
-/* ─── Sent ─── */
-async function loadSent() {
-  document.getElementById('sent-list').innerHTML = '<div class="email-empty"><p>Loading…</p></div>';
-  try {
-    const emails = await api.getSent(state.currentUser.id);
-    document.getElementById('sent-subtitle').textContent = `${emails.length} sent message${emails.length !== 1 ? 's' : ''}`;
-    renderEmailList(emails, 'sent-list', 'sent-reader', true);
-  } catch { setListError('sent-list', 'Failed to load sent mail.'); }
-}
-
-/* ─── Drafts ─── */
-async function loadDrafts() {
-  document.getElementById('drafts-grid').innerHTML = '<div class="email-empty"><p>Loading…</p></div>';
-  try {
-    const drafts = await api.getDrafts(state.currentUser.id);
-    renderDraftGrid(drafts);
-  } catch { document.getElementById('drafts-grid').innerHTML = '<div class="email-empty"><p>Failed to load drafts.</p></div>'; }
-}
-
-/* ─── Admin Emails ─── */
-const COURSE_KEYWORDS = ['course','class','enrollment','enroll','training','lesson','tutorial','program','curriculum','workshop','lecture','python','data science','machine learning','ai','study','certificate','bootcamp','module','syllabus'];
+/* ─── Admin Email Lists ─── */
+const COURSE_KEYWORDS = ['course','class','enrollment','enroll','training','lesson','tutorial','program','curriculum','workshop','lecture','python','data science','machine learning','ai','study','certificate','bootcamp'];
 
 async function loadCourseEmails() {
-  document.getElementById('review-list').innerHTML = '<div class="email-empty"><p>Loading…</p></div>';
+  document.getElementById('course-list').innerHTML = '<div class="email-empty"><p>Loading…</p></div>';
   try {
-    const allEmails = await fetchAllUserEmails();
-    const filtered = allEmails.filter(e => {
+    const all      = await fetchAllEmails();
+    const filtered = all.filter(e => {
       const text = `${e.subject || ''} ${e.body || ''}`.toLowerCase();
       return COURSE_KEYWORDS.some(kw => text.includes(kw));
     });
-    renderReviewStats(filtered, allEmails);
-    renderEmailList(filtered, 'review-list', 'review-reader', false);
+    renderReviewStats(filtered, all);
+    renderEmailList(filtered, 'course-list', 'course-reader', false);
     const badge = document.getElementById('course-badge');
     if (filtered.length) { badge.textContent = filtered.length; badge.classList.remove('hidden'); }
     else badge.classList.add('hidden');
-  } catch { setListError('review-list', 'Failed to load emails.'); }
+  } catch { setListError('course-list', 'Failed to load course emails.'); }
 }
 
 async function loadAllEmails() {
   document.getElementById('all-list').innerHTML = '<div class="email-empty"><p>Loading…</p></div>';
   try {
-    const emails = await fetchAllUserEmails();
+    const emails = await fetchAllEmails();
     renderEmailList(emails, 'all-list', 'all-reader', false);
   } catch { setListError('all-list', 'Failed to load emails.'); }
 }
 
-async function fetchAllUserEmails() {
+async function fetchAllEmails() {
   const results = [];
   await Promise.all(state.users.map(async user => {
     try {
@@ -536,11 +566,25 @@ async function fetchAllUserEmails() {
   return results;
 }
 
+function renderReviewStats(courseEmails, allEmails) {
+  const unread = courseEmails.filter(e => !e.is_read).length;
+  document.getElementById('review-stats').innerHTML = [
+    { val: courseEmails.length, label: 'Course Emails' },
+    { val: unread,              label: 'Unread' },
+    { val: allEmails.length,    label: 'Total Emails' },
+    { val: state.users.length,  label: 'Users' },
+  ].map(s => `
+    <div class="stat-card">
+      <div class="stat-value">${s.val}</div>
+      <div class="stat-label">${s.label}</div>
+    </div>`).join('');
+}
+
 /* ─── Email List Rendering ─── */
 function renderEmailList(emails, listId, readerId, isSent) {
   const list = document.getElementById(listId);
   if (!emails || !emails.length) {
-    list.innerHTML = '<div class="email-empty"><p>No emails here</p></div>';
+    list.innerHTML = '<div class="email-empty"><p>No emails here yet</p></div>';
     return;
   }
   const sorted = [...emails].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -549,11 +593,9 @@ function renderEmailList(emails, listId, readerId, isSent) {
     const fromLabel = isSent
       ? (email.recipient_email || String(email.recipient_id || 'Unknown'))
       : (email.sender_email    || String(email.sender_id    || 'Unknown'));
-    const initials = avatarInitials(fromLabel);
-    const color    = avatarColor(fromLabel);
     return `
       <div class="email-item${isUnread ? ' unread' : ''}" onclick="openEmail(${email.id},'${readerId}',${isSent})">
-        <div class="email-avatar" style="background:${color}">${initials}</div>
+        <div class="email-avatar" style="background:${avatarColor(fromLabel)}">${avatarInitials(fromLabel)}</div>
         <div class="email-item-body">
           <div class="email-item-top">
             <span class="email-from">${escHtml(trunc(fromLabel, 22))}</span>
@@ -569,8 +611,7 @@ function renderEmailList(emails, listId, readerId, isSent) {
 
 async function openEmail(emailId, readerId, isSent) {
   document.querySelectorAll('.email-item').forEach(el => el.classList.remove('active'));
-  const clicked = document.querySelector(`.email-item[onclick*="openEmail(${emailId}"]`);
-  if (clicked) clicked.classList.add('active');
+  document.querySelector(`.email-item[onclick*="openEmail(${emailId}"]`)?.classList.add('active');
 
   const reader = document.getElementById(readerId);
   reader.innerHTML = '<div class="reader-empty"><div class="spinner"></div></div>';
@@ -579,7 +620,7 @@ async function openEmail(emailId, readerId, isSent) {
     await api.markRead(emailId);
     updateInboxBadge(-1);
     const email = await api.getEmail(emailId);
-    state.replyTargetEmailId = email.id;
+    state.replyTargetId = email.id;
     reader.innerHTML = renderEmailFull(email, isSent);
   } catch {
     reader.innerHTML = '<div class="reader-empty"><p>Could not load email.</p></div>';
@@ -587,79 +628,29 @@ async function openEmail(emailId, readerId, isSent) {
 }
 
 function renderEmailFull(email, isSent) {
-  const isAdmin       = state.role === 'admin';
-  const senderLabel   = email.sender_email    || String(email.sender_id    || 'Unknown');
-  const recipientLabel= email.recipient_email || String(email.recipient_id || 'Unknown');
-  const initials      = avatarInitials(senderLabel);
-  const color         = avatarColor(senderLabel);
-  const dateStr       = email.created_at ? new Date(email.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
-  const actions       = isAdmin
+  const senderLabel    = email.sender_email    || String(email.sender_id    || 'Unknown');
+  const recipientLabel = email.recipient_email || String(email.recipient_id || 'Unknown');
+  const dateStr        = email.created_at ? new Date(email.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  const isAdmin        = state.role === 'admin';
+
+  const actions = isAdmin
     ? `<button class="btn btn-secondary btn-sm" onclick="api.markRead(${email.id}).then(()=>toast('Marked reviewed','success'))">Mark Reviewed</button>`
     : `<button class="btn btn-primary btn-sm" onclick="openReplyModal()">Reply</button>`;
 
   return `
     <div class="email-full">
-      <div class="email-full-header">
-        <div class="email-full-subject">${escHtml(email.subject || '(no subject)')}</div>
-        <div class="email-sender-row">
-          <div class="email-sender-avatar" style="background:${color}">${initials}</div>
-          <div class="email-sender-info">
-            <div class="email-sender-name">${escHtml(senderLabel)}</div>
-            <div class="email-sender-addr">To: ${escHtml(recipientLabel)}</div>
-          </div>
-          <div class="email-sent-time">${dateStr}</div>
+      <div class="email-full-subject">${escHtml(email.subject || '(no subject)')}</div>
+      <div class="email-sender-row">
+        <div class="email-sender-avatar" style="background:${avatarColor(senderLabel)}">${avatarInitials(senderLabel)}</div>
+        <div class="email-sender-info">
+          <div class="email-sender-name">${escHtml(senderLabel)}</div>
+          <div class="email-sender-addr">To: ${escHtml(recipientLabel)}</div>
         </div>
+        <div class="email-sent-time">${dateStr}</div>
       </div>
       <div class="email-full-body">${escHtml(email.body || '')}</div>
       <div class="email-full-actions">${actions}</div>
     </div>`;
-}
-
-function renderDraftGrid(drafts) {
-  const grid = document.getElementById('drafts-grid');
-  if (!drafts || !drafts.length) {
-    grid.innerHTML = '<div class="email-empty" style="grid-column:1/-1"><p>No AI drafts yet</p></div>';
-    return;
-  }
-  const sorted = [...drafts].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  grid.innerHTML = sorted.map(d => `
-    <div class="draft-grid-card">
-      <div class="draft-grid-header">
-        <span class="draft-grid-status ${d.status}">${d.status}</span>
-        <span class="draft-grid-date">${formatDate(d.created_at)}</span>
-      </div>
-      <div class="draft-grid-to">To: ${escHtml(d.draft?.recipient || '—')}</div>
-      <div class="draft-grid-subject">${escHtml(d.draft?.subject || '(no subject)')}</div>
-      <div class="draft-grid-body">${escHtml(trunc(d.draft?.body || '', 120))}</div>
-      <div class="draft-grid-actions">
-        ${d.status === 'ready' ? `<button class="btn btn-success btn-sm" onclick="sendExistingDraft('${d.draft_id}')">Send</button>` : ''}
-        ${d.status !== 'sent' ? `<button class="btn btn-ghost btn-sm" onclick="cancelExistingDraft('${d.draft_id}')">Discard</button>` : ''}
-      </div>
-    </div>`).join('');
-}
-
-function renderReviewStats(courseEmails, allEmails) {
-  const unread = courseEmails.filter(e => !e.is_read).length;
-  document.getElementById('review-stats').innerHTML = [
-    { val: courseEmails.length, label: 'Course Emails' },
-    { val: unread,              label: 'Unread' },
-    { val: allEmails.length,   label: 'Total Emails' },
-    { val: state.users.length, label: 'Users' },
-  ].map(s => `
-    <div class="stat-card">
-      <div class="stat-value">${s.val}</div>
-      <div class="stat-label">${s.label}</div>
-    </div>`).join('');
-}
-
-async function sendExistingDraft(draftId) {
-  try { await api.sendDraft(draftId); toast('Email sent!', 'success'); loadDrafts(); }
-  catch (e) { toast(`Failed: ${e.message}`, 'error'); }
-}
-
-async function cancelExistingDraft(draftId) {
-  try { await api.cancelDraft(draftId); toast('Draft discarded.', 'info'); loadDrafts(); }
-  catch (e) { toast(`Failed: ${e.message}`, 'error'); }
 }
 
 /* ─── Reply Modal ─── */
@@ -669,17 +660,15 @@ function openReplyModal() {
   setTimeout(() => document.getElementById('reply-body').focus(), 50);
 }
 
-function closeReplyModal() {
-  document.getElementById('reply-modal').classList.add('hidden');
-}
+function closeReplyModal() { document.getElementById('reply-modal').classList.add('hidden'); }
 
 async function sendReply() {
   const body = document.getElementById('reply-body').value.trim();
-  if (!body || !state.replyTargetEmailId) return;
+  if (!body || !state.replyTargetId) return;
   const btn = document.getElementById('reply-send-btn');
   btn.disabled = true;
   try {
-    await api.replyEmail(state.currentUser.id, state.replyTargetEmailId, body);
+    await api.replyEmail(state.currentUser.id, state.replyTargetId, body);
     toast('Reply sent!', 'success');
     closeReplyModal();
   } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
@@ -690,18 +679,21 @@ async function sendReply() {
 function setRole(role) {
   state.role = role;
   document.querySelectorAll('.role-btn').forEach(b => b.classList.toggle('active', b.dataset.role === role));
-  document.getElementById('user-nav').classList.toggle('hidden', role === 'admin');
-  document.getElementById('admin-nav').classList.toggle('hidden', role === 'user');
-  showView(role === 'user' ? 'chat' : 'review');
+  document.getElementById('user-tabs').classList.toggle('hidden', role === 'admin');
+  document.getElementById('admin-tabs').classList.toggle('hidden', role === 'user');
+  showTab(role === 'user' ? 'inbox' : 'all-emails');
 }
 
-/* ─── Input auto-resize ─── */
+/* ─── Helpers ─── */
+function setListError(listId, msg) {
+  document.getElementById(listId).innerHTML = `<div class="email-empty"><p>${escHtml(msg)}</p></div>`;
+}
+
 function autoResizeInput(el) {
   el.style.height = 'auto';
   el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
 }
 
-/* ─── Suggestion chips ─── */
 function bindSuggestionChips() {
   document.querySelectorAll('.suggestion-chip').forEach(chip => {
     chip.addEventListener('click', () => {
@@ -715,39 +707,71 @@ function bindSuggestionChips() {
 
 /* ─── Event Listeners ─── */
 function setupEventListeners() {
+  // User & role
   document.getElementById('user-select').addEventListener('change', e => selectUser(e.target.value));
+  document.querySelectorAll('.role-btn').forEach(b => b.addEventListener('click', () => setRole(b.dataset.role)));
 
-  document.querySelectorAll('.role-btn').forEach(btn =>
-    btn.addEventListener('click', () => setRole(btn.dataset.role))
-  );
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
-  document.querySelectorAll('[data-view]').forEach(btn =>
-    btn.addEventListener('click', () => showView(btn.dataset.view))
-  );
+  // Inbox filter
+  document.querySelectorAll('.filter-btn').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    state.inboxFilter = b.dataset.filter;
+    state.inboxFilter === 'sent' ? loadSent() : loadInbox();
+  }));
 
-  // Chat
-  document.getElementById('chat-send').addEventListener('click', sendChatMessage);
-  document.getElementById('chat-clear').addEventListener('click', clearChat);
+  // Refresh buttons
+  document.getElementById('refresh-inbox').addEventListener('click', () => state.inboxFilter === 'sent' ? loadSent() : loadInbox());
+  document.getElementById('refresh-all').addEventListener('click', loadAllEmails);
+  document.getElementById('refresh-course').addEventListener('click', loadCourseEmails);
 
-  const chatInput = document.getElementById('chat-input');
-  chatInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+  // Compose
+  document.getElementById('compose-send').addEventListener('click', sendCompose);
+  document.getElementById('compose-clear').addEventListener('click', () => {
+    document.getElementById('compose-to').value      = '';
+    document.getElementById('compose-subject').value = '';
+    document.getElementById('compose-body').value    = '';
   });
+  document.getElementById('compose-ai-btn').addEventListener('click', () => {
+    const to  = document.getElementById('compose-to').value.trim();
+    const sub = document.getElementById('compose-subject').value.trim();
+    if (to || sub) {
+      const hint = [to && `to ${to}`, sub && `about "${sub}"`].filter(Boolean).join(' ');
+      document.getElementById('chat-input').value = hint;
+    }
+    openChat();
+  });
+
+  // Calendar nav
+  document.getElementById('cal-prev').addEventListener('click', () => {
+    state.calMonth--;
+    if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
+    renderCalendarGrid();
+  });
+  document.getElementById('cal-next').addEventListener('click', () => {
+    state.calMonth++;
+    if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
+    renderCalendarGrid();
+  });
+
+  // Chat toggle
+  document.getElementById('chat-toggle').addEventListener('click', toggleChat);
+  document.getElementById('chat-close').addEventListener('click', toggleChat);
+
+  // Chat input
+  document.getElementById('chat-send').addEventListener('click', sendChatMessage);
+  const chatInput = document.getElementById('chat-input');
+  chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
   chatInput.addEventListener('input', () => autoResizeInput(chatInput));
 
   // Suggestion chips (initial render)
   bindSuggestionChips();
 
-  // Refresh buttons
-  document.getElementById('refresh-inbox').addEventListener('click', loadInbox);
-  document.getElementById('refresh-sent').addEventListener('click', loadSent);
-  document.getElementById('refresh-drafts').addEventListener('click', loadDrafts);
-  document.getElementById('refresh-review').addEventListener('click', loadCourseEmails);
-  document.getElementById('refresh-all').addEventListener('click', loadAllEmails);
-
   // Admin search
   document.getElementById('course-search').addEventListener('input', e => {
-    document.querySelectorAll('#review-list .email-item').forEach(el => {
+    document.querySelectorAll('#course-list .email-item').forEach(el => {
       el.style.display = el.textContent.toLowerCase().includes(e.target.value.toLowerCase()) ? '' : 'none';
     });
   });
@@ -757,11 +781,6 @@ function setupEventListeners() {
   document.getElementById('reply-cancel-btn').addEventListener('click', closeReplyModal);
   document.getElementById('reply-send-btn').addEventListener('click', sendReply);
   document.getElementById('reply-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeReplyModal(); });
-}
-
-/* ─── Helpers ─── */
-function setListError(listId, msg) {
-  document.getElementById(listId).innerHTML = `<div class="email-empty"><p>${escHtml(msg)}</p></div>`;
 }
 
 /* ─── Start ─── */

@@ -2,6 +2,7 @@ import os
 import asyncio
 from fastapi import FastAPI, WebSocket, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from typing import Optional
 from agent.routes.agent import (
     CreateDraftRequest,
@@ -40,9 +41,12 @@ async def agent_get_draft(draft_id: str):
     return await get_draft(draft_id)
 
 
+class SendDraftBody(BaseModel):
+    body: Optional[str] = None
+
 @app.post("/api/agent/draft/{draft_id}/send")
-async def agent_send_draft(draft_id: str):
-    return await send_draft(draft_id)
+async def agent_send_draft(draft_id: str, req: SendDraftBody = SendDraftBody()):
+    return await send_draft(draft_id, req.body)
 
 
 @app.delete("/api/agent/draft/{draft_id}")

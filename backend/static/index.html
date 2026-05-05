@@ -4,217 +4,194 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Email Agent</title>
-    <link rel="stylesheet" href="/static/styles.css?v=4" />
+    <link rel="stylesheet" href="/static/styles.css?v=5" />
   </head>
   <body>
-    <div class="app">
 
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <div class="brand">
-          <div class="brand-icon">EA</div>
-          <div class="brand-text">
-            <span class="brand-name">Email Agent</span>
-            <span class="brand-tag">AI-Powered</span>
-          </div>
+    <!-- ── Topbar ── -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon">EA</div>
+        <span class="brand-name">Email Agent</span>
+      </div>
+
+      <nav class="tab-nav" id="user-tabs">
+        <button class="tab-btn active" data-tab="inbox">
+          Inbox
+          <span class="tab-badge hidden" id="inbox-badge">0</span>
+        </button>
+        <button class="tab-btn" data-tab="compose">Compose</button>
+        <button class="tab-btn" data-tab="calendar">Calendar</button>
+      </nav>
+
+      <nav class="tab-nav hidden" id="admin-tabs">
+        <button class="tab-btn active" data-tab="all-emails">All Emails</button>
+        <button class="tab-btn" data-tab="course-emails">
+          Course Emails
+          <span class="tab-badge hidden" id="course-badge">0</span>
+        </button>
+      </nav>
+
+      <div class="topbar-right">
+        <div class="agent-status-pill">
+          <div class="status-dot" id="agent-dot"></div>
+          <span id="agent-text">Checking…</span>
         </div>
-
-        <div class="sidebar-section">
-          <label class="sidebar-label">Logged in as</label>
-          <select id="user-select" class="user-select">
-            <option value="">Loading users...</option>
-          </select>
+        <div class="role-toggle">
+          <button class="role-btn active" data-role="user">User</button>
+          <button class="role-btn" data-role="admin">Admin</button>
         </div>
+        <select id="user-select" class="user-select-top">
+          <option value="">Loading users…</option>
+        </select>
+      </div>
+    </header>
 
-        <div class="sidebar-section">
-          <label class="sidebar-label">View mode</label>
-          <div class="role-toggle">
-            <button class="role-btn active" data-role="user">User</button>
-            <button class="role-btn" data-role="admin">Admin</button>
+    <!-- ── Main Content ── -->
+    <main class="main">
+
+      <!-- Inbox Tab -->
+      <div class="tab-panel" id="tab-inbox">
+        <div class="panel-toolbar">
+          <div class="inbox-filter">
+            <button class="filter-btn active" data-filter="inbox">Inbox</button>
+            <button class="filter-btn" data-filter="sent">Sent</button>
           </div>
+          <span class="panel-subtitle" id="inbox-subtitle"></span>
+          <button class="btn btn-ghost btn-sm" id="refresh-inbox">Refresh</button>
         </div>
-
-        <div class="sidebar-divider"></div>
-
-        <nav class="sidebar-nav">
-          <div id="user-nav">
-            <button class="nav-item active" data-view="chat">
-              <span class="nav-label">Assistant</span>
-            </button>
-            <button class="nav-item" data-view="inbox">
-              <span class="nav-label">Inbox</span>
-              <span class="nav-badge hidden" id="inbox-badge">0</span>
-            </button>
-            <button class="nav-item" data-view="sent">
-              <span class="nav-label">Sent</span>
-            </button>
-            <button class="nav-item" data-view="drafts">
-              <span class="nav-label">AI Drafts</span>
-            </button>
-          </div>
-          <div id="admin-nav" class="hidden">
-            <button class="nav-item active" data-view="review">
-              <span class="nav-label">Course Emails</span>
-              <span class="nav-badge hidden" id="course-badge">0</span>
-            </button>
-            <button class="nav-item" data-view="all-emails">
-              <span class="nav-label">All Emails</span>
-            </button>
-          </div>
-        </nav>
-
-        <div class="sidebar-footer">
-          <div class="agent-status-row">
-            <div class="status-dot" id="agent-dot"></div>
-            <span id="agent-text">Checking agent...</span>
-          </div>
-        </div>
-      </aside>
-
-      <!-- Main Content -->
-      <main class="main-content">
-
-        <!-- ── Chat / Assistant View ── -->
-        <div class="view" id="view-chat">
-          <div class="chat-window">
-            <div class="chat-header">
-              <div class="chat-header-info">
-                <div class="chat-avatar">AI</div>
-                <div>
-                  <div class="chat-name">Email Assistant</div>
-                  <div class="chat-status" id="chat-status">Ready to help</div>
-                </div>
-              </div>
-              <button class="btn btn-ghost btn-sm" id="chat-clear">Clear chat</button>
-            </div>
-
-            <div class="chat-messages" id="chat-messages">
-              <div class="msg msg-ai">
-                <div class="msg-avatar-wrap">
-                  <div class="msg-avatar ai-avatar">AI</div>
-                </div>
-                <div class="msg-bubble">
-                  Hi! I'm your email assistant. Tell me what you need — I can schedule meetings,
-                  write emails, or send follow-ups. Just describe your request naturally.
-                  <div class="msg-suggestions">
-                    <button class="suggestion-chip" data-text="Schedule a meeting with bob@example.com next Monday at 2pm to discuss the Python course">Schedule a meeting</button>
-                    <button class="suggestion-chip" data-text="Write a follow-up email to charlie@example.com about their course enrollment, we haven't heard back in a week">Follow-up email</button>
-                    <button class="suggestion-chip" data-text="Send an introduction email to alice@example.com about our new AI and Data Science program starting next month">Introduction email</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="chat-input-area">
-              <div class="chat-input-row">
-                <textarea
-                  id="chat-input"
-                  class="chat-input"
-                  placeholder="e.g. Book a meeting with bob@example.com next Monday at 2pm..."
-                  rows="1"
-                ></textarea>
-                <button id="chat-send" class="chat-send-btn">Send</button>
-              </div>
-              <p class="chat-hint">Press Enter to send &nbsp;·&nbsp; Shift+Enter for new line</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Inbox View ── -->
-        <div class="view hidden" id="view-inbox">
-          <div class="view-header">
-            <div>
-              <h1 class="view-title">Inbox</h1>
-              <p class="view-subtitle" id="inbox-subtitle">Loading…</p>
-            </div>
-            <button class="btn btn-secondary btn-sm" id="refresh-inbox">Refresh</button>
-          </div>
-          <div class="email-split">
-            <div class="email-list-panel" id="inbox-list">
-              <div class="email-empty"><p>Loading…</p></div>
-            </div>
-            <div class="email-reader-panel" id="inbox-reader">
-              <div class="reader-empty"><p>Select an email to read</p></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Sent View ── -->
-        <div class="view hidden" id="view-sent">
-          <div class="view-header">
-            <div>
-              <h1 class="view-title">Sent</h1>
-              <p class="view-subtitle" id="sent-subtitle">Loading…</p>
-            </div>
-            <button class="btn btn-secondary btn-sm" id="refresh-sent">Refresh</button>
-          </div>
-          <div class="email-split">
-            <div class="email-list-panel" id="sent-list">
-              <div class="email-empty"><p>Loading…</p></div>
-            </div>
-            <div class="email-reader-panel" id="sent-reader">
-              <div class="reader-empty"><p>Select an email to read</p></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── AI Drafts View ── -->
-        <div class="view hidden" id="view-drafts">
-          <div class="view-header">
-            <div>
-              <h1 class="view-title">AI Drafts</h1>
-              <p class="view-subtitle">Manage your AI-generated draft emails</p>
-            </div>
-            <button class="btn btn-secondary btn-sm" id="refresh-drafts">Refresh</button>
-          </div>
-          <div class="drafts-grid" id="drafts-grid">
+        <div class="email-split">
+          <div class="email-list-panel" id="inbox-list">
             <div class="email-empty"><p>Loading…</p></div>
           </div>
+          <div class="email-reader-panel" id="inbox-reader">
+            <div class="reader-empty"><p>Select an email to read</p></div>
+          </div>
         </div>
+      </div>
 
-        <!-- ── Admin: Course Emails ── -->
-        <div class="view hidden" id="view-review">
-          <div class="view-header">
+      <!-- Compose Tab -->
+      <div class="tab-panel hidden" id="tab-compose">
+        <div class="compose-wrap">
+          <div class="compose-card">
+            <div class="compose-card-header">
+              <h2 class="compose-title">New Message</h2>
+              <button class="btn btn-ghost btn-sm" id="compose-clear">Clear</button>
+            </div>
+            <div class="compose-field">
+              <label class="compose-label">To</label>
+              <input type="email" id="compose-to" class="compose-input" placeholder="recipient@example.com" />
+            </div>
+            <div class="compose-field">
+              <label class="compose-label">Subject</label>
+              <input type="text" id="compose-subject" class="compose-input" placeholder="Email subject" />
+            </div>
+            <div class="compose-field">
+              <label class="compose-label">Message</label>
+              <textarea id="compose-body" class="compose-textarea" rows="14" placeholder="Write your message here…"></textarea>
+            </div>
+            <div class="compose-actions">
+              <button class="btn btn-primary" id="compose-send">Send Email</button>
+              <button class="btn btn-secondary btn-sm" id="compose-ai-btn">Draft with AI</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Calendar Tab -->
+      <div class="tab-panel hidden" id="tab-calendar">
+        <div class="calendar-wrap">
+          <div class="calendar-left">
+            <div class="cal-nav-row">
+              <button class="cal-nav-btn" id="cal-prev">&lsaquo;</button>
+              <span class="cal-month-title" id="cal-month-title"></span>
+              <button class="cal-nav-btn" id="cal-next">&rsaquo;</button>
+            </div>
+            <div class="cal-weekdays">
+              <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+            </div>
+            <div class="cal-grid" id="cal-grid"></div>
+          </div>
+          <div class="calendar-right">
+            <h3 class="meetings-heading">Scheduled Meetings</h3>
+            <div id="meetings-list">
+              <div class="email-empty"><p>No scheduled meetings yet</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin: All Emails -->
+      <div class="tab-panel hidden" id="tab-all-emails">
+        <div class="panel-toolbar">
+          <span class="panel-subtitle">All emails across all users</span>
+          <button class="btn btn-ghost btn-sm" id="refresh-all">Refresh</button>
+        </div>
+        <div class="email-split">
+          <div class="email-list-panel" id="all-list">
+            <div class="email-empty"><p>Loading…</p></div>
+          </div>
+          <div class="email-reader-panel" id="all-reader">
+            <div class="reader-empty"><p>Select an email to read</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin: Course Emails -->
+      <div class="tab-panel hidden" id="tab-course-emails">
+        <div class="panel-toolbar">
+          <span class="panel-subtitle">Emails related to courses and training</span>
+          <input type="text" id="course-search" class="search-input" placeholder="Search…" />
+          <button class="btn btn-ghost btn-sm" id="refresh-course">Refresh</button>
+        </div>
+        <div class="stats-row" id="review-stats"></div>
+        <div class="email-split">
+          <div class="email-list-panel" id="course-list">
+            <div class="email-empty"><p>Loading…</p></div>
+          </div>
+          <div class="email-reader-panel" id="course-reader">
+            <div class="reader-empty"><p>Select an email to review</p></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- ── Floating Chat Widget ── -->
+    <div class="chat-fab">
+      <div class="chat-widget hidden" id="chat-widget">
+        <div class="chat-widget-header">
+          <div class="chat-widget-info">
+            <div class="chat-widget-avatar">AI</div>
             <div>
-              <h1 class="view-title">Course Email Review</h1>
-              <p class="view-subtitle">Emails related to courses and training programs</p>
-            </div>
-            <div class="header-actions">
-              <input type="text" id="course-search" class="form-input search-input" placeholder="Search…" />
-              <button class="btn btn-secondary btn-sm" id="refresh-review">Refresh</button>
+              <div class="chat-widget-name">Email Assistant</div>
+              <div class="chat-widget-status" id="chat-status">Ready to help</div>
             </div>
           </div>
-          <div class="stats-row" id="review-stats"></div>
-          <div class="email-split">
-            <div class="email-list-panel" id="review-list">
-              <div class="email-empty"><p>Loading…</p></div>
+          <button class="chat-widget-close" id="chat-close">&#x2715;</button>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+          <div class="msg msg-ai">
+            <div class="msg-avatar-wrap">
+              <div class="msg-avatar ai-avatar">AI</div>
             </div>
-            <div class="email-reader-panel" id="review-reader">
-              <div class="reader-empty"><p>Select an email to review</p></div>
+            <div class="msg-bubble">
+              Hi! Describe what you need and I'll handle it — drafting emails, scheduling meetings, and more.
+              <div class="msg-suggestions">
+                <button class="suggestion-chip" data-text="Schedule a meeting with bob@example.com next Monday at 2pm to discuss the Python course">Schedule a meeting</button>
+                <button class="suggestion-chip" data-text="Write a follow-up email to charlie@example.com about their course enrollment">Follow-up email</button>
+              </div>
             </div>
           </div>
         </div>
-
-        <!-- ── Admin: All Emails ── -->
-        <div class="view hidden" id="view-all-emails">
-          <div class="view-header">
-            <div>
-              <h1 class="view-title">All Emails</h1>
-              <p class="view-subtitle">All emails across all users</p>
-            </div>
-            <button class="btn btn-secondary btn-sm" id="refresh-all">Refresh</button>
-          </div>
-          <div class="email-split">
-            <div class="email-list-panel" id="all-list">
-              <div class="email-empty"><p>Loading…</p></div>
-            </div>
-            <div class="email-reader-panel" id="all-reader">
-              <div class="reader-empty"><p>Select an email to read</p></div>
-            </div>
+        <div class="chat-input-area">
+          <div class="chat-input-row">
+            <textarea id="chat-input" class="chat-input" placeholder="e.g. Draft an email to bob@example.com…" rows="1"></textarea>
+            <button id="chat-send" class="chat-send-btn">Send</button>
           </div>
         </div>
-
-      </main>
+      </div>
+      <button class="chat-fab-btn" id="chat-toggle">AI</button>
     </div>
 
     <!-- Reply Modal -->
@@ -238,6 +215,6 @@
     </div>
 
     <div id="toast-container" class="toast-container"></div>
-    <script src="/static/app.js?v=4"></script>
+    <script src="/static/app.js?v=5"></script>
   </body>
 </html>

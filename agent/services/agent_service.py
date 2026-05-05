@@ -381,7 +381,7 @@ class AgentService:
             for d in user_drafts
         ]
 
-    async def send_draft(self, draft_id: str) -> dict:
+    async def send_draft(self, draft_id: str, body: Optional[str] = None) -> dict:
         draft = drafts.get(draft_id)
         if not draft:
             return {"error": "Draft not found"}
@@ -389,7 +389,7 @@ class AgentService:
         if draft.status != "pending":
             return {"error": f"Cannot send draft with status: {draft.status}"}
 
-        final_body = draft.draft.body
+        final_body = body if body is not None else draft.draft.body
 
         try:
             result = await mail_client.send_email(
