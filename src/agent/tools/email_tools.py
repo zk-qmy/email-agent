@@ -11,12 +11,11 @@ from langgraph.types import interrupt
 
 
 # PRIVATE FUNCs
-def _refine_draft(rendered, previous_draft: str, feedback: str) -> str:
+async def _refine_draft(rendered, previous_draft: str, feedback: str) -> str:
     """Ask LLM to refine the draft based on user feedback."""
     print("=== Feed back to LLM to refine draft ... === ")
-    # print(f"Previous draft: {previous_draft} \n Feedback: {feedback}")
     return extract_text(
-        get_llm().invoke(
+        await get_llm().ainvoke(
             f"{rendered.to_prompt()}\n\n"
             f"Previous draft:\n{previous_draft}\n\n"
             f"User feedback: {feedback}\n\n"
@@ -103,7 +102,7 @@ def resolve_recipient(name: str) -> str:
 
 
 @tool
-def draft_meeting_email(
+async def draft_meeting_email(
     recipient: str,
     date: str,
     time: str,
@@ -126,11 +125,11 @@ def draft_meeting_email(
     )
 
     if user_feedback and previous_draft:
-        draft = _refine_draft(rendered, previous_draft, user_feedback)
+        draft = await _refine_draft(rendered, previous_draft, user_feedback)
     elif previous_draft:
         draft = previous_draft.strip()
     else:
-        draft = extract_text(get_llm().invoke(rendered.to_prompt()))
+        draft = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
 
     return _review_draft(draft, recipient)
 
@@ -168,7 +167,7 @@ def send_email(
 
 
 @tool
-def draft_general_email(
+async def draft_general_email(
     recipient: str,
     key_points: List[str],
     purpose: str,
@@ -194,10 +193,10 @@ def draft_general_email(
     )
 
     if user_feedback and previous_draft:
-        draft = _refine_draft(rendered, previous_draft, user_feedback)
+        draft = await _refine_draft(rendered, previous_draft, user_feedback)
     elif previous_draft:
         draft = previous_draft.strip()
     else:
-        draft = extract_text(get_llm().invoke(rendered.to_prompt()))
+        draft = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
 
     return _review_draft(draft, recipient)

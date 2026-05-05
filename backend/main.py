@@ -1,15 +1,14 @@
 import os
+from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db, seed_data
 from backend.routes.auth import router as auth_router
 from backend.routes.email import router as email_router
-from backend.routes.users import router as users_router
 from backend.routes.ws_notifications import router as ws_router, connection_manager
 
 AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://127.0.0.1:8000")
@@ -30,8 +29,17 @@ app = FastAPI(
 )
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
-if os.path.isdir(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+
+@app.get("/static/{filename:path}")
+async def serve_static(filename: str):
+    file_path = os.path.join(static_dir, filename.split("?")[0])
+    if not os.path.isfile(file_path):
+        return Response(status_code=404)
+    return FileResponse(
+        file_path,
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,7 +51,6 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(email_router, prefix="/api/emails", tags=["emails"])
-app.include_router(users_router, prefix="/api/auth", tags=["users"])
 app.include_router(ws_router, tags=["websocket"])
 
 
@@ -62,9 +69,16 @@ async def check_agent_health():
 
 
 @app.post("/api/agent/notify/{user_id}")
-async def notify_user(user_id: int, event: dict):
-    await connection_manager.send_to_user(user_id, event)
-    return {"status": "sent"}
+async def notify_user(user_id: int, request: Request):
+    from backend.routes.ws_notifications import connection_manager
+
+    try:
+        event = await request.json()
+    except Exception:
+        event = {}
+
+    await connection_manager.broadcast_to_user(user_id, event)
+    return {"status": "ok"}
 
 
 @app.api_route(
@@ -79,7 +93,7 @@ async def proxy_to_agent(path: str, request: Request):
         from httpx import AsyncClient, ConnectError, ReadTimeout
 
         try:
-            async with AsyncClient(timeout=30.0) as client:
+            async with AsyncClient(timeout=120.0) as client:
                 body = await request.body()
                 response = await client.request(
                     method=request.method,
@@ -113,7 +127,10 @@ async def health():
 
 @app.get("/")
 async def serve_index():
-    return FileResponse(os.path.join(static_dir, "index.html"))
+    return FileResponse(
+        os.path.join(static_dir, "index.html"),
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
 
 
 if __name__ == "__main__":

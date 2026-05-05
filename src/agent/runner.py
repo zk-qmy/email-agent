@@ -17,14 +17,14 @@ def is_asking_user(messages: list) -> bool:
     return "?" in last and not has_action
 
 
-def run(app, user_message: str, thread_id: str = None) -> str:
+async def run(app, user_message: str, thread_id: str = None) -> str:
     if thread_id is None:
         thread_id = str(uuid.uuid4())
 
     thread_config = {"configurable": {"thread_id": thread_id}}
     print(f"\nSession: {thread_id}")
 
-    result = app.invoke(initial_state(user_message), config=thread_config)
+    result = await app.ainvoke(initial_state(user_message), config=thread_config)
 
     # ── Keep handling interrupts until graph is done ──────────────
     while True:
@@ -48,12 +48,12 @@ def run(app, user_message: str, thread_id: str = None) -> str:
             else:
                 resume = {"approved": False, "action_input": user_input}
 
-            result = app.invoke(Command(resume=resume), config=thread_config)
+            result = await app.ainvoke(Command(resume=resume), config=thread_config)
 
         elif interrupt_type == "confirm_send":
             user_input = input("Send? (y/n): ").strip()
             if user_input.lower() == "y":
-                result = app.invoke(
+                result = await app.ainvoke(
                     Command(resume={"approved": True}), config=thread_config
                 )
             elif user_input.lower() == "n":
@@ -61,7 +61,7 @@ def run(app, user_message: str, thread_id: str = None) -> str:
                 break  # stop loop if not approved
             else:
                 resume = {"approved": False, "action_input": user_input}
-                result = app.invoke(
+                result = await app.ainvoke(
                     Command(resume=resume),
                     config=thread_config
                 )
@@ -72,12 +72,12 @@ def run(app, user_message: str, thread_id: str = None) -> str:
                 thread_config,
                 {"messages": [HumanMessage(content=user_input)]},
             )
-            result = app.invoke(
+            result = await app.ainvoke(
                 Command(resume=user_input),
                 config=thread_config
             )
 
-        # result = app.invoke(Command(resume=resume), config=thread_config)
+        # result = await app.ainvoke(Command(resume=resume), config=thread_config)
     # ── LLM asked a question ──────────────────────────────────────
     if result is None:  # guard against None result
         return thread_id
@@ -92,7 +92,7 @@ def run(app, user_message: str, thread_id: str = None) -> str:
 
         user_input = input("You: ").strip()
         if user_input:
-            result = app.invoke(
+            result = await app.ainvoke(
                 {"messages": messages + [f"User: {user_input}"]},
                 config=thread_config,
             )
