@@ -2,22 +2,20 @@
 
 /* ─── State ─── */
 const state = {
-  currentUser:      null,
-  users:            [],
-  role:             'user',
-  currentTab:       'inbox',
-  inboxFilter:      'inbox',
-  ws:               null,
-  replyTargetId:    null,
+  currentUser:       null,
+  ws:                null,
+  currentTab:        'inbox',
+  inboxFilter:       'inbox',
+  replyTargetId:     null,
   // Chat
-  chatOpen:         false,
-  pendingContext:   null,
-  awaitingRecipient:false,
-  activeDraftId:    null,
-  activeThreadId:   null,
+  chatOpen:          false,
+  pendingContext:     null,
+  awaitingRecipient: false,
+  activeDraftId:     null,
+  activeThreadId:    null,
   // Calendar
-  calYear:          new Date().getFullYear(),
-  calMonth:         new Date().getMonth(),
+  calYear:           new Date().getFullYear(),
+  calMonth:          new Date().getMonth(),
 };
 
 /* ─── API ─── */
@@ -25,12 +23,12 @@ const api = {
   async req(method, path, body) {
     const opts = { method, headers: { 'Content-Type': 'application/json' } };
     if (body !== undefined) opts.body = JSON.stringify(body);
-    const res = await fetch(path, opts);
+    const res  = await fetch(path, opts);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
     return data;
   },
-  getUsers:       ()                   => api.req('GET', '/api/auth/users').then(r => r.users || r),
+  login:          (email, pw)          => api.req('POST', '/api/auth/login', { email, password: pw }),
   getInbox:       (uid)                => api.req('GET', `/api/emails/inbox?user_id=${uid}`).then(r => (r.emails || []).map(e => e.email || e)),
   getSent:        (uid)                => api.req('GET', `/api/emails/sent?user_id=${uid}`).then(r => (r.emails || []).map(e => e.email || e)),
   getEmail:       (eid)                => api.req('GET', `/api/emails/${eid}`).then(r => r.email || r),
@@ -38,7 +36,6 @@ const api = {
   markRead:       (eid)                => api.req('PUT', '/api/emails/mark_read', { email_id: eid }),
   replyEmail:     (sid, pid, body)     => api.req('POST', '/api/emails/reply', { sender_id: sid, parent_email_id: pid, body }),
   createDraft:    (uid, to, sub, ctx)  => api.req('POST', '/api/agent/draft', { user_id: uid, recipient: to, subject: sub, context: ctx }),
-  getDraft:       (did)                => api.req('GET', `/api/agent/draft/${did}`),
   sendDraft:      (did, body)          => api.req('POST', `/api/agent/draft/${did}/send`, body !== undefined ? { body } : {}),
   cancelDraft:    (did)                => api.req('DELETE', `/api/agent/draft/${did}`),
   getThread:      (tid)                => api.req('GET', `/api/agent/thread/${tid}`),
@@ -58,15 +55,10 @@ function formatDate(str) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function trunc(s, n = 70) {
-  if (!s) return '';
-  return s.length > n ? s.slice(0, n) + '…' : s;
-}
+function trunc(s, n = 70) { return !s ? '' : s.length > n ? s.slice(0, n) + '…' : s; }
 
 function escHtml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function extractEmail(text) {
@@ -78,14 +70,14 @@ const AVATAR_COLORS = ['#e84b5a','#6366f1','#10b981','#f59e0b','#8b5cf6','#0ea5e
 
 function avatarColor(name) {
   let n = 0;
-  for (let i = 0; i < (name || '').length; i++) n += name.charCodeAt(i);
+  for (let i = 0; i < (name||'').length; i++) n += name.charCodeAt(i);
   return AVATAR_COLORS[n % AVATAR_COLORS.length];
 }
 
 function avatarInitials(label) {
-  const parts = String(label || '?').split(/[@.\s]+/).filter(Boolean);
+  const parts = String(label||'?').split(/[@.\s]+/).filter(Boolean);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return (parts[0] || '?')[0].toUpperCase();
+  return (parts[0]||'?')[0].toUpperCase();
 }
 
 /* ─── Toast ─── */
@@ -98,72 +90,116 @@ function toast(msg, type = 'info') {
   setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 3500);
 }
 
+/* ─── Login / Logout ─── */
+async function submitLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pw    = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+
+  errEl.classList.add('hidden');
+  if (!email || !pw) { errEl.textContent = 'Please enter your email and password.'; errEl.classList.remove('hidden'); return; }
+
+  const btn = document.getElementById('login-submit');
+  btn.disabled    = true;
+  btn.textContent = 'Signing in…';
+
+  try {
+    const user = await api.login(email, pw);
+    showMainApp(user);
+  } catch (e) {
+    errEl.textContent = e.message.includes('401') || e.message.toLowerCase().includes('invalid')
+      ? 'Incorrect email or password.'
+      : (e.message || 'Sign in failed. Please try again.');
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = 'Sign in';
+  }
+}
+
+function submitForgot() {
+  const email = document.getElementById('forgot-email').value.trim();
+  const errEl = document.getElementById('forgot-error');
+
+  errEl.classList.add('hidden');
+  if (!email) { errEl.textContent = 'Please enter your email address.'; errEl.classList.remove('hidden'); return; }
+
+  toast('If that email is registered, reset instructions are on their way.', 'success');
+  document.getElementById('forgot-email').value = '';
+  document.getElementById('forgot-form').classList.add('hidden');
+  document.getElementById('signin-form').classList.remove('hidden');
+}
+
+function showMainApp(user) {
+  state.currentUser = user;
+
+  // Update user pill in topbar
+  const initials = avatarInitials(user.username || user.email);
+  const color    = avatarColor(user.username || user.email);
+  document.getElementById('user-pill-avatar').textContent          = initials;
+  document.getElementById('user-pill-avatar').style.background     = color;
+  document.getElementById('user-pill-name').textContent            = user.username || user.email;
+
+  // Swap screens
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('main-app').classList.remove('hidden');
+  document.getElementById('chat-fab').classList.remove('hidden');
+
+  // Connect WS and load initial tab
+  connectWS(user.user_id || user.id);
+  showTab('inbox');
+}
+
+function logout() {
+  if (state.ws) { state.ws.close(); state.ws = null; }
+  state.currentUser = null;
+
+  // Reset chat
+  document.getElementById('chat-messages').innerHTML = `
+    <div class="msg msg-ai">
+      <div class="msg-avatar-wrap"><div class="msg-avatar ai-avatar">AI</div></div>
+      <div class="msg-bubble">
+        Hi! Describe what you need and I'll handle it — drafting emails, scheduling meetings, and more.
+        <div class="msg-suggestions">
+          <button class="suggestion-chip" data-text="Schedule a meeting with bob@example.com next Monday at 2pm to discuss the Python course">Schedule a meeting</button>
+          <button class="suggestion-chip" data-text="Write a follow-up email to charlie@example.com about their course enrollment">Follow-up email</button>
+        </div>
+      </div>
+    </div>`;
+  bindSuggestionChips();
+  document.getElementById('chat-widget').classList.add('hidden');
+  state.chatOpen = false;
+
+  // Swap screens
+  document.getElementById('main-app').classList.add('hidden');
+  document.getElementById('chat-fab').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-email').value    = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').classList.add('hidden');
+}
+
 /* ─── WebSocket ─── */
 function connectWS(userId) {
   if (state.ws) { state.ws.close(); state.ws = null; }
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const url = `${proto}://${location.hostname}:8000/api/agent/ws/${userId}`;
   try {
-    state.ws = new WebSocket(url);
-    state.ws.onopen    = () => setAgentStatus(true);
-    state.ws.onclose   = () => { setAgentStatus(false); setTimeout(() => { if (state.currentUser) connectWS(state.currentUser.id); }, 5000); };
-    state.ws.onerror   = () => setAgentStatus(false);
+    state.ws = new WebSocket(`${proto}://${location.hostname}:8000/api/agent/ws/${userId}`);
+    state.ws.onclose   = () => setTimeout(() => { if (state.currentUser) connectWS(userId); }, 5000);
     state.ws.onmessage = (ev) => { try { handleWsEvent(JSON.parse(ev.data)); } catch {} };
-  } catch { setAgentStatus(false); }
+  } catch {}
 }
 
 function handleWsEvent(data) {
   const ev = data && data.event;
   if (ev === 'new_email')        { toast('New email received!', 'info'); updateInboxBadge(1); if (state.currentTab === 'inbox') refreshTab('inbox'); }
-  if (ev === 'workflow_complete') toast('Workflow completed!', 'success');
   if (ev === 'followup_sent')    addSystemMsg('Follow-up email sent automatically.');
   if (ev === 'reply_received')   { addSystemMsg('Reply received!'); if (state.currentTab === 'inbox') refreshTab('inbox'); }
 }
 
-function setAgentStatus(online) {
-  document.getElementById('agent-dot').className    = `status-dot ${online ? 'online' : 'offline'}`;
-  document.getElementById('agent-text').textContent = online ? 'Agent online' : 'Agent offline';
-  const cs = document.getElementById('chat-status');
-  if (cs) {
-    cs.textContent = online ? 'Ready to help' : 'Agent offline';
-    cs.style.color = '';
-  }
-}
-
 /* ─── Init ─── */
-async function init() {
+function init() {
   setupEventListeners();
-  showTab('inbox');
-  await loadUsers();
-  setAgentStatus(false);
-  checkAgentHealth();
-}
-
-async function loadUsers() {
-  try {
-    const users = await api.getUsers();
-    state.users = users;
-    const sel = document.getElementById('user-select');
-    sel.innerHTML = users.map(u =>
-      `<option value="${u.id}">${escHtml(u.username)} (${escHtml(u.email)})</option>`
-    ).join('');
-    if (users.length > 0) selectUser(users[0].id);
-  } catch { toast('Could not load users — is the backend running?', 'error'); }
-}
-
-function selectUser(userId) {
-  const user = state.users.find(u => u.id == userId);
-  if (!user) return;
-  state.currentUser = user;
-  connectWS(user.id);
-  refreshTab(state.currentTab);
-}
-
-async function checkAgentHealth() {
-  try {
-    const r = await fetch('/health');
-    if (r.ok) setAgentStatus(true);
-  } catch { setAgentStatus(false); }
 }
 
 /* ─── Tab Management ─── */
@@ -178,18 +214,17 @@ function showTab(name) {
 function refreshTab(name) {
   if (!state.currentUser) return;
   switch (name) {
-    case 'inbox':        state.inboxFilter === 'sent' ? loadSent() : loadInbox(); break;
-    case 'calendar':     loadCalendar(); break;
-    case 'all-emails':   loadAllEmails(); break;
-    case 'course-emails':loadCourseEmails(); break;
+    case 'inbox':    state.inboxFilter === 'sent' ? loadSent() : loadInbox(); break;
+    case 'calendar': loadCalendar(); break;
   }
 }
 
 /* ─── Inbox / Sent ─── */
 async function loadInbox() {
   document.getElementById('inbox-list').innerHTML = '<div class="email-empty"><p>Loading…</p></div>';
+  const uid = state.currentUser.user_id || state.currentUser.id;
   try {
-    const emails = await api.getInbox(state.currentUser.id);
+    const emails = await api.getInbox(uid);
     const unread = emails.filter(e => !e.is_read).length;
     document.getElementById('inbox-subtitle').textContent =
       `${emails.length} message${emails.length !== 1 ? 's' : ''}${unread ? `, ${unread} unread` : ''}`;
@@ -200,9 +235,11 @@ async function loadInbox() {
 
 async function loadSent() {
   document.getElementById('inbox-list').innerHTML = '<div class="email-empty"><p>Loading…</p></div>';
+  const uid = state.currentUser.user_id || state.currentUser.id;
   try {
-    const emails = await api.getSent(state.currentUser.id);
-    document.getElementById('inbox-subtitle').textContent = `${emails.length} sent message${emails.length !== 1 ? 's' : ''}`;
+    const emails = await api.getSent(uid);
+    document.getElementById('inbox-subtitle').textContent =
+      `${emails.length} sent message${emails.length !== 1 ? 's' : ''}`;
     renderEmailList(emails, 'inbox-list', 'inbox-reader', true);
     updateInboxBadge(0, 0);
   } catch { setListError('inbox-list', 'Failed to load sent mail.'); }
@@ -210,7 +247,7 @@ async function loadSent() {
 
 function updateInboxBadge(delta = 0, forceCount = null) {
   const badge = document.getElementById('inbox-badge');
-  const next = forceCount !== null ? forceCount : Math.max(0, (parseInt(badge.textContent, 10) || 0) + delta);
+  const next  = forceCount !== null ? forceCount : Math.max(0, (parseInt(badge.textContent, 10) || 0) + delta);
   if (next > 0) { badge.textContent = next; badge.classList.remove('hidden'); }
   else badge.classList.add('hidden');
 }
@@ -222,24 +259,19 @@ async function sendCompose() {
   const body    = document.getElementById('compose-body').value.trim();
 
   if (!to || !body) { toast('Please fill in To and Message fields.', 'error'); return; }
-  if (!state.currentUser) { toast('Please select a user first.', 'error'); return; }
 
   const btn = document.getElementById('compose-send');
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
+  btn.disabled = true; btn.textContent = 'Sending…';
 
   try {
-    await api.sendEmail(state.currentUser.id, to, subject || '(no subject)', body);
+    const uid = state.currentUser.user_id || state.currentUser.id;
+    await api.sendEmail(uid, to, subject || '(no subject)', body);
     toast('Email sent!', 'success');
     document.getElementById('compose-to').value      = '';
     document.getElementById('compose-subject').value = '';
     document.getElementById('compose-body').value    = '';
-  } catch (e) {
-    toast(`Failed: ${e.message}`, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Send Email';
-  }
+  } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Send Email'; }
 }
 
 function populateCompose(to, subject, body) {
@@ -276,23 +308,20 @@ function renderCalendarGrid() {
 
 async function loadMeetings() {
   if (!state.currentUser) return;
-  const el = document.getElementById('meetings-list');
+  const el  = document.getElementById('meetings-list');
+  const uid = state.currentUser.user_id || state.currentUser.id;
   try {
-    const threads = await api.getThreads(state.currentUser.id);
+    const threads = await api.getThreads(uid);
     if (!threads.length) {
       el.innerHTML = '<div class="email-empty"><p>No scheduled meetings yet.<br>Use the AI assistant to schedule one.</p></div>';
       return;
     }
-    el.innerHTML = threads.map(t => {
-      const statusClass = t.status || 'sent';
-      const statusLabel = (t.status || '').replace(/_/g, ' ');
-      return `
-        <div class="meeting-card">
-          <div class="meeting-card-recipient">${escHtml(t.recipient || '—')}</div>
-          <div class="meeting-card-detail">Sent ${formatDate(t.created_at)}</div>
-          <span class="meeting-status-badge ${statusClass}">${escHtml(statusLabel)}</span>
-        </div>`;
-    }).join('');
+    el.innerHTML = threads.map(t => `
+      <div class="meeting-card">
+        <div class="meeting-card-recipient">${escHtml(t.recipient || '—')}</div>
+        <div class="meeting-card-detail">Sent ${formatDate(t.created_at)}</div>
+        <span class="meeting-status-badge ${t.status || ''}">${escHtml((t.status || '').replace(/_/g,' '))}</span>
+      </div>`).join('');
   } catch {
     el.innerHTML = '<div class="email-empty"><p>Could not load meetings.</p></div>';
   }
@@ -307,22 +336,20 @@ function toggleChat() {
 }
 
 function openChat() {
-  const w = document.getElementById('chat-widget');
+  document.getElementById('chat-widget').classList.remove('hidden');
   state.chatOpen = true;
-  w.classList.remove('hidden');
   setTimeout(() => document.getElementById('chat-input')?.focus(), 80);
 }
 
 /* ─── Chat Messages ─── */
 function addUserMsg(text) {
-  const msgs = document.getElementById('chat-messages');
-  const div  = document.createElement('div');
-  div.className = 'msg msg-user';
-  const initials = state.currentUser ? avatarInitials(state.currentUser.username) : '?';
-  const color    = state.currentUser ? avatarColor(state.currentUser.username) : '#9ca3af';
-  div.innerHTML = `
+  const msgs     = document.getElementById('chat-messages');
+  const div      = document.createElement('div');
+  div.className  = 'msg msg-user';
+  const name     = state.currentUser?.username || state.currentUser?.email || '?';
+  div.innerHTML  = `
     <div class="msg-avatar-wrap">
-      <div class="msg-avatar user-avatar" style="background:${color}">${initials}</div>
+      <div class="msg-avatar user-avatar" style="background:${avatarColor(name)}">${avatarInitials(name)}</div>
     </div>
     <div class="msg-bubble">${escHtml(text)}</div>`;
   msgs.appendChild(div);
@@ -330,13 +357,11 @@ function addUserMsg(text) {
 }
 
 function addAiMsg(html) {
-  const msgs = document.getElementById('chat-messages');
-  const div  = document.createElement('div');
+  const msgs    = document.getElementById('chat-messages');
+  const div     = document.createElement('div');
   div.className = 'msg msg-ai';
   div.innerHTML = `
-    <div class="msg-avatar-wrap">
-      <div class="msg-avatar ai-avatar">AI</div>
-    </div>
+    <div class="msg-avatar-wrap"><div class="msg-avatar ai-avatar">AI</div></div>
     <div class="msg-bubble">${html}</div>`;
   msgs.appendChild(div);
   scrollChat();
@@ -344,10 +369,10 @@ function addAiMsg(html) {
 }
 
 function addThinkingMsg() {
-  const msgs = document.getElementById('chat-messages');
-  const div  = document.createElement('div');
-  div.className = 'msg msg-ai msg-thinking';
-  div.id = 'msg-thinking';
+  const msgs    = document.getElementById('chat-messages');
+  const div     = document.createElement('div');
+  div.className = 'msg msg-ai';
+  div.id        = 'msg-thinking';
   div.innerHTML = `
     <div class="msg-avatar-wrap"><div class="msg-avatar ai-avatar">AI</div></div>
     <div class="msg-bubble msg-thinking"><span></span><span></span><span></span></div>`;
@@ -355,13 +380,11 @@ function addThinkingMsg() {
   scrollChat();
 }
 
-function removeThinkingMsg() {
-  document.getElementById('msg-thinking')?.remove();
-}
+function removeThinkingMsg() { document.getElementById('msg-thinking')?.remove(); }
 
 function addSystemMsg(text, isError = false) {
-  const msgs = document.getElementById('chat-messages');
-  const div  = document.createElement('div');
+  const msgs    = document.getElementById('chat-messages');
+  const div     = document.createElement('div');
   div.className = `msg msg-system${isError ? ' error' : ''}`;
   div.innerHTML = `<div class="msg-bubble">${escHtml(text)}</div>`;
   msgs.appendChild(div);
@@ -373,7 +396,7 @@ function scrollChat() {
   if (msgs) msgs.scrollTop = msgs.scrollHeight;
 }
 
-/* ─── Chat Send Logic ─── */
+/* ─── Chat Logic ─── */
 async function sendChatMessage() {
   const input = document.getElementById('chat-input');
   const text  = input.value.trim();
@@ -388,7 +411,7 @@ async function sendChatMessage() {
     if (email) {
       state.awaitingRecipient = false;
       const ctx = state.pendingContext;
-      state.pendingContext = null;
+      state.pendingContext    = null;
       addThinkingMsg();
       await processDraft(email, ctx);
     } else {
@@ -404,13 +427,14 @@ async function sendChatMessage() {
   } else {
     state.pendingContext    = text;
     state.awaitingRecipient = true;
-    addAiMsg('Got it! Who should I send this to? Please provide the recipient\'s email address.');
+    addAiMsg("Got it! Who should I send this to? Please provide the recipient's email address.");
   }
 }
 
 async function processDraft(recipient, context) {
   try {
-    const result = await api.createDraft(state.currentUser.id, recipient, '', context);
+    const uid    = state.currentUser.user_id || state.currentUser.id;
+    const result = await api.createDraft(uid, recipient, '', context);
     state.activeDraftId  = result.draft_id;
     state.activeThreadId = result.thread_id || null;
     removeThinkingMsg();
@@ -456,12 +480,9 @@ function showDraftInChat(draft) {
 function editDraftInCompose(draftId) {
   const ta      = document.getElementById(`draft-body-${draftId}`);
   const card    = ta?.closest('.msg-draft-card');
-  const to      = card?.querySelector('.msg-draft-val')?.textContent || '';
-  const subject = card?.querySelectorAll('.msg-draft-val')[1]?.textContent || '';
-  const body    = ta?.value || '';
-
-  populateCompose(to, subject, body);
-  toggleChat();
+  const vals    = card?.querySelectorAll('.msg-draft-val') || [];
+  populateCompose(vals[0]?.textContent || '', vals[1]?.textContent || '', ta?.value || '');
+  if (state.chatOpen) toggleChat();
 }
 
 async function showMeetingInChat(threadId) {
@@ -488,14 +509,13 @@ async function showMeetingInChat(threadId) {
       <div class="msg-meeting-card">
         <div class="msg-meeting-title">Meeting Details</div>
         ${rows}
-      </div>
-      ${confirmBtns}`);
+      </div>${confirmBtns}`);
   } catch {}
 }
 
 async function sendDraftFromChat(draftId) {
   const ta  = document.getElementById(`draft-body-${draftId}`);
-  const body = ta ? ta.value : undefined;
+  const body = ta?.value;
   const btn  = ta?.closest('.msg-draft-card')?.querySelector('.btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
   try {
@@ -526,58 +546,6 @@ async function confirmMeetingFromChat(threadId) {
 async function declineMeetingFromChat(threadId) {
   try { await api.declineMeeting(threadId); addSystemMsg('Meeting declined.'); }
   catch (e) { toast(`Failed: ${e.message}`, 'error'); }
-}
-
-/* ─── Admin Email Lists ─── */
-const COURSE_KEYWORDS = ['course','class','enrollment','enroll','training','lesson','tutorial','program','curriculum','workshop','lecture','python','data science','machine learning','ai','study','certificate','bootcamp'];
-
-async function loadCourseEmails() {
-  document.getElementById('course-list').innerHTML = '<div class="email-empty"><p>Loading…</p></div>';
-  try {
-    const all      = await fetchAllEmails();
-    const filtered = all.filter(e => {
-      const text = `${e.subject || ''} ${e.body || ''}`.toLowerCase();
-      return COURSE_KEYWORDS.some(kw => text.includes(kw));
-    });
-    renderReviewStats(filtered, all);
-    renderEmailList(filtered, 'course-list', 'course-reader', false);
-    const badge = document.getElementById('course-badge');
-    if (filtered.length) { badge.textContent = filtered.length; badge.classList.remove('hidden'); }
-    else badge.classList.add('hidden');
-  } catch { setListError('course-list', 'Failed to load course emails.'); }
-}
-
-async function loadAllEmails() {
-  document.getElementById('all-list').innerHTML = '<div class="email-empty"><p>Loading…</p></div>';
-  try {
-    const emails = await fetchAllEmails();
-    renderEmailList(emails, 'all-list', 'all-reader', false);
-  } catch { setListError('all-list', 'Failed to load emails.'); }
-}
-
-async function fetchAllEmails() {
-  const results = [];
-  await Promise.all(state.users.map(async user => {
-    try {
-      const inbox = await api.getInbox(user.id);
-      inbox.forEach(e => results.push({ ...e, _ownerName: user.username }));
-    } catch {}
-  }));
-  return results;
-}
-
-function renderReviewStats(courseEmails, allEmails) {
-  const unread = courseEmails.filter(e => !e.is_read).length;
-  document.getElementById('review-stats').innerHTML = [
-    { val: courseEmails.length, label: 'Course Emails' },
-    { val: unread,              label: 'Unread' },
-    { val: allEmails.length,    label: 'Total Emails' },
-    { val: state.users.length,  label: 'Users' },
-  ].map(s => `
-    <div class="stat-card">
-      <div class="stat-value">${s.val}</div>
-      <div class="stat-label">${s.label}</div>
-    </div>`).join('');
 }
 
 /* ─── Email List Rendering ─── */
@@ -631,11 +599,6 @@ function renderEmailFull(email, isSent) {
   const senderLabel    = email.sender_email    || String(email.sender_id    || 'Unknown');
   const recipientLabel = email.recipient_email || String(email.recipient_id || 'Unknown');
   const dateStr        = email.created_at ? new Date(email.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—';
-  const isAdmin        = state.role === 'admin';
-
-  const actions = isAdmin
-    ? `<button class="btn btn-secondary btn-sm" onclick="api.markRead(${email.id}).then(()=>toast('Marked reviewed','success'))">Mark Reviewed</button>`
-    : `<button class="btn btn-primary btn-sm" onclick="openReplyModal()">Reply</button>`;
 
   return `
     <div class="email-full">
@@ -649,7 +612,9 @@ function renderEmailFull(email, isSent) {
         <div class="email-sent-time">${dateStr}</div>
       </div>
       <div class="email-full-body">${escHtml(email.body || '')}</div>
-      <div class="email-full-actions">${actions}</div>
+      <div class="email-full-actions">
+        <button class="btn btn-primary btn-sm" onclick="openReplyModal()">Reply</button>
+      </div>
     </div>`;
 }
 
@@ -668,20 +633,12 @@ async function sendReply() {
   const btn = document.getElementById('reply-send-btn');
   btn.disabled = true;
   try {
-    await api.replyEmail(state.currentUser.id, state.replyTargetId, body);
+    const uid = state.currentUser.user_id || state.currentUser.id;
+    await api.replyEmail(uid, state.replyTargetId, body);
     toast('Reply sent!', 'success');
     closeReplyModal();
   } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
   finally { btn.disabled = false; }
-}
-
-/* ─── Role ─── */
-function setRole(role) {
-  state.role = role;
-  document.querySelectorAll('.role-btn').forEach(b => b.classList.toggle('active', b.dataset.role === role));
-  document.getElementById('user-tabs').classList.toggle('hidden', role === 'admin');
-  document.getElementById('admin-tabs').classList.toggle('hidden', role === 'user');
-  showTab(role === 'user' ? 'inbox' : 'all-emails');
 }
 
 /* ─── Helpers ─── */
@@ -707,9 +664,27 @@ function bindSuggestionChips() {
 
 /* ─── Event Listeners ─── */
 function setupEventListeners() {
-  // User & role
-  document.getElementById('user-select').addEventListener('change', e => selectUser(e.target.value));
-  document.querySelectorAll('.role-btn').forEach(b => b.addEventListener('click', () => setRole(b.dataset.role)));
+  // Login form
+  document.getElementById('login-submit').addEventListener('click', submitLogin);
+  document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
+  document.getElementById('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-password').focus(); });
+
+  // Forgot password
+  document.getElementById('show-forgot').addEventListener('click', () => {
+    document.getElementById('signin-form').classList.add('hidden');
+    document.getElementById('forgot-form').classList.remove('hidden');
+    document.getElementById('forgot-email').focus();
+  });
+  document.getElementById('show-signin').addEventListener('click', () => {
+    document.getElementById('forgot-form').classList.add('hidden');
+    document.getElementById('signin-form').classList.remove('hidden');
+    document.getElementById('login-error').classList.add('hidden');
+  });
+  document.getElementById('forgot-submit').addEventListener('click', submitForgot);
+  document.getElementById('forgot-email').addEventListener('keydown', e => { if (e.key === 'Enter') submitForgot(); });
+
+  // Logout
+  document.getElementById('logout-btn').addEventListener('click', logout);
 
   // Tabs
   document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
@@ -722,59 +697,41 @@ function setupEventListeners() {
     state.inboxFilter === 'sent' ? loadSent() : loadInbox();
   }));
 
-  // Refresh buttons
   document.getElementById('refresh-inbox').addEventListener('click', () => state.inboxFilter === 'sent' ? loadSent() : loadInbox());
-  document.getElementById('refresh-all').addEventListener('click', loadAllEmails);
-  document.getElementById('refresh-course').addEventListener('click', loadCourseEmails);
 
   // Compose
   document.getElementById('compose-send').addEventListener('click', sendCompose);
   document.getElementById('compose-clear').addEventListener('click', () => {
-    document.getElementById('compose-to').value      = '';
-    document.getElementById('compose-subject').value = '';
-    document.getElementById('compose-body').value    = '';
+    ['compose-to','compose-subject','compose-body'].forEach(id => document.getElementById(id).value = '');
   });
   document.getElementById('compose-ai-btn').addEventListener('click', () => {
     const to  = document.getElementById('compose-to').value.trim();
     const sub = document.getElementById('compose-subject').value.trim();
     if (to || sub) {
-      const hint = [to && `to ${to}`, sub && `about "${sub}"`].filter(Boolean).join(' ');
-      document.getElementById('chat-input').value = hint;
+      document.getElementById('chat-input').value = [to && `to ${to}`, sub && `about "${sub}"`].filter(Boolean).join(' ');
     }
     openChat();
   });
 
   // Calendar nav
   document.getElementById('cal-prev').addEventListener('click', () => {
-    state.calMonth--;
-    if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
+    if (--state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
     renderCalendarGrid();
   });
   document.getElementById('cal-next').addEventListener('click', () => {
-    state.calMonth++;
-    if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
+    if (++state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
     renderCalendarGrid();
   });
 
-  // Chat toggle
+  // Chat
   document.getElementById('chat-toggle').addEventListener('click', toggleChat);
   document.getElementById('chat-close').addEventListener('click', toggleChat);
-
-  // Chat input
   document.getElementById('chat-send').addEventListener('click', sendChatMessage);
   const chatInput = document.getElementById('chat-input');
   chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } });
   chatInput.addEventListener('input', () => autoResizeInput(chatInput));
 
-  // Suggestion chips (initial render)
   bindSuggestionChips();
-
-  // Admin search
-  document.getElementById('course-search').addEventListener('input', e => {
-    document.querySelectorAll('#course-list .email-item').forEach(el => {
-      el.style.display = el.textContent.toLowerCase().includes(e.target.value.toLowerCase()) ? '' : 'none';
-    });
-  });
 
   // Reply modal
   document.getElementById('reply-modal-close').addEventListener('click', closeReplyModal);

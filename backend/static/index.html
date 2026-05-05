@@ -4,161 +4,157 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Email Agent</title>
-    <link rel="stylesheet" href="/static/styles.css?v=5" />
+    <link rel="stylesheet" href="/static/styles.css?v=6" />
   </head>
   <body>
 
-    <!-- ── Topbar ── -->
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-icon">EA</div>
-        <span class="brand-name">Email Agent</span>
-      </div>
-
-      <nav class="tab-nav" id="user-tabs">
-        <button class="tab-btn active" data-tab="inbox">
-          Inbox
-          <span class="tab-badge hidden" id="inbox-badge">0</span>
-        </button>
-        <button class="tab-btn" data-tab="compose">Compose</button>
-        <button class="tab-btn" data-tab="calendar">Calendar</button>
-      </nav>
-
-      <nav class="tab-nav hidden" id="admin-tabs">
-        <button class="tab-btn active" data-tab="all-emails">All Emails</button>
-        <button class="tab-btn" data-tab="course-emails">
-          Course Emails
-          <span class="tab-badge hidden" id="course-badge">0</span>
-        </button>
-      </nav>
-
-      <div class="topbar-right">
-        <div class="agent-status-pill">
-          <div class="status-dot" id="agent-dot"></div>
-          <span id="agent-text">Checking…</span>
+    <!-- ── Login Screen ── -->
+    <div id="login-screen">
+      <div class="login-card" id="login-form-wrap">
+        <div class="login-brand">
+          <div class="brand-icon">EA</div>
+          <span class="login-brand-name">Email Agent</span>
         </div>
-        <div class="role-toggle">
-          <button class="role-btn active" data-role="user">User</button>
-          <button class="role-btn" data-role="admin">Admin</button>
-        </div>
-        <select id="user-select" class="user-select-top">
-          <option value="">Loading users…</option>
-        </select>
-      </div>
-    </header>
 
-    <!-- ── Main Content ── -->
-    <main class="main">
-
-      <!-- Inbox Tab -->
-      <div class="tab-panel" id="tab-inbox">
-        <div class="panel-toolbar">
-          <div class="inbox-filter">
-            <button class="filter-btn active" data-filter="inbox">Inbox</button>
-            <button class="filter-btn" data-filter="sent">Sent</button>
+        <!-- Sign in form -->
+        <div id="signin-form">
+          <h1 class="login-title">Sign in</h1>
+          <p class="login-sub">Enter your email and password to continue</p>
+          <div class="login-field">
+            <label class="login-label">Email</label>
+            <input type="email" id="login-email" class="login-input" placeholder="you@example.com" autocomplete="email" />
           </div>
-          <span class="panel-subtitle" id="inbox-subtitle"></span>
-          <button class="btn btn-ghost btn-sm" id="refresh-inbox">Refresh</button>
+          <div class="login-field">
+            <label class="login-label">Password</label>
+            <input type="password" id="login-password" class="login-input" placeholder="••••••••" autocomplete="current-password" />
+          </div>
+          <p class="login-error hidden" id="login-error"></p>
+          <button class="btn btn-primary login-btn" id="login-submit">Sign in</button>
+          <button class="login-link" id="show-forgot">Forgot password?</button>
         </div>
-        <div class="email-split">
-          <div class="email-list-panel" id="inbox-list">
-            <div class="email-empty"><p>Loading…</p></div>
+
+        <!-- Forgot password form -->
+        <div id="forgot-form" class="hidden">
+          <h1 class="login-title">Reset password</h1>
+          <p class="login-sub">Enter your email and we'll send you a reset link</p>
+          <div class="login-field">
+            <label class="login-label">Email</label>
+            <input type="email" id="forgot-email" class="login-input" placeholder="you@example.com" autocomplete="email" />
           </div>
-          <div class="email-reader-panel" id="inbox-reader">
-            <div class="reader-empty"><p>Select an email to read</p></div>
-          </div>
+          <p class="login-error hidden" id="forgot-error"></p>
+          <button class="btn btn-primary login-btn" id="forgot-submit">Send reset link</button>
+          <button class="login-link" id="show-signin">Back to sign in</button>
         </div>
       </div>
+    </div>
 
-      <!-- Compose Tab -->
-      <div class="tab-panel hidden" id="tab-compose">
-        <div class="compose-wrap">
-          <div class="compose-card">
-            <div class="compose-card-header">
-              <h2 class="compose-title">New Message</h2>
-              <button class="btn btn-ghost btn-sm" id="compose-clear">Clear</button>
-            </div>
-            <div class="compose-field">
-              <label class="compose-label">To</label>
-              <input type="email" id="compose-to" class="compose-input" placeholder="recipient@example.com" />
-            </div>
-            <div class="compose-field">
-              <label class="compose-label">Subject</label>
-              <input type="text" id="compose-subject" class="compose-input" placeholder="Email subject" />
-            </div>
-            <div class="compose-field">
-              <label class="compose-label">Message</label>
-              <textarea id="compose-body" class="compose-textarea" rows="14" placeholder="Write your message here…"></textarea>
-            </div>
-            <div class="compose-actions">
-              <button class="btn btn-primary" id="compose-send">Send Email</button>
-              <button class="btn btn-secondary btn-sm" id="compose-ai-btn">Draft with AI</button>
-            </div>
-          </div>
-        </div>
-      </div>
+    <!-- ── Main App (hidden until signed in) ── -->
+    <div id="main-app" class="hidden">
 
-      <!-- Calendar Tab -->
-      <div class="tab-panel hidden" id="tab-calendar">
-        <div class="calendar-wrap">
-          <div class="calendar-left">
-            <div class="cal-nav-row">
-              <button class="cal-nav-btn" id="cal-prev">&lsaquo;</button>
-              <span class="cal-month-title" id="cal-month-title"></span>
-              <button class="cal-nav-btn" id="cal-next">&rsaquo;</button>
-            </div>
-            <div class="cal-weekdays">
-              <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
-            </div>
-            <div class="cal-grid" id="cal-grid"></div>
-          </div>
-          <div class="calendar-right">
-            <h3 class="meetings-heading">Scheduled Meetings</h3>
-            <div id="meetings-list">
-              <div class="email-empty"><p>No scheduled meetings yet</p></div>
-            </div>
-          </div>
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-icon">EA</div>
+          <span class="brand-name">Email Agent</span>
         </div>
-      </div>
 
-      <!-- Admin: All Emails -->
-      <div class="tab-panel hidden" id="tab-all-emails">
-        <div class="panel-toolbar">
-          <span class="panel-subtitle">All emails across all users</span>
-          <button class="btn btn-ghost btn-sm" id="refresh-all">Refresh</button>
-        </div>
-        <div class="email-split">
-          <div class="email-list-panel" id="all-list">
-            <div class="email-empty"><p>Loading…</p></div>
-          </div>
-          <div class="email-reader-panel" id="all-reader">
-            <div class="reader-empty"><p>Select an email to read</p></div>
-          </div>
-        </div>
-      </div>
+        <nav class="tab-nav" id="user-tabs">
+          <button class="tab-btn active" data-tab="inbox">
+            Inbox
+            <span class="tab-badge hidden" id="inbox-badge">0</span>
+          </button>
+          <button class="tab-btn" data-tab="compose">Compose</button>
+          <button class="tab-btn" data-tab="calendar">Calendar</button>
+        </nav>
 
-      <!-- Admin: Course Emails -->
-      <div class="tab-panel hidden" id="tab-course-emails">
-        <div class="panel-toolbar">
-          <span class="panel-subtitle">Emails related to courses and training</span>
-          <input type="text" id="course-search" class="search-input" placeholder="Search…" />
-          <button class="btn btn-ghost btn-sm" id="refresh-course">Refresh</button>
-        </div>
-        <div class="stats-row" id="review-stats"></div>
-        <div class="email-split">
-          <div class="email-list-panel" id="course-list">
-            <div class="email-empty"><p>Loading…</p></div>
+        <div class="topbar-right">
+          <div class="user-pill" id="user-pill">
+            <div class="user-pill-avatar" id="user-pill-avatar">?</div>
+            <span class="user-pill-name" id="user-pill-name">User</span>
           </div>
-          <div class="email-reader-panel" id="course-reader">
-            <div class="reader-empty"><p>Select an email to review</p></div>
-          </div>
+          <button class="btn btn-ghost btn-sm" id="logout-btn">Sign out</button>
         </div>
-      </div>
+      </header>
 
-    </main>
+      <!-- Main Content -->
+      <main class="main">
+
+        <!-- Inbox Tab -->
+        <div class="tab-panel" id="tab-inbox">
+          <div class="panel-toolbar">
+            <div class="inbox-filter">
+              <button class="filter-btn active" data-filter="inbox">Inbox</button>
+              <button class="filter-btn" data-filter="sent">Sent</button>
+            </div>
+            <span class="panel-subtitle" id="inbox-subtitle"></span>
+            <button class="btn btn-ghost btn-sm" id="refresh-inbox">Refresh</button>
+          </div>
+          <div class="email-split">
+            <div class="email-list-panel" id="inbox-list">
+              <div class="email-empty"><p>Loading…</p></div>
+            </div>
+            <div class="email-reader-panel" id="inbox-reader">
+              <div class="reader-empty"><p>Select an email to read</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compose Tab -->
+        <div class="tab-panel hidden" id="tab-compose">
+          <div class="compose-wrap">
+            <div class="compose-card">
+              <div class="compose-card-header">
+                <h2 class="compose-title">New Message</h2>
+                <button class="btn btn-ghost btn-sm" id="compose-clear">Clear</button>
+              </div>
+              <div class="compose-field">
+                <label class="compose-label">To</label>
+                <input type="email" id="compose-to" class="compose-input" placeholder="recipient@example.com" />
+              </div>
+              <div class="compose-field">
+                <label class="compose-label">Subject</label>
+                <input type="text" id="compose-subject" class="compose-input" placeholder="Email subject" />
+              </div>
+              <div class="compose-field">
+                <label class="compose-label">Message</label>
+                <textarea id="compose-body" class="compose-textarea" rows="14" placeholder="Write your message here…"></textarea>
+              </div>
+              <div class="compose-actions">
+                <button class="btn btn-primary" id="compose-send">Send Email</button>
+                <button class="btn btn-secondary btn-sm" id="compose-ai-btn">Draft with AI</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Calendar Tab -->
+        <div class="tab-panel hidden" id="tab-calendar">
+          <div class="calendar-wrap">
+            <div class="calendar-left">
+              <div class="cal-nav-row">
+                <button class="cal-nav-btn" id="cal-prev">&lsaquo;</button>
+                <span class="cal-month-title" id="cal-month-title"></span>
+                <button class="cal-nav-btn" id="cal-next">&rsaquo;</button>
+              </div>
+              <div class="cal-weekdays">
+                <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+              </div>
+              <div class="cal-grid" id="cal-grid"></div>
+            </div>
+            <div class="calendar-right">
+              <h3 class="meetings-heading">Scheduled Meetings</h3>
+              <div id="meetings-list">
+                <div class="email-empty"><p>No scheduled meetings yet</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
 
     <!-- ── Floating Chat Widget ── -->
-    <div class="chat-fab">
+    <div class="chat-fab hidden" id="chat-fab">
       <div class="chat-widget hidden" id="chat-widget">
         <div class="chat-widget-header">
           <div class="chat-widget-info">
@@ -215,6 +211,6 @@
     </div>
 
     <div id="toast-container" class="toast-container"></div>
-    <script src="/static/app.js?v=5"></script>
+    <script src="/static/app.js?v=6"></script>
   </body>
 </html>
