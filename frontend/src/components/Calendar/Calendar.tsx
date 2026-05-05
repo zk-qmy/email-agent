@@ -70,7 +70,7 @@ export function Calendar() {
           <div>
             {threads.map((thread) => (
               <div key={thread.id} className="bg-white rounded-lg p-3.5 mb-2.5 border-l-[3px] border-primary shadow-sm">
-                <div className="font-semibold text-xs text-text mb-0.75">{escHtml(thread.recipient || '—')}</div>
+                <div className="font-semibold text-xs text-text mb-0.75">{escHtml(thread.recipient_username || '—')}</div>
                 <div className="text-xs text-text-secondary mb-1.5">Sent {formatDate(thread.created_at)}</div>
                 <span className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full ${thread.status === 'waiting_reply' ? 'bg-warning-light text-warning' : thread.status === 'completed' ? 'bg-success-light text-success' : thread.status === 'declined' ? 'bg-danger-light text-danger' : 'bg-blue-50 text-blue-500'}`}>
                   {escHtml((thread.status || '').replace(/_/g, ' '))}
