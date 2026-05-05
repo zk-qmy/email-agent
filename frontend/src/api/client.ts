@@ -1,5 +1,7 @@
 import type { User, Email, DraftResponse, Thread } from './types';
 
+const AGENT_BASE_URL = '';
+
 class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -11,7 +13,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   const opts: RequestInit = { method, headers: { 'Content-Type': 'application/json' } };
   if (body !== undefined) opts.body = JSON.stringify(body);
   
-  const res = await fetch(path, opts);
+  const res = await fetch(`${AGENT_BASE_URL}${path}`, opts);
   const data = await res.json().catch(() => ({}));
   
   if (!res.ok) throw new ApiError(res.status, data.detail || `HTTP ${res.status}`);
@@ -23,12 +25,12 @@ export const api = {
     req<User>('POST', '/api/auth/login', { email, password }),
 
   getInbox: (userId: number) =>
-    req<{ emails: Email[] }>('GET', `/api/emails/inbox?user_id=${userId}`)
-      .then(r => r.emails || []),
+    req<{ emails: { email: Email }[] }>('GET', `/api/emails/inbox?user_id=${userId}`)
+      .then(r => r.emails?.map(e => e.email) || []),
 
   getSent: (userId: number) =>
-    req<{ emails: Email[] }>('GET', `/api/emails/sent?user_id=${userId}`)
-      .then(r => r.emails || []),
+    req<{ emails: { email: Email }[] }>('GET', `/api/emails/sent?user_id=${userId}`)
+      .then(r => r.emails?.map(e => e.email) || []),
 
   getEmail: (emailId: number) =>
     req<{ email: Email }>('GET', `/api/emails/${emailId}`)
@@ -43,21 +45,23 @@ export const api = {
   replyEmail: (senderId: number, parentEmailId: number, body: string) =>
     req('POST', '/api/emails/reply', { sender_id: senderId, parent_email_id: parentEmailId, body }),
 
-  createDraft: (userId: number, recipient: string, subject: string, context: string) =>
-    req<DraftResponse>('POST', '/api/agent/draft', { user_id: userId, recipient, subject, context }),
+  createThread: (userId: number) =>
+    req<{ thread_id: string }>('POST', '/api/agent/thread', { user_id: userId }),
 
-  sendDraft: (draftId: string, body?: string) =>
-    req('POST', `/api/agent/draft/${draftId}/send`, body !== undefined ? { body } : {}),
+  createDraft: (userId: number, prompt: string, threadId?: string) =>
+    req<DraftResponse>('POST', '/api/agent/draft', { user_id: userId, prompt, thread_id: threadId || null }),
 
-  cancelDraft: (draftId: string) =>
-    req('DELETE', `/api/agent/draft/${draftId}`),
+  sendDraft: (threadId: string, userId: number, body: string) =>
+    req('POST', `/api/agent/thread/${threadId}/reply`, { user_id: userId, response: body }),
+
+  cancelDraft: (threadId: string) =>
+    req('DELETE', `/api/agent/thread/${threadId}`),
 
   getThread: (threadId: string) =>
-    req<{ thread: Thread }>('GET', `/api/agent/thread/${threadId}`)
-      .then(r => r.thread),
+    req<Thread>('GET', `/api/agent/thread/${threadId}`),
 
-  getThreads: (userId: number) =>
-    req<{ threads: Thread[] }>('GET', `/api/agent/threads?user_id=${userId}`)
+  getThreads: (userId: number, status?: string) =>
+    req<{ threads: Thread[] }>('GET', `/api/agent/threads?user_id=${userId}${status ? `&status=${status}` : ''}`)
       .then(r => r.threads || []),
 
   confirmMeeting: (threadId: string) =>
@@ -65,6 +69,12 @@ export const api = {
 
   declineMeeting: (threadId: string) =>
     req('POST', `/api/agent/thread/${threadId}/decline`, {}),
+
+  getThreadStatus: (threadId: string) =>
+    req<{ status: string; reply_intent?: string }>('GET', `/api/agent/status/${threadId}`),
+
+  getThreadHistory: (threadId: string) =>
+    req<{ messages: { role: string; content: string }[] }>('GET', `/api/agent/history/${threadId}`),
 };
 
 export function extractEmail(text: string): string | null {

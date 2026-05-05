@@ -18,9 +18,10 @@ export interface Email {
 }
 
 export interface Draft {
-  draft_id: string;
+  draft_id?: string;
   thread_id?: string;
-  recipient: string;
+  recipient_username?: string;
+  recipient_email?: string;
   subject: string;
   body: string;
 }
@@ -28,7 +29,8 @@ export interface Draft {
 export interface Thread {
   id: string;
   thread_id?: string;
-  recipient: string;
+  recipient_username?: string;
+  recipient_email?: string;
   status: string;
   created_at: string;
   meeting?: Meeting;
@@ -53,9 +55,19 @@ export interface DraftResponse {
 export interface ChatMessage {
   id: string;
   role: 'user' | 'ai' | 'system';
+  threadId: string;
   content?: string;
   draft?: Draft;
   meeting?: Meeting;
   question?: string;
   isThinking?: boolean;
+}
+
+export interface ThreadStatus {
+  status: string;
+  reply_intent?: string;
+}
+
+export interface ThreadHistory {
+  messages: { role: string; content: string }[];
 }

@@ -10,11 +10,12 @@ interface StoreState {
   threads: Thread[];
   replyTargetId: number | null;
   chatOpen: boolean;
-  chatMessages: ChatMessage[];
+  chatThreads: Record<string, ChatMessage[]>;
+  allThreadIds: string[];
+  activeThreadId: string | null;
   pendingContext: string | null;
   awaitingRecipient: boolean;
   activeDraftId: string | null;
-  activeThreadId: string | null;
   calYear: number;
   calMonth: number;
   toasts: { id: number; message: string; type: 'info' | 'success' | 'error' }[];
@@ -28,12 +29,14 @@ interface StoreState {
   setThreads: (threads: Thread[]) => void;
   setReplyTargetId: (id: number | null) => void;
   setChatOpen: (open: boolean) => void;
-  addChatMessage: (msg: ChatMessage) => void;
-  removeChatMessage: (id: string) => void;
+  createThread: (threadId: string) => void;
+  setActiveThreadId: (threadId: string | null) => void;
+  addMessageToThread: (threadId: string, msg: ChatMessage) => void;
+  removeMessageFromThread: (threadId: string, msgId: string) => void;
+  updateMessageInThread: (threadId: string, msgId: string, updates: Partial<ChatMessage>) => void;
   setPendingContext: (ctx: string | null) => void;
   setAwaitingRecipient: (awaiting: boolean) => void;
   setActiveDraftId: (id: string | null) => void;
-  setActiveThreadId: (id: string | null) => void;
   navigateCalendar: (prev: boolean) => void;
   addToast: (message: string, type?: 'info' | 'success' | 'error') => void;
   removeToast: (id: number) => void;
@@ -49,11 +52,12 @@ export const useStore = create<StoreState>((set) => ({
   threads: [],
   replyTargetId: null,
   chatOpen: false,
-  chatMessages: [],
+  chatThreads: {},
+  allThreadIds: [],
+  activeThreadId: null,
   pendingContext: null,
   awaitingRecipient: false,
   activeDraftId: null,
-  activeThreadId: null,
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth(),
   toasts: [],
@@ -67,16 +71,39 @@ export const useStore = create<StoreState>((set) => ({
   setThreads: (threads) => set({ threads }),
   setReplyTargetId: (id) => set({ replyTargetId: id }),
   setChatOpen: (open) => set({ chatOpen: open }),
-  addChatMessage: (msg) => set((state) => ({ 
-    chatMessages: [...state.chatMessages, msg] 
-  })),
-  removeChatMessage: (id) => set((state) => ({
-    chatMessages: state.chatMessages.filter(m => m.id !== id)
-  })),
+  createThread: (threadId) => set((state) => {
+    if (state.allThreadIds.includes(threadId)) return {};
+    return {
+      chatThreads: { ...state.chatThreads, [threadId]: [] },
+      allThreadIds: [...state.allThreadIds, threadId],
+      activeThreadId: threadId,
+    };
+  }),
+  setActiveThreadId: (threadId) => set({ activeThreadId: threadId }),
+  addMessageToThread: (threadId, msg) => set((state) => {
+    const threadMessages = state.chatThreads[threadId] || [];
+    return {
+      chatThreads: { ...state.chatThreads, [threadId]: [...threadMessages, msg] },
+    };
+  }),
+  removeMessageFromThread: (threadId, msgId) => set((state) => {
+    const threadMessages = state.chatThreads[threadId] || [];
+    return {
+      chatThreads: { ...state.chatThreads, [threadId]: threadMessages.filter(m => m.id !== msgId) },
+    };
+  }),
+  updateMessageInThread: (threadId, msgId, updates) => set((state) => {
+    const threadMessages = state.chatThreads[threadId] || [];
+    return {
+      chatThreads: {
+        ...state.chatThreads,
+        [threadId]: threadMessages.map(m => m.id === msgId ? { ...m, ...updates } : m),
+      },
+    };
+  }),
   setPendingContext: (ctx) => set({ pendingContext: ctx }),
   setAwaitingRecipient: (awaiting) => set({ awaitingRecipient: awaiting }),
   setActiveDraftId: (id) => set({ activeDraftId: id }),
-  setActiveThreadId: (id) => set({ activeThreadId: id }),
   navigateCalendar: (prev) => set((state) => {
     let month = state.calMonth;
     let year = state.calYear;
@@ -99,11 +126,12 @@ export const useStore = create<StoreState>((set) => ({
     emails: [],
     selectedEmail: null,
     threads: [],
-    chatMessages: [],
     chatOpen: false,
+    chatThreads: {},
+    allThreadIds: [],
+    activeThreadId: null,
     pendingContext: null,
     awaitingRecipient: false,
     activeDraftId: null,
-    activeThreadId: null,
   }),
 }));
