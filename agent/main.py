@@ -6,12 +6,11 @@ from pydantic import BaseModel
 from typing import Optional
 from agent.routes.agent import (
     CreateDraftRequest,
+    DraftReplyRequest,
     create_draft,
-    get_draft,
-    send_draft,
-    cancel_draft,
-    get_user_drafts,
     get_thread,
+    cancel_thread,
+    reply_to_draft,
     get_user_threads,
     confirm_meeting,
     decline_meeting,
@@ -31,37 +30,24 @@ app.add_middleware(
 )
 
 
-@app.post("/api/agent/draft")
-async def agent_create_draft(request: CreateDraftRequest):
+@app.post("/api/agent/thread")
+async def agent_create_thread(request: CreateDraftRequest):
     return await create_draft(request)
-
-
-@app.get("/api/agent/draft/{draft_id}")
-async def agent_get_draft(draft_id: str):
-    return await get_draft(draft_id)
-
-
-class SendDraftBody(BaseModel):
-    body: Optional[str] = None
-
-@app.post("/api/agent/draft/{draft_id}/send")
-async def agent_send_draft(draft_id: str, req: SendDraftBody = SendDraftBody()):
-    return await send_draft(draft_id, req.body)
-
-
-@app.delete("/api/agent/draft/{draft_id}")
-async def agent_cancel_draft(draft_id: str):
-    return await cancel_draft(draft_id)
-
-
-@app.get("/api/agent/drafts")
-async def agent_list_drafts(user_id: int, status: Optional[str] = None):
-    return await get_user_drafts(user_id, status)
 
 
 @app.get("/api/agent/thread/{thread_id}")
 async def agent_get_thread(thread_id: str):
     return await get_thread(thread_id)
+
+
+@app.delete("/api/agent/thread/{thread_id}")
+async def agent_cancel_thread(thread_id: str):
+    return await cancel_thread(thread_id)
+
+
+@app.post("/api/agent/thread/{thread_id}/reply")
+async def agent_reply_to_thread(thread_id: str, request: DraftReplyRequest):
+    return await reply_to_draft(thread_id, request)
 
 
 @app.get("/api/agent/threads")

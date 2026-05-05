@@ -7,7 +7,7 @@ try:
 except ValueError:
     pass  # Already patched or using uvloop
 
-from src.integrations.mail.client import mail_client
+from src.integrations.mail.client import MailClient
 
 
 def _run_async(coro):
@@ -28,12 +28,15 @@ def _run_async(coro):
 
 
 def send_email_sync(sender_id: int, recipient_email: str, subject: str, body: str):
-    return _run_async(mail_client.send_email(sender_id, recipient_email, subject, body))
+    client = MailClient()
+    return _run_async(client.send_email(sender_id, recipient_email, subject, body))
 
 
 def poll_inbox_sync(user_id: int, last_check: Optional[str] = None):
-    return _run_async(mail_client.poll_inbox(user_id, last_check))
+    client = MailClient()
+    return _run_async(client.poll_inbox(user_id, last_check))
 
 
 def mark_read_sync(email_id: int):
-    return _run_async(mail_client.mark_read(email_id))
+    client = MailClient()
+    return _run_async(client.mark_read(email_id))

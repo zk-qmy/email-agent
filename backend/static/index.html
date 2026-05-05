@@ -301,94 +301,10 @@
                                     <button
                                         class="test-btn"
                                         data-method="GET"
-                                        data-endpoint="/api/agent/drafts?user_id={{user_id}}"
-                                    >
-                                        Get Drafts
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
                                         data-endpoint="/api/agent/threads?user_id={{user_id}}"
                                     >
                                         Get Threads
                                     </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="api-section">
-                            <h2
-                                class="section-title"
-                                data-section="agent-draft"
-                            >
-                                <span>Draft</span>
-                                <span class="toggle">▼</span>
-                            </h2>
-                            <div
-                                class="section-content"
-                                id="agent-draft-section"
-                            >
-                                <div class="test-group">
-                                    <button
-                                        class="test-btn"
-                                        data-method="POST"
-                                        data-endpoint="/api/agent/draft"
-                                        data-body='{"user_id": {{user_id}}, "recipient": "{{recipient_email}}", "subject": "{{subject}}", "context": "{{context}}"}'
-                                    >
-                                        Create Draft
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="GET"
-                                        data-endpoint="/api/agent/draft/{{draft_id}}"
-                                    >
-                                        Get Draft
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="POST"
-                                        data-endpoint="/api/agent/draft/{{draft_id}}/send"
-                                        data-body="{}"
-                                    >
-                                        Send Draft
-                                    </button>
-                                    <button
-                                        class="test-btn"
-                                        data-method="DELETE"
-                                        data-endpoint="/api/agent/draft/{{draft_id}}"
-                                    >
-                                        Cancel Draft
-                                    </button>
-                                </div>
-                                <div class="input-row">
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="draft_id"
-                                        placeholder="draft_id"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="recipient_email"
-                                        placeholder="recipient"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="subject"
-                                        placeholder="subject"
-                                        value=""
-                                    />
-                                    <input
-                                        type="text"
-                                        class="input-field"
-                                        data-var="context"
-                                        placeholder="context"
-                                        value=""
-                                    />
                                 </div>
                             </div>
                         </div>
@@ -408,11 +324,74 @@
                                 <div class="test-group">
                                     <button
                                         class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/agent/thread"
+                                        data-body='{"user_id": {{user_id}}, "prompt": "{{context}}"}'
+                                    >
+                                        Create Thread
+                                    </button>
+                                    <button
+                                        class="test-btn"
                                         data-method="GET"
                                         data-endpoint="/api/agent/thread/{{thread_id}}"
                                     >
                                         Get Thread
                                     </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="DELETE"
+                                        data-endpoint="/api/agent/thread/{{thread_id}}"
+                                    >
+                                        Cancel Thread
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/agent/thread/{{thread_id}}/reply"
+                                        data-body='{"user_id": {{user_id}}, "response": "{{response}}"}'
+                                    >
+                                        Reply to Thread
+                                    </button>
+                                </div>
+                                <div class="input-row">
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="thread_id"
+                                        placeholder="thread_id"
+                                        value=""
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="context"
+                                        placeholder="prompt"
+                                        value=""
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="response"
+                                        placeholder="response (y to approve or feedback)"
+                                        value="y"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="api-section">
+                            <h2
+                                class="section-title"
+                                data-section="agent-status"
+                            >
+                                <span>Status</span>
+                                <span class="toggle">▼</span>
+                            </h2>
+                            <div
+                                class="section-content"
+                                id="agent-status-section"
+                            >
+                                <div class="test-group">
                                     <button
                                         class="test-btn"
                                         data-method="GET"
@@ -484,14 +463,26 @@
                     </div>
                 </div>
 
-                <div class="response-panel">
-                    <div class="response-header">
-                        <h3>Response</h3>
-                        <button id="clear-response" class="btn btn-secondary">
-                            Clear
-                        </button>
+                <div class="response-column">
+                    <div class="response-panel">
+                        <div class="response-header">
+                            <h3>Response</h3>
+                            <button id="clear-response" class="btn btn-secondary">
+                                Clear
+                            </button>
+                        </div>
+                        <pre id="response-output"></pre>
                     </div>
-                    <pre id="response-output"></pre>
+
+                    <div class="response-panel">
+                        <div class="response-header">
+                            <h3>Agent Response</h3>
+                            <button id="clear-agent-response" class="btn btn-secondary">
+                                Clear
+                            </button>
+                        </div>
+                        <pre id="agent-response-output"></pre>
+                    </div>
                 </div>
             </div>
         </div>

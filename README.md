@@ -25,6 +25,9 @@ The Email Agent is a multi-service system that:
                      └─────────────┘
 ```
 
+## Agent Loop
+![Meeting Graph](assets/graph/agent_graph_20260501_200012.png)
+
 ## Actual Directory Structure
 
 ```
@@ -73,13 +76,31 @@ email-agent/
 │
 ├── config/
 │   ├── __init__.py
+│   ├── prompts/
+│   │   ├── base.py
+│   │   ├── email.py            # prompts for email tasks
+│   │   ├── system_prompt.py    # agent's system prompt
+│   │   └── __init__.py
 │   └── settings.py             # Pydantic settings
 │
 ├── src/                        # Core library
 │   ├── __init__.py
-│   ├── core/
+│   ├── agent/
 │   │   ├── __init__.py
-│   │   └── states.py           # AgentState, MeetingData, EmailData
+│   │   ├── nodes/
+│   │   │   ├── __init__.py
+│   │   │   ├── reasoning.py    # reasoning node
+│   │   │   └── action.py       # using tools node
+│   │   ├── tools/
+│   │   │   ├── __init__.py
+│   │   │   ├── email_tools.py      # tools for email tasks
+│   │   │   ├── registry.py         # registry point for tools
+│   │   │   └── schedule_tools.py   # tools for scheduling tasks
+│   │   ├── config.py
+│   │   ├── graph.py            # agent graph
+│   │   ├── runner.py           # handle interrupt + HIL
+│   │   ├── state.py            # AgentState, Email
+│   │   └── utils.py           
 │   ├── integrations/
 │   │   ├── __init__.py
 │   │   ├── llm/
@@ -89,26 +110,15 @@ email-agent/
 │   │       ├── __init__.py
 │   │       ├── client.py       # Async HTTP client to backend
 │   │       └── sync_client.py  # Sync mail operations
-│   ├── memory/
-│   │   ├── __init__.py
-│   │   └── checkpointer.py     # LangGraph MemorySaver
-│   ├── nodes/
-│   │   ├── __init__.py
-│   │   ├── shared/
-│   │   │   ├── __init__.py
-│   │   │   ├── decision_nodes.py # classify_workflow
-│   │   │   └── email_nodes.py    # draft, approve, send, wait, followup
-│   │   └── specialized/
-│   │       ├── __init__.py
-│   │       └── meeting_nodes.py # Meeting scheduling nodes
-│   └── workflows/
+│   └── nodes/
 │       ├── __init__.py
-│       ├── router.py           # Main LangGraph router
-│       └── meeting_scheduler.py # Meeting scheduling workflow
-│
-├── scripts/
-│   ├── __init__.py
-│   └── run.py                  # CLI test script
+│       ├── shared/
+│       │   ├── __init__.py
+│       │   ├── decision_nodes.py # classify_workflow
+│       │   └── email_nodes.py    # draft, approve, send, wait, followup
+│       └── specialized/
+│           ├── __init__.py
+│           └── meeting_nodes.py # Meeting scheduling nodes
 │
 ├── test/
 │   └── __init__.py
@@ -193,12 +203,16 @@ The agent handles email processing, workflow routing, and LLM interactions.
 uvicorn agent.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Run CLI Test Script
+### Quick agent test
 
-Test the meeting scheduler workflow:
+Change the `initial_prompt` for a quick test. For example:
 
+```python
+initial_prompt = "help me write an email to prof linh to schedule a meeting on 2nd may"
+```
+Then,
 ```bash
-python scripts/run.py
+python main.py
 ```
 
 ## Web UI
@@ -293,6 +307,3 @@ The database is seeded with test users:
 | bob      | password123 |
 | charlie  | password123 |
 
-## Schedule Meeting Workflow
-
-![Meeting Graph](assets/graph/meeting_graph.png)

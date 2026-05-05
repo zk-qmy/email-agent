@@ -6,18 +6,19 @@ from agent.services.agent_service import agent_service
 
 class CreateDraftRequest(BaseModel):
     user_id: int
-    recipient: str
-    subject: str
-    context: str
+    prompt: str
+
+
+class DraftReplyRequest(BaseModel):
+    user_id: int
+    response: str
 
 
 async def create_draft(request: CreateDraftRequest):
     try:
-        result = agent_service.create_draft(
+        result = await agent_service.create_draft_async(
             user_id=request.user_id,
-            recipient=request.recipient,
-            subject=request.subject,
-            context=request.context,
+            prompt=request.prompt,
         )
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
@@ -28,23 +29,39 @@ async def create_draft(request: CreateDraftRequest):
         raise HTTPException(status_code=500, detail=f"Failed to create draft: {str(e)}")
 
 
-async def get_draft(draft_id: str):
+async def get_thread(thread_id: str):
     try:
-        result = agent_service.get_draft(draft_id)
+        result = agent_service.get_draft(thread_id)
         if not result:
-            raise HTTPException(status_code=404, detail="Draft not found")
+            raise HTTPException(status_code=404, detail="Thread not found")
         return result
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get draft: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get thread: {str(e)}")
 
 
-async def send_draft(draft_id: str, body: Optional[str] = None):
+
+
+
+async def cancel_thread(thread_id: str):
     try:
-        result = await agent_service.send_draft(
-            draft_id=draft_id,
-            body=body,
+        result = agent_service.cancel_draft(thread_id)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to cancel thread: {str(e)}")
+
+
+async def reply_to_draft(thread_id: str, request: DraftReplyRequest):
+    try:
+        result = await agent_service.reply_to_draft_async(
+            thread_id=thread_id,
+            user_id=request.user_id,
+            response=request.response,
         )
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
@@ -52,19 +69,7 @@ async def send_draft(draft_id: str, body: Optional[str] = None):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send draft: {str(e)}")
-
-
-async def cancel_draft(draft_id: str):
-    try:
-        result = agent_service.cancel_draft(draft_id)
-        if "error" in result:
-            raise HTTPException(status_code=400, detail=result["error"])
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to cancel draft: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to reply to thread: {str(e)}")
 
 
 async def get_user_drafts(user_id: int, status: Optional[str] = None):
@@ -117,12 +122,9 @@ async def decline_meeting(thread_id: str):
         )
 
 
-active_workflows = {}
-
-
 async def get_status(thread_id: str):
     try:
-        result = agent_service.get_status(thread_id, active_workflows)
+        result = agent_service.get_status(thread_id)
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
         return result
@@ -134,7 +136,7 @@ async def get_status(thread_id: str):
 
 async def get_history(thread_id: str):
     try:
-        result = agent_service.get_history(thread_id, active_workflows)
+        result = agent_service.get_history(thread_id)
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
         return result

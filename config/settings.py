@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     BASE_DIR: ClassVar[Path] = BASE_DIR
 
     GOOGLE_API_KEY: str | None = None
-    RECURSION_LIMIT: int = 5
-    MAX_FOLLOWUP_COUNT: int = 2
+    # RECURSION_LIMIT: int = 5
+    # MAX_FOLLOWUP_COUNT: int = 2
 
     class Config:
         env_file = BASE_DIR / ".env"
