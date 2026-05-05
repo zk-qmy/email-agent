@@ -5,8 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from agent.routes.agent import (
+    CreateThreadRequest,
     CreateDraftRequest,
     DraftReplyRequest,
+    create_thread,
     create_draft,
     get_thread,
     cancel_thread,
@@ -31,7 +33,12 @@ app.add_middleware(
 
 
 @app.post("/api/agent/thread")
-async def agent_create_thread(request: CreateDraftRequest):
+async def agent_create_thread(request: CreateThreadRequest):
+    return await create_thread(request)
+
+
+@app.post("/api/agent/draft")
+async def agent_create_draft(request: CreateDraftRequest):
     return await create_draft(request)
 
 

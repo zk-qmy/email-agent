@@ -4,9 +4,14 @@ from fastapi import WebSocket, WebSocketDisconnect, HTTPException
 from agent.services.agent_service import agent_service
 
 
+class CreateThreadRequest(BaseModel):
+    user_id: int
+
+
 class CreateDraftRequest(BaseModel):
     user_id: int
     prompt: str
+    thread_id: Optional[str] = None
 
 
 class DraftReplyRequest(BaseModel):
@@ -14,11 +19,20 @@ class DraftReplyRequest(BaseModel):
     response: str
 
 
+async def create_thread(request: CreateThreadRequest):
+    try:
+        result = agent_service.create_empty_thread(user_id=request.user_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create thread: {str(e)}")
+
+
 async def create_draft(request: CreateDraftRequest):
     try:
         result = await agent_service.create_draft_async(
             user_id=request.user_id,
             prompt=request.prompt,
+            thread_id=request.thread_id,
         )
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
@@ -53,7 +67,7 @@ async def cancel_thread(thread_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to cancel thread: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to remove thread: {str(e)}")
 
 
 async def reply_to_draft(thread_id: str, request: DraftReplyRequest):
