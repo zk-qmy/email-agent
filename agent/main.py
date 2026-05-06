@@ -1,9 +1,11 @@
+import logging
 import os
 import asyncio
 from fastapi import FastAPI, WebSocket, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+from backend.exceptions import add_exception_handlers
 from agent.routes.agent import (
     CreateThreadRequest,
     CreateDraftRequest,
@@ -21,6 +23,8 @@ from agent.routes.agent import (
     websocket_endpoint,
 )
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Email Agent API", version="1.0.0")
 
 app.add_middleware(
@@ -30,6 +34,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+add_exception_handlers(app)
 
 
 @app.post("/api/agent/thread")
