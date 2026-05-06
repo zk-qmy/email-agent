@@ -34,6 +34,9 @@ class ConnectionManager:
                 print(f"[ws_manager] Send failed for user {user_id}: {e}")
                 await self.disconnect(user_id)
 
+    async def broadcast_to_user(self, user_id: int, event: dict):
+        await self.send_to_user(user_id, event)
+
     async def shutdown(self):
         async with self._lock:
             for ws in list(self._connections.values()):
