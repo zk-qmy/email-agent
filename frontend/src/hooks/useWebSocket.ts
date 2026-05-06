@@ -18,6 +18,7 @@ export function useWebSocket(userId: number | undefined) {
   const addToast = useStore((s) => s.addToast);
   const setEmails = useStore((s) => s.setEmails);
   const setCurrentTab = useStore((s) => s.setCurrentTab);
+  const refreshEmails = useStore((s) => s.refreshEmails);
   const createThread = useStore((s) => s.createThread);
   const addMessageToThread = useStore((s) => s.addMessageToThread);
   const removeMessageFromThread = useStore((s) => s.removeMessageFromThread);
@@ -57,7 +58,7 @@ export function useWebSocket(userId: number | undefined) {
         if (event === 'new_email') {
           addToast('New email received!', 'info');
           if (useStore.getState().currentTab === 'inbox') {
-            useStore.getState().setCurrentTab('inbox');
+            refreshEmails();
           }
           return;
         }
@@ -201,7 +202,7 @@ export function useWebSocket(userId: number | undefined) {
     return () => {
       ws.close();
     };
-  }, [userId, addToast, setEmails, setCurrentTab, createThread, addMessageToThread, removeMessageFromThread, updateMessageInThread, setActiveThreadId]);
+  }, [userId, addToast, setEmails, setCurrentTab, refreshEmails, createThread, addMessageToThread, removeMessageFromThread, updateMessageInThread, setActiveThreadId]);
 
   return wsRef;
 }

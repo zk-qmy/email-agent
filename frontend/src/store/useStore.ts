@@ -6,6 +6,7 @@ interface StoreState {
   currentTab: 'inbox' | 'compose' | 'calendar';
   inboxFilter: 'inbox' | 'sent';
   emails: Email[];
+  emailRefreshKey: number;
   selectedEmail: Email | null;
   threads: Thread[];
   replyTargetId: number | null;
@@ -24,6 +25,7 @@ interface StoreState {
   setCurrentUser: (user: User | null) => void;
   setCurrentTab: (tab: 'inbox' | 'compose' | 'calendar') => void;
   setInboxFilter: (filter: 'inbox' | 'sent') => void;
+  refreshEmails: () => void;
   setEmails: (emails: Email[]) => void;
   setSelectedEmail: (email: Email | null) => void;
   setThreads: (threads: Thread[]) => void;
@@ -48,6 +50,7 @@ export const useStore = create<StoreState>((set) => ({
   currentTab: 'inbox',
   inboxFilter: 'inbox',
   emails: [],
+  emailRefreshKey: 0,
   selectedEmail: null,
   threads: [],
   replyTargetId: null,
@@ -66,6 +69,7 @@ export const useStore = create<StoreState>((set) => ({
   setCurrentUser: (user) => set({ currentUser: user }),
   setCurrentTab: (tab) => set({ currentTab: tab }),
   setInboxFilter: (filter) => set({ inboxFilter: filter }),
+  refreshEmails: () => set((state) => ({ emailRefreshKey: state.emailRefreshKey + 1 })),
   setEmails: (emails) => set({ emails }),
   setSelectedEmail: (email) => set({ selectedEmail: email }),
   setThreads: (threads) => set({ threads }),

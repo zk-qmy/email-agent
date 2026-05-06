@@ -6,10 +6,12 @@ import type { Email } from '../../api/types';
 export function EmailList() {
   const currentUser = useStore((s) => s.currentUser);
   const inboxFilter = useStore((s) => s.inboxFilter);
+  const emailRefreshKey = useStore((s) => s.emailRefreshKey);
   const emails = useStore((s) => s.emails);
   const selectedEmail = useStore((s) => s.selectedEmail);
   const setEmails = useStore((s) => s.setEmails);
   const setSelectedEmail = useStore((s) => s.setSelectedEmail);
+  const refreshEmails = useStore((s) => s.refreshEmails);
 
   const userId = currentUser?.user_id ?? currentUser?.id;
 
@@ -28,7 +30,7 @@ export function EmailList() {
     };
     
     loadEmails();
-  }, [userId, inboxFilter, setEmails]);
+  }, [userId, inboxFilter, emailRefreshKey, setEmails]);
 
   const sortedEmails = [...emails].sort((a, b) => 
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -57,7 +59,7 @@ export function EmailList() {
           </button>
         </div>
         <span className="flex-1 text-xs text-text-secondary">{subtitle}</span>
-        <button className="btn btn-ghost btn-sm" onClick={() => useStore.getState().setInboxFilter(inboxFilter)}>
+        <button className="btn btn-ghost btn-sm" onClick={refreshEmails}>
           Refresh
         </button>
       </div>
