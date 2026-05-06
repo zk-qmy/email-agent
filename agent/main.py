@@ -1,6 +1,7 @@
 import logging
 import os
 import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -25,7 +26,23 @@ from agent.routes.agent import (
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Email Agent API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from agent.services.ws_client import backend_ws_client
+    from agent.services.agent_service import agent_service
+
+    backend_ws_client.set_push_handler(agent_service.handle_backend_push)
+    backend_ws_client._running = True
+
+    yield
+
+    await backend_ws_client.close()
+    from src.integrations.mail.client import mail_client
+    await mail_client.close()
+
+
+app = FastAPI(title="Email Agent API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -96,24 +113,6 @@ async def websocket_chat(websocket: WebSocket, user_id: int):
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
-
-
-@app.on_event("startup")
-async def startup():
-    from agent.services.ws_client import backend_ws_client
-    from agent.services.agent_service import agent_service
-
-    backend_ws_client.set_push_handler(agent_service.handle_backend_push)
-    backend_ws_client._running = True
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    from agent.services.ws_client import backend_ws_client
-    from src.integrations.mail.client import mail_client
-
-    await backend_ws_client.close()
-    await mail_client.close()
 
 
 if __name__ == "__main__":

@@ -312,10 +312,37 @@ class TestMarkRead:
 
 
 class TestPollInbox:
-    @pytest.mark.skip(reason="May fail without complete db setup")
-    def test_poll_inbox(self, app):
-        pass
+    def test_poll_inbox(self, app, seeded_user, seeded_recipient):
+        """Test poll inbox returns new emails."""
+        app.post(
+            "/api/emails/send",
+            json={
+                "sender_id": seeded_user["id"],
+                "recipient_email": seeded_recipient["email"],
+                "subject": "Test Poll",
+                "body": "Test body"
+            }
+        )
 
-    @pytest.mark.skip(reason="May fail without complete db setup")
-    def test_poll_inbox_with_last_check(self, app):
-        pass
+        response = app.get(f"/api/emails/poll?user_id={seeded_recipient['id']}")
+        assert response.status_code == 200
+        data = response.json()
+        assert "new_emails" in data
+        assert "count" in data
+
+    def test_poll_inbox_with_last_check(self, app, seeded_user, seeded_recipient):
+        """Test poll inbox with last_check filter."""
+        app.post(
+            "/api/emails/send",
+            json={
+                "sender_id": seeded_user["id"],
+                "recipient_email": seeded_recipient["email"],
+                "subject": "Test Poll 2",
+                "body": "Test body 2"
+            }
+        )
+
+        response = app.get(f"/api/emails/poll?user_id={seeded_recipient['id']}&last_check=2020-01-01T00:00:00")
+        assert response.status_code == 200
+        data = response.json()
+        assert "new_emails" in data

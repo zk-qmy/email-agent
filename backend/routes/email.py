@@ -63,12 +63,12 @@ async def get_sent(user_id: int = Query(...)):
     return {"emails": [{"email": e} for e in emails]}
 
 
-@router.get("/{email_id}")
-async def get_email(email_id: int):
-    email = mail_service.get_email(email_id)
-    if not email:
-        raise HTTPException(status_code=404, detail="Email not found")
-    return {"email": email}
+@router.get("/poll")
+async def poll_inbox(
+    user_id: int = Query(...), last_check: Optional[str] = Query(None)
+):
+    result = mail_service.poll_inbox(user_id, last_check)
+    return result
 
 
 @router.post("/query")
@@ -83,12 +83,12 @@ async def query_emails(request: QueryEmailsRequest):
     return {"emails": emails}
 
 
-@router.get("/poll")
-async def poll_inbox(
-    user_id: int = Query(...), last_check: Optional[str] = Query(None)
-):
-    result = mail_service.poll_inbox(user_id, last_check)
-    return result
+@router.get("/{email_id}")
+async def get_email(email_id: int):
+    email = mail_service.get_email(email_id)
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+    return {"email": email}
 
 
 @router.put("/mark_read")
