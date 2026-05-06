@@ -29,6 +29,7 @@
             <div class="tabs">
                 <button class="tab-btn active" data-tab="auth">Auth</button>
                 <button class="tab-btn" data-tab="email">Email</button>
+                <button class="tab-btn" data-tab="calendar">Calendar</button>
                 <button class="tab-btn" data-tab="agent">Agent</button>
             </div>
 
@@ -280,6 +281,153 @@
                                         class="input-field"
                                         data-var="email_id"
                                         placeholder="email_id"
+                                        value=""
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="calendar-tab" class="tab-pane">
+                        <div class="api-section">
+                            <h2 class="section-title" data-section="calendar-availability">
+                                <span>Availability</span>
+                                <span class="toggle">▼</span>
+                            </h2>
+                            <div class="section-content" id="calendar-availability-section">
+                                <div class="test-group">
+                                    <button
+                                        class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/calendar/availability"
+                                        data-body='{"user_id": {{user_id}}, "start_time": "{{start_time}}", "duration_minutes": {{duration_minutes}}}'
+                                    >
+                                        Check Availability
+                                    </button>
+                                </div>
+                                <div class="input-row">
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="start_time"
+                                        placeholder="start_time (YYYY-MM-DDTHH:MM:SS)"
+                                        value="2025-05-15T14:00:00"
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="duration_minutes"
+                                        placeholder="duration_minutes"
+                                        value="60"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="api-section">
+                            <h2 class="section-title" data-section="calendar-events">
+                                <span>Events</span>
+                                <span class="toggle">▼</span>
+                            </h2>
+                            <div class="section-content" id="calendar-events-section">
+                                <div class="test-group">
+                                    <button
+                                        class="test-btn"
+                                        data-method="GET"
+                                        data-endpoint="/api/calendar/events?user_id={{user_id}}&start_date={{start_date}}&end_date={{end_date}}"
+                                    >
+                                        Get Events
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="GET"
+                                        data-endpoint="/api/calendar/events/{{event_id}}"
+                                    >
+                                        Get Event
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/calendar/events"
+                                        data-body='{"organizer_id": {{user_id}}, "title": "{{title}}", "description": "{{description}}", "start_time": "{{start_time}}", "end_time": "{{end_time}}", "attendee_ids": [], "location": "{{location}}"}'
+                                    >
+                                        Create Event
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="PUT"
+                                        data-endpoint="/api/calendar/events/{{event_id}}"
+                                        data-body='{"title": "{{title}}", "description": "{{description}}", "location": "{{location}}"}'
+                                    >
+                                        Update Event
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="DELETE"
+                                        data-endpoint="/api/calendar/events/{{event_id}}"
+                                    >
+                                        Delete Event
+                                    </button>
+                                </div>
+                                <div class="input-row">
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="event_id"
+                                        placeholder="event_id"
+                                        value=""
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="title"
+                                        placeholder="title"
+                                        value="Meeting"
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="description"
+                                        placeholder="description"
+                                        value=""
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="location"
+                                        placeholder="location"
+                                        value=""
+                                    />
+                                </div>
+                                <div class="input-row">
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="start_time"
+                                        placeholder="start_time (YYYY-MM-DDTHH:MM:SS)"
+                                        value="2025-05-15T14:00:00"
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="end_time"
+                                        placeholder="end_time (YYYY-MM-DDTHH:MM:SS)"
+                                        value="2025-05-15T15:00:00"
+                                    />
+                                </div>
+                                <div class="input-row">
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="start_date"
+                                        placeholder="filter: start_date (YYYY-MM-DD)"
+                                        value=""
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="end_date"
+                                        placeholder="filter: end_date (YYYY-MM-DD)"
                                         value=""
                                     />
                                 </div>

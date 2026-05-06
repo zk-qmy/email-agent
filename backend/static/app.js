@@ -22,6 +22,18 @@ function interpolateEndpoint(endpoint, userId, sectionContent) {
         /\{\{thread_id\}\}/g,
         getInputValue(sectionContent, "thread_id"),
     );
+    result = result.replace(
+        /\{\{event_id\}\}/g,
+        getInputValue(sectionContent, "event_id"),
+    );
+    result = result.replace(
+        /\{\{start_date\}\}/g,
+        getInputValue(sectionContent, "start_date"),
+    );
+    result = result.replace(
+        /\{\{end_date\}\}/g,
+        getInputValue(sectionContent, "end_date"),
+    );
     return result;
 }
 
@@ -80,6 +92,42 @@ function interpolateBody(body, userId, sectionContent) {
     result = result.replace(
         /\{\{response\}\}/g,
         getInputValue(sectionContent, "response"),
+    );
+    result = result.replace(
+        /\{\{start_time\}\}/g,
+        getInputValue(sectionContent, "start_time"),
+    );
+    result = result.replace(
+        /\{\{duration_minutes\}\}/g,
+        getInputValue(sectionContent, "duration_minutes"),
+    );
+    result = result.replace(
+        /\{\{title\}\}/g,
+        getInputValue(sectionContent, "title"),
+    );
+    result = result.replace(
+        /\{\{description\}\}/g,
+        getInputValue(sectionContent, "description"),
+    );
+    result = result.replace(
+        /\{\{location\}\}/g,
+        getInputValue(sectionContent, "location"),
+    );
+    result = result.replace(
+        /\{\{event_id\}\}/g,
+        getInputValue(sectionContent, "event_id"),
+    );
+    result = result.replace(
+        /\{\{start_date\}\}/g,
+        getInputValue(sectionContent, "start_date"),
+    );
+    result = result.replace(
+        /\{\{end_date\}\}/g,
+        getInputValue(sectionContent, "end_date"),
+    );
+    result = result.replace(
+        /\{\{end_time\}\}/g,
+        getInputValue(sectionContent, "end_time"),
     );
     return result;
 }

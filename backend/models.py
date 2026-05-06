@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -56,4 +56,36 @@ class Email(Base):
             "folder": self.folder,
             "is_read": self.is_read,
             "created_at": self.created_at.isoformat() if self.created_at is not None else None,
+        }
+
+
+class CalendarEvent(Base):
+    __tablename__ = "calendar_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    organizer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    attendee_ids = Column(JSON, nullable=True, default=list)
+    location = Column(String(200), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    organizer = relationship("User", foreign_keys=[organizer_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "organizer_id": self.organizer_id,
+            "organizer_email": self.organizer.email if self.organizer else None,
+            "title": self.title,
+            "description": self.description,
+            "start_time": self.start_time.isoformat() if self.start_time is not None else None,
+            "end_time": self.end_time.isoformat() if self.end_time is not None else None,
+            "attendee_ids": self.attendee_ids or [],
+            "location": self.location,
+            "created_at": self.created_at.isoformat() if self.created_at is not None else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at is not None else None,
         }
