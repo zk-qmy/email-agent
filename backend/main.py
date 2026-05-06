@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -10,6 +11,9 @@ from backend.routes.auth import router as auth_router
 from backend.routes.email import router as email_router
 from backend.routes.users import router as users_router
 from backend.routes.ws_notifications import router as ws_router, connection_manager
+from backend.exceptions import add_exception_handlers
+
+logger = logging.getLogger(__name__)
 
 AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://127.0.0.1:8000")
 
@@ -48,6 +52,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+add_exception_handlers(app)
 
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(email_router, prefix="/api/emails", tags=["emails"])
@@ -107,10 +113,10 @@ async def proxy_to_agent(path: str, request: Request):
                 content={"error": f"Cannot connect to Agent backend: {str(e)}"},
             )
     except Exception as e:
-        print(f"Proxy error: {e}")
+        logger.exception(f"Proxy error: {e}")
         return JSONResponse(
             status_code=502,
-            content={"error": f"Agent backend error: {str(e)}"},
+            content={"error": "AgentBackendError", "message": "Agent backend error"},
         )
 
 

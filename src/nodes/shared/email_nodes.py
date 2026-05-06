@@ -29,7 +29,8 @@ def format_time(time_str: str) -> str:
             return "12:00 PM"
         else:
             return f"{hour - 12}:{minute:02d} PM"
-    except:
+    except (ValueError, IndexError) as e:
+        print(f"[format_time] error parsing time '{time_str}': {e}")
         return time_str
 
 
@@ -258,27 +259,30 @@ def extract_reply_intent(state: AgentState) -> dict:
     if not reply:
         return {}
 
-    result = (
-        get_llm()
-        .with_structured_output(ReplyIntentOutput)
-        .invoke(
-            [
-                {
-                    "role": "system",
-                    "content": (
-                        "Classify the email reply intent as one of:\n"
-                        "- confirmed\n- negotiate\n- declined\n"
-                        "Return structured output only."
-                    ),
-                },
-                {"role": "user", "content": reply},
-            ]
+    try:
+        result = (
+            get_llm()
+            .with_structured_output(ReplyIntentOutput)
+            .invoke(
+                [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Classify the email reply intent as one of:\n"
+                            "- confirmed\n- negotiate\n- declined\n"
+                            "Return structured output only."
+                        ),
+                    },
+                    {"role": "user", "content": reply},
+                ]
+            )
         )
-    )
+        reply_intent = cast(ReplyIntentOutput, result).reply_intent
+        print(f"[extract_reply_intent] intent: {reply_intent}")
+    except Exception as e:
+        print(f"[extract_reply_intent] LLM error: {e}")
+        reply_intent = "negotiate"
 
-    # type: ignore[union-attr]
-    reply_intent = cast(ReplyIntentOutput, result).reply_intent
-    print(f"[extract_reply_intent] intent: {reply_intent}")
     return {"email": EmailData(reply_intent=reply_intent)}
 
 
