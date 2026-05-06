@@ -122,12 +122,9 @@ async def decline_meeting(thread_id: str):
         )
 
 
-active_workflows = {}
-
-
 async def get_status(thread_id: str):
     try:
-        result = agent_service.get_status(thread_id, active_workflows)
+        result = agent_service.get_status(thread_id)
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
         return result
@@ -139,7 +136,7 @@ async def get_status(thread_id: str):
 
 async def get_history(thread_id: str):
     try:
-        result = agent_service.get_history(thread_id, active_workflows)
+        result = agent_service.get_history(thread_id)
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
         return result
