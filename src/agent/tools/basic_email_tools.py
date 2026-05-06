@@ -1,4 +1,4 @@
-# tools/email_tools.py
+# tools/basic_email_tools.py
 import os
 from src.integrations.llm.client import get_llm
 from src.agent.utils import extract_text

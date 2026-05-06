@@ -1040,7 +1040,7 @@ class AgentService:
 
         if not recipient_email:
             if "@" not in recipient:
-                from src.agent.tools.email_tools import resolve_recipient
+                from src.agent.tools.basic_email_tools import resolve_recipient
 
                 result = resolve_recipient(recipient)
                 import json

@@ -1,8 +1,11 @@
-from src.agent.tools.email_tools import (
+from src.agent.tools.basic_email_tools import (
     draft_meeting_email,
     draft_general_email,
     send_email,
     resolve_recipient,
+)
+from src.agent.tools.email_mining_tools import (
+    summarize_email
 )
 from src.agent.tools.schedule_tools import schedule_meeting
 
@@ -15,7 +18,10 @@ ALL_TOOLS = [
     # General Email tools
     draft_general_email,
     # Book calendar
-    schedule_meeting
+    schedule_meeting,
+    # Email mining
+    summarize_email
+    
 ]
 ALL_TOOLS_BY_NAME = {tool.name: tool for tool in ALL_TOOLS}
 

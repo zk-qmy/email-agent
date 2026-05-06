@@ -23,16 +23,50 @@ class EmailPrompts(PromptConfig):
     The NodePrompt parts (system/context/task/critic) can use $variable substitution.
     """
 
-    # classify: NodePrompt = field(
-    #     default_factory=lambda: NodePrompt(
-    #         system=SystemPrompt.system_prompt,
-    #         task=(
-    #             """
-    #     """
-    #         ),
-    #         critic=("""        """),
-    #     )
-    # )
+    summarize_email: NodePrompt = field(
+        default_factory=lambda: NodePrompt(
+            system=SystemPrompt.system_prompt,
+            context=(
+                "Email details:\n"
+                "  Subject:   $subject\n"
+                "  Sender:    $sender\n"
+                "  Recipient: $recipient\n"
+                "  Body:\n"
+                "$body"
+            ),
+            task=(
+                "Summarize the email in CONTEXT into a concise and structured format.\n"
+                "Format:\n"
+                "  Sender: <sender>\n"
+                "  Recipient: <recipient>\n"
+                "  Summary: <1-2 sentence overview>\n"
+                "  Key Points:\n"
+                "    - <bullet 1>\n"
+                "    - <bullet 2>\n"
+                "    - <bullet 3 (if needed)>\n"
+                "  Action Items (if any):\n"
+                "    - <action 1>\n"
+                "    - <action 2>\n\n"
+                "Rules:\n"
+                "- Use the exact sender and recipient from CONTEXT\n"
+                "- Keep the summary concise (maximum 2 sentences)\n"
+                "- Extract only the most important points from the email body\n"
+                "- Do not add information that is not in the email\n"
+                "- Use short bullet points for Main Points\n"
+                "- Maximum 3 main points\n"
+                "- Maintain a professional and neutral tone"
+            ),
+            critic=(
+                "Verify:\n"
+                "- Sender and Recipient are correctly included\n"
+                "- Summary is 1-2 sentences only\n"
+                "- Main Points are relevant and concise\n"
+                "- No hallucinated or extra information\n"
+                "- Output strictly follows the required format\n"
+                "- Tone is neutral and professional"
+            ),
+        )
+    )
 
     # extract_meeting_info: NodePrompt = field(
     #     default_factory=lambda: NodePrompt(
