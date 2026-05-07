@@ -17,7 +17,7 @@ def is_asking_user(messages: list) -> bool:
     return "?" in last and not has_action
 
 
-def run(app, user_message: str, pdf_path: str, thread_id: str = None) -> str:
+def run(app, user_message: str, pdf_path: str = None, thread_id: str = None) -> str:
     if thread_id is None:
         thread_id = str(uuid.uuid4())
 

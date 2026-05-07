@@ -40,3 +40,30 @@ def poll_inbox_sync(user_id: int, last_check: Optional[str] = None):
 def mark_read_sync(email_id: int):
     client = MailClient()
     return _run_async(client.mark_read(email_id))
+
+
+def get_inbox_sync(user_id: int, unread: bool = False):
+    client = MailClient()
+    return _run_async(client.get_inbox(user_id, unread))
+
+
+def get_email_id_sync(user_id: int, index: int = 0) -> int:
+    """Get a single email ID from inbox by index."""
+    inbox = get_inbox_sync(user_id)
+    emails = inbox.get("emails", [])
+    if not emails:
+        raise ValueError("Inbox is empty")
+    return emails[index]["email"]["id"]
+
+
+def get_email_sync(email_id: int) -> dict:
+    """Get full email content by ID."""
+    client = MailClient()
+    return _run_async(client.get_email(email_id))
+
+
+def get_email_by_index_sync(user_id: int, index: int = 0) -> dict:
+    """Get a whole email from inbox by index."""
+    email_id = get_email_id_sync(user_id, index)
+    response = get_email_sync(email_id)
+    return response["email"]

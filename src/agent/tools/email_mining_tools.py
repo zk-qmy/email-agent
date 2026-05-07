@@ -3,6 +3,7 @@ from src.integrations.llm.client import get_llm
 from src.agent.utils import extract_text
 from config.prompts.files import file_prompts
 from config.prompts.email import email_prompts
+from src.integrations.mail.sync_client import get_email_by_index_sync
 import json
 import pdfplumber
 from langchain_core.tools import tool
@@ -12,9 +13,37 @@ from langgraph.types import interrupt
 # TODO: Classify department
 
 # === SUMMARIZATION ===
-# TODO: Add retrieve the email from database or conversation
+# Placeholder
+@tool
+def get_email_content_test(user_id: int, index: int = 0) -> dict:
+    """get the email content of current user
+
+    Args:
+        user_id (int): current user id
+        index (int, optional): The order of the email in the inbox
+
+    Returns:
+        dict: a dictionary of information of the email
+    """
+    try:
+        email = get_email_by_index_sync(user_id, index)
+        print(json.dumps(email, indent=2))
+        return {
+            "status": "success",
+            "source": "live_backend",
+            "subject": email["subject"],
+            "body": email["body"],
+            "sender": email["sender_email"],
+            "recipient": email["recipient_email"],
+        }
+    except ValueError as e:
+        return {"status": "error", "error": str(e)}
+    except Exception as e:
+        return {"status": "error", "error": f"Failed to get email: {e}"}
+
 @tool
 def summarize_email(
+    # email_id: int,
     subject: str,
     body: str,
     sender: str,
