@@ -1,4 +1,5 @@
 # tools/email_tools.py
+import json
 import os
 from src.integrations.llm.client import get_llm
 from src.agent.utils import extract_text
@@ -200,3 +201,44 @@ async def draft_general_email(
         draft = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
 
     return _review_draft(draft, recipient)
+
+
+@tool
+def analyze_reply_intent(reply_body: str, meeting_details: str) -> str:
+    """Analyze a reply email to determine the sender's intent regarding the meeting.
+
+    Args:
+        reply_body: The full text content of the reply email
+        meeting_details: Summary of the meeting that was proposed (date, time, purpose, recipient)
+
+    Returns:
+        JSON string with reply_intent ('confirmed', 'negotiate', or 'declined') and reason
+    """
+    print("=== analyze_reply_intent: analyzing reply ===")
+
+    prompt = f"""You are analyzing a reply to a meeting request email.
+
+Meeting details:
+{meeting_details}
+
+Reply email content:
+{reply_body}
+
+Determine the sender's intent by analyzing the reply content:
+- 'confirmed': The sender explicitly accepts the meeting (e.g., "yes", "that works", "I'll be there", "confirmed")
+- 'negotiate': The sender suggests alternative times/dates or asks for changes (e.g., "how about", "can we", "different time", "maybe")
+- 'declined': The sender declines the meeting (e.g., "no", "can't", "won't work", "declines", "busy")
+- If unclear, default to 'negotiate'
+
+Output ONLY valid JSON with this exact format:
+{{"reply_intent": "confirmed|negotiate|declined", "reason": "brief explanation"}}"""
+
+    try:
+        result = extract_text(get_llm().invoke(prompt))
+        parsed = json.loads(result)
+        if parsed.get("reply_intent") in ("confirmed", "negotiate", "declined"):
+            return json.dumps(parsed)
+        return json.dumps({"reply_intent": "negotiate", "reason": "Could not determine intent, defaulting to negotiate"})
+    except Exception as e:
+        print(f"[analyze_reply_intent] Error: {e}")
+        return json.dumps({"reply_intent": "negotiate", "reason": f"Error: {str(e)}"})
