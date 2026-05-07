@@ -19,6 +19,13 @@ function interpolateEndpoint(endpoint, userId, sectionContent) {
         getInputValue(sectionContent, "email_id"),
     );
     result = result.replace(
+<<<<<<< HEAD
+=======
+        /\{\{draft_id\}\}/g,
+        getInputValue(sectionContent, "draft_id"),
+    );
+    result = result.replace(
+>>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
         /\{\{thread_id\}\}/g,
         getInputValue(sectionContent, "thread_id"),
     );
@@ -58,6 +65,13 @@ function interpolateBody(body, userId, sectionContent) {
         getInputValue(sectionContent, "body"),
     );
     result = result.replace(
+<<<<<<< HEAD
+=======
+        /\{\{draft_id\}\}/g,
+        getInputValue(sectionContent, "draft_id"),
+    );
+    result = result.replace(
+>>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
         /\{\{thread_id\}\}/g,
         getInputValue(sectionContent, "thread_id"),
     );
@@ -77,10 +91,13 @@ function interpolateBody(body, userId, sectionContent) {
         /\{\{message\}\}/g,
         getInputValue(sectionContent, "message"),
     );
+<<<<<<< HEAD
     result = result.replace(
         /\{\{response\}\}/g,
         getInputValue(sectionContent, "response"),
     );
+=======
+>>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
     return result;
 }
 
@@ -175,7 +192,12 @@ async function loadUsers() {
                             `<option value="${u.id}">${u.username} (${u.email})</option>`,
                     )
                     .join("");
+<<<<<<< HEAD
 
+=======
+                
+                // Auto-select first user and fill fields
+>>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
                 select.selectedIndex = 0;
                 if (select.value) {
                     select.dispatchEvent(new Event("change"));
@@ -205,8 +227,11 @@ document.addEventListener("DOMContentLoaded", () => {
             const userId = event.target.value;
             if (!userId) return;
 
+<<<<<<< HEAD
             connectWebSocket(userId);
 
+=======
+>>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
             const result = await callApi(`/api/auth/users/${userId}`);
 
             if (result.status === 200 && result.data && result.data.user) {
@@ -224,6 +249,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
+<<<<<<< HEAD
     let ws = null;
     let currentUserId = null;
 
@@ -273,6 +299,8 @@ document.addEventListener("DOMContentLoaded", () => {
         output.innerHTML = `${eventInfo}\n\n${formatJson(data)}`;
     }
 
+=======
+>>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
     document.querySelectorAll(".tab-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
             document
@@ -311,6 +339,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
+<<<<<<< HEAD
+=======
+            if (!userId && endpoint.includes("{{user_id}}")) {
+                displayError("Please select a user first");
+                return;
+            }
+
+>>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
             const sectionContent = btn.closest(".section-content");
 
             endpoint = interpolateEndpoint(endpoint, userId, sectionContent);
@@ -346,8 +382,12 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("clear-response").addEventListener("click", () => {
         document.getElementById("response-output").textContent = "";
     });
+<<<<<<< HEAD
 
     document.getElementById("clear-agent-response").addEventListener("click", () => {
         document.getElementById("agent-response-output").textContent = "";
     });
 });
+=======
+});
+>>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf

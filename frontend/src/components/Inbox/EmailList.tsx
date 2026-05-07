@@ -17,7 +17,7 @@ export function EmailList() {
 
   useEffect(() => {
     if (!userId) return;
-    
+
     const loadEmails = async () => {
       if (inboxFilter === 'deleted') {
         setEmails([]);
@@ -32,11 +32,11 @@ export function EmailList() {
         console.error('Failed to load emails:', err);
       }
     };
-    
+
     loadEmails();
   }, [userId, inboxFilter, emailRefreshKey, setEmails]);
 
-  const sortedEmails = [...emails].sort((a, b) => 
+  const sortedEmails = [...emails].sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
@@ -95,9 +95,9 @@ export function EmailList() {
   );
 }
 
-function EmailItem({ email, isSelected, isSent, onClick }: { 
-  email: Email; 
-  isSelected: boolean; 
+function EmailItem({ email, isSelected, isSent, onClick }: {
+  email: Email;
+  isSelected: boolean;
   isSent: boolean;
   onClick: () => void;
 }) {
@@ -105,7 +105,7 @@ function EmailItem({ email, isSelected, isSent, onClick }: {
   const fromLabel = isSent
     ? (email.recipient_email || String(email.recipient_id || 'Unknown'))
     : (email.sender_email || String(email.sender_id || 'Unknown'));
-  
+
   return (
     <div
       className={`flex items-start gap-2.75 px-4 py-3 border-b border-border cursor-pointer transition-colors hover:bg-gray-50 ${isSelected ? 'bg-primary-light' : ''} ${isUnread ? 'bg-[#fdfcff]' : ''}`}

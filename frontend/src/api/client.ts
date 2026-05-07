@@ -12,10 +12,10 @@ class ApiError extends Error {
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
   const opts: RequestInit = { method, headers: { 'Content-Type': 'application/json' } };
   if (body !== undefined) opts.body = JSON.stringify(body);
-  
+
   const res = await fetch(`${AGENT_BASE_URL}${path}`, opts);
   const data = await res.json().catch(() => ({}));
-  
+
   if (!res.ok) throw new ApiError(res.status, data.detail || `HTTP ${res.status}`);
   return data;
 }
