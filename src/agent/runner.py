@@ -17,14 +17,14 @@ def is_asking_user(messages: list) -> bool:
     return "?" in last and not has_action
 
 
-def run(app, user_message: str, thread_id: str = None) -> str:
+def run(app, user_message: str, pdf_path: str, thread_id: str = None) -> str:
     if thread_id is None:
         thread_id = str(uuid.uuid4())
 
     thread_config = {"configurable": {"thread_id": thread_id}}
     print(f"\nSession: {thread_id}")
 
-    result = app.invoke(initial_state(user_message), config=thread_config)
+    result = app.invoke(initial_state(user_message, pdf_path), config=thread_config)
 
     # ── Keep handling interrupts until graph is done ──────────────
     while True:

@@ -1,13 +1,3 @@
-"""
-extract_meeting_info
-check_missing_fields???
-ask_for _missing _info?
-draft
-followup
-extract_intent
-write_noti
-"""
-
 from dataclasses import dataclass, field
 from config.prompts.base import NodePrompt, PromptConfig
 from config.prompts.system_prompt import SystemPrompt

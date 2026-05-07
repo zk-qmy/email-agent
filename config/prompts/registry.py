@@ -1,10 +1,11 @@
 # src/core/prompts/registry.py
 from config.prompts.base import PromptConfig
 from config.prompts.email import email_prompts
-# from config.prompts.support import support_prompts
+from config.prompts.files import file_prompts
 
 _REGISTRY: dict[str, PromptConfig] = {
     "schedule": email_prompts,
+    "files" : file_prompts,
     # "ticket":   support_prompts,
 }
 
