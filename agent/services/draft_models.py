@@ -4,7 +4,8 @@ from datetime import datetime
 
 
 class DraftContent(BaseModel):
-    recipient: str
+    recipient_username: Optional[str] = None
+    recipient_email: Optional[str] = None
     subject: str
     body: str
 

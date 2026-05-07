@@ -1,17 +1,21 @@
+import logging
 import os
 import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+from backend.exceptions import add_exception_handlers
 from agent.routes.agent import (
+    CreateThreadRequest,
     CreateDraftRequest,
+    DraftReplyRequest,
+    create_thread,
     create_draft,
-    get_draft,
-    send_draft,
-    cancel_draft,
-    get_user_drafts,
     get_thread,
+    cancel_thread,
+    reply_to_draft,
     get_user_threads,
     confirm_meeting,
     decline_meeting,
@@ -20,7 +24,25 @@ from agent.routes.agent import (
     websocket_endpoint,
 )
 
-app = FastAPI(title="Email Agent API", version="1.0.0")
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from agent.services.ws_client import backend_ws_client
+    from agent.services.agent_service import agent_service
+
+    backend_ws_client.set_push_handler(agent_service.handle_backend_push)
+    backend_ws_client._running = True
+
+    yield
+
+    await backend_ws_client.close()
+    from src.integrations.mail.client import mail_client
+    await mail_client.close()
+
+
+app = FastAPI(title="Email Agent API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,38 +52,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+add_exception_handlers(app)
+
+
+@app.post("/api/agent/thread")
+async def agent_create_thread(request: CreateThreadRequest):
+    return await create_thread(request)
+
 
 @app.post("/api/agent/draft")
 async def agent_create_draft(request: CreateDraftRequest):
     return await create_draft(request)
 
 
-@app.get("/api/agent/draft/{draft_id}")
-async def agent_get_draft(draft_id: str):
-    return await get_draft(draft_id)
-
-
-class SendDraftBody(BaseModel):
-    body: Optional[str] = None
-
-@app.post("/api/agent/draft/{draft_id}/send")
-async def agent_send_draft(draft_id: str, req: SendDraftBody = SendDraftBody()):
-    return await send_draft(draft_id, req.body)
-
-
-@app.delete("/api/agent/draft/{draft_id}")
-async def agent_cancel_draft(draft_id: str):
-    return await cancel_draft(draft_id)
-
-
-@app.get("/api/agent/drafts")
-async def agent_list_drafts(user_id: int, status: Optional[str] = None):
-    return await get_user_drafts(user_id, status)
-
-
 @app.get("/api/agent/thread/{thread_id}")
 async def agent_get_thread(thread_id: str):
     return await get_thread(thread_id)
+
+
+@app.delete("/api/agent/thread/{thread_id}")
+async def agent_cancel_thread(thread_id: str):
+    return await cancel_thread(thread_id)
+
+
+@app.post("/api/agent/thread/{thread_id}/reply")
+async def agent_reply_to_thread(thread_id: str, request: DraftReplyRequest):
+    return await reply_to_draft(thread_id, request)
 
 
 @app.get("/api/agent/threads")
@@ -97,24 +113,6 @@ async def websocket_chat(websocket: WebSocket, user_id: int):
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
-
-
-@app.on_event("startup")
-async def startup():
-    from agent.services.ws_client import backend_ws_client
-    from agent.services.agent_service import agent_service
-
-    backend_ws_client.set_push_handler(agent_service.handle_backend_push)
-    backend_ws_client._running = True
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    from agent.services.ws_client import backend_ws_client
-    from src.integrations.mail.client import mail_client
-
-    await backend_ws_client.close()
-    await mail_client.close()
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -10,6 +11,9 @@ from backend.database import init_db, seed_data
 from backend.routes.auth import router as auth_router
 from backend.routes.email import router as email_router
 from backend.routes.ws_notifications import router as ws_router, connection_manager
+from backend.exceptions import add_exception_handlers
+
+logger = logging.getLogger(__name__)
 
 AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://127.0.0.1:8000")
 
@@ -28,7 +32,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+static_dir = os.path.join(os.path.dirname(__file__), "static")
 
 
 @app.get("/static/{filename:path}")
@@ -49,6 +53,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+add_exception_handlers(app)
+
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(email_router, prefix="/api/emails", tags=["emails"])
 app.include_router(ws_router, tags=["websocket"])
@@ -66,6 +72,19 @@ async def check_agent_health():
             return {"status": "offline"}
     except Exception as e:
         return {"status": "offline", "error": str(e)}
+
+
+@app.post("/api/agent/notify/{user_id}")
+async def notify_user(user_id: int, request: Request):
+    from backend.routes.ws_notifications import connection_manager
+
+    try:
+        event = await request.json()
+    except Exception:
+        event = {}
+
+    await connection_manager.broadcast_to_user(user_id, event)
+    return {"status": "ok"}
 
 
 @app.api_route(
@@ -100,10 +119,10 @@ async def proxy_to_agent(path: str, request: Request):
                 content={"error": f"Cannot connect to Agent backend: {str(e)}"},
             )
     except Exception as e:
-        print(f"Proxy error: {e}")
+        logger.exception(f"Proxy error: {e}")
         return JSONResponse(
             status_code=502,
-            content={"error": f"Agent backend error: {str(e)}"},
+            content={"error": "AgentBackendError", "message": "Agent backend error"},
         )
 
 

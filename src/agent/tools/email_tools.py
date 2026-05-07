@@ -1,0 +1,202 @@
+# tools/email_tools.py
+import os
+from src.integrations.llm.client import get_llm
+from src.agent.utils import extract_text
+from src.integrations.mail.sync_client import send_email_sync
+from config.prompts.email import email_prompts
+
+from typing import List
+from langchain_core.tools import tool
+from langgraph.types import interrupt
+
+
+# PRIVATE FUNCs
+async def _refine_draft(rendered, previous_draft: str, feedback: str) -> str:
+    """Ask LLM to refine the draft based on user feedback."""
+    print("=== Feed back to LLM to refine draft ... === ")
+    return extract_text(
+        await get_llm().ainvoke(
+            f"{rendered.to_prompt()}\n\n"
+            f"Previous draft:\n{previous_draft}\n\n"
+            f"User feedback: {feedback}\n\n"
+            f"Rewrite the email applying the feedback. "
+            f"Keep 'Subject: <line>' as the very first line."
+        )
+    )
+
+
+def _parse_decision(raw) -> dict:
+    """Normalise interrupt() return value to a plain dict."""
+    if isinstance(raw, dict):
+        if "response" in raw:
+            response = raw.get("response", "").strip().lower()
+            if response == "y":
+                return {"approved": True, "action_input": ""}
+            else:
+                return {"approved": False, "action_input": raw.get("response", "")}
+        return raw
+    return {"approved": False, "action_input": str(raw)}
+
+
+def _review_draft(draft: str, recipient: str) -> dict:
+    """Single interrupt for draft review — shared by all draft tools."""
+    decision = _parse_decision(
+        interrupt(
+            {
+                "type": "review_draft",
+                "question": (
+                    f"\n📝 Draft email — review before sending:\n"
+                    f"{'─' * 48}\n{draft}\n{'─' * 48}\n"
+                    f"Type 'y' to approve, or give feedback to revise:"
+                ),
+                "draft": draft,
+                "recipient": recipient,
+            }
+        )
+    )
+
+    return {
+        "draft": draft,
+        "approved": decision.get("approved", False),
+        "user_feedback": decision.get("action_input", ""),
+    }
+
+
+BACKEND_URL = os.getenv("EMAIL_BACKEND_URL", "http://127.0.0.1:5001")
+
+
+@tool
+def resolve_recipient(name: str) -> str:
+    """Look up recipient email by name with fuzzy search.
+
+    Args:
+        name: Recipient's name (username, partial name, or email)
+
+    Returns:
+        Email address if found, or error message asking user to clarify.
+    """
+    import httpx
+
+    print(f"=== resolve_recipient: looking up '{name}' ===")
+
+    if "@" in name:
+        return f'{{"email": "{name}"}}'
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.get(f"{BACKEND_URL}/api/auth/search-users", params={"q": name})
+            if response.status_code != 200:
+                return "Failed to search users. Please provide email directly."
+            users = response.json().get("users", [])
+            if not users:
+                return f"User '{name}' not found. Please provide email directly."
+            if len(users) == 1:
+                return f'{{"email": "{users[0]["email"]}", "username": "{users[0]["username"]}"}}'
+            options = [f"{u['username']} ({u['email']})" for u in users]
+            return f"Multiple matches found: {', '.join(options)}. Please specify which one."
+    except Exception as e:
+        return f"Failed to resolve recipient: {str(e)}. Please provide email directly."
+
+
+# EMAIL TOOLS
+
+
+@tool
+async def draft_meeting_email(
+    recipient: str,
+    date: str,
+    time: str,
+    purpose: str,
+    previous_draft: str = "",
+    user_feedback: str = "",
+) -> str:
+    """Draft a professional meeting request email and present it to the user for review.
+
+    Args:
+        recipient:     Recipient's name
+        date:           Meeting date e.g. '2025-05-02', 'Monday'
+        time:           Meeting time e.g. '2pm', '14:00'
+        purpose:        Reason for the meeting
+        previous_draft: Prior draft to show instead of generating a new one
+        user_feedback:  Feedback from user to guide the next revision
+    """
+    rendered = email_prompts.draft_meeting_email.render(
+        recipient=recipient, date=date, time=time, purpose=purpose
+    )
+
+    if user_feedback and previous_draft:
+        draft = await _refine_draft(rendered, previous_draft, user_feedback)
+    elif previous_draft:
+        draft = previous_draft.strip()
+    else:
+        draft = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
+
+    return _review_draft(draft, recipient)
+
+
+@tool
+def send_email(
+    user_id: int,
+    recipient: str,
+    subject: str,
+    body: str,
+    draft_approved: bool = False,
+) -> str:
+    """Send an email to a recipient.
+    Args:
+        user_id:   Sender's user ID (integer)
+        recipient: Recipient's email address
+        subject:   Email subject line
+        body:      Full email body text
+        draft_approved: Flag to skip confirmation if draft was already approved
+    """
+    print("Tools: using `send_email` ...")
+
+    result = send_email_sync(
+        sender_id=user_id,
+        recipient_email=recipient,
+        subject=subject,
+        body=body,
+    )
+    print(f"=== [send_email] sent: {result}")
+    # real send logic here (SMTP, Gmail API, etc.)
+    return f"Email sent to {recipient}. Subject: {subject}"
+
+
+# GENERAL EMAIL TOOLS
+
+
+@tool
+async def draft_general_email(
+    recipient: str,
+    key_points: List[str],
+    purpose: str,
+    tone: str = "professional",
+    previous_draft: str = "",
+    user_feedback: str = "",
+) -> str:
+    """Draft a email and present it to the user for review.
+
+    Args:
+        recipient:     Recipient's name
+        key_points:     List of main ideas
+        purpose:        Reason for the meeting
+        tone:           Tone of the email e.g 'friendly', 'professional'
+        previous_draft: Prior draft to show instead of generating a new one
+        user_feedback:  Feedback from user to guide the next revision
+    """
+    rendered = email_prompts.draft_general_email.render(
+        recipient=recipient,
+        key_points=key_points,
+        purpose=purpose,
+        tone=tone
+    )
+
+    if user_feedback and previous_draft:
+        draft = await _refine_draft(rendered, previous_draft, user_feedback)
+    elif previous_draft:
+        draft = previous_draft.strip()
+    else:
+        draft = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
+
+    return _review_draft(draft, recipient)
