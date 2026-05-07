@@ -10,6 +10,9 @@ from src.agent.tools.email_mining_tools import (
     # PDF process
     parse_pdf,
     validate_pdf,
+    # RAG
+    suggest_department,
+    ask_guide,
 )
 from src.agent.tools.schedule_tools import schedule_meeting
 
@@ -28,19 +31,9 @@ ALL_TOOLS = [
     summarize_email,
     parse_pdf,
     validate_pdf,
+    # RAG
+    suggest_department,
+    ask_guide,
     
 ]
 ALL_TOOLS_BY_NAME = {tool.name: tool for tool in ALL_TOOLS}
-
-# TOOLS: dict[str, callable] = {
-#     "draft_email": draft_email_tool,
-#     "send_email": send_email_tool,
-#     "schedule_meeting": schedule_meeting_tool,
-# }
-
-# # Auto-injected into the reasoning prompt
-# TOOL_DESCRIPTIONS = """
-# - draft_email: write a professional email
-# - send_email: send an email
-# - schedule_meeting: schedule a calendar meeting
-# """.strip()

@@ -8,10 +8,52 @@ import json
 import pdfplumber
 from langchain_core.tools import tool
 from langgraph.types import interrupt
+from src.agent.tools.rag.pipeline import query_guide
+from config.prompts.rag import rag_prompts
 
 # === CLASSIFICATION ===
-# TODO: Classify department
+@tool
+def suggest_department(student_request: str) -> dict:
+    """suggest department to send to base on student_request
 
+    Args:
+        student_request (str): request from student
+    """
+    try:
+        context = query_guide(student_request)
+        rendered = rag_prompts.suggest_department.render(
+            context=context,
+            student_request=student_request
+        )
+        result = extract_text(get_llm().invoke(rendered.to_prompt()))
+        clean = result.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        return json.loads(clean)
+    except Exception as e:
+        return {"error": str(e)}
+
+# === GENERAL RAG
+@tool
+def ask_guide(question: str) -> dict:
+    """retrieve information from document using RAG
+
+    Args:
+        question (str): user's question
+
+    Returns:
+        dict: _description_
+    """
+    try:
+        context = query_guide(question)
+        rendered = rag_prompts.ask_guide.render(
+            context=context,
+            question=question
+        )
+        result = extract_text(get_llm().invoke(rendered.to_prompt()))
+        clean = result.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        return json.loads(clean)
+    except Exception as e:
+        return {"error:": str(e)}
+    
 # === SUMMARIZATION ===
 # Placeholder
 @tool

@@ -13,3 +13,5 @@ wheels/
 .env
 
 test-pdf/
+logs/
+tests/rag
