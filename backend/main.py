@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -9,7 +10,6 @@ from fastapi.responses import JSONResponse, Response, FileResponse
 from backend.database import init_db, seed_data
 from backend.routes.auth import router as auth_router
 from backend.routes.email import router as email_router
-from backend.routes.users import router as users_router
 from backend.routes.ws_notifications import router as ws_router, connection_manager
 from backend.exceptions import add_exception_handlers
 
@@ -57,7 +57,6 @@ add_exception_handlers(app)
 
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(email_router, prefix="/api/emails", tags=["emails"])
-app.include_router(users_router, prefix="/api/auth", tags=["users"])
 app.include_router(ws_router, tags=["websocket"])
 
 
@@ -76,9 +75,16 @@ async def check_agent_health():
 
 
 @app.post("/api/agent/notify/{user_id}")
-async def notify_user(user_id: int, event: dict):
-    await connection_manager.send_to_user(user_id, event)
-    return {"status": "sent"}
+async def notify_user(user_id: int, request: Request):
+    from backend.routes.ws_notifications import connection_manager
+
+    try:
+        event = await request.json()
+    except Exception:
+        event = {}
+
+    await connection_manager.broadcast_to_user(user_id, event)
+    return {"status": "ok"}
 
 
 @app.api_route(
@@ -93,7 +99,7 @@ async def proxy_to_agent(path: str, request: Request):
         from httpx import AsyncClient, ConnectError, ReadTimeout
 
         try:
-            async with AsyncClient(timeout=30.0) as client:
+            async with AsyncClient(timeout=120.0) as client:
                 body = await request.body()
                 response = await client.request(
                     method=request.method,

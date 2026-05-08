@@ -28,7 +28,7 @@ def extract_thought(response) -> str:
     return ""
 
 
-def reasoning_node(state):
+async def reasoning_node(state):
     messages = state["messages"]
 
     if messages and isinstance(messages[-1], ToolMessage):
@@ -49,7 +49,7 @@ def reasoning_node(state):
             )
         ]
 
-    response = llm_with_tools.invoke([SystemMessage(content=reasoning_prompt)] + messages)
+    response = await llm_with_tools.ainvoke([SystemMessage(content=reasoning_prompt)] + messages)
     # print(f"=== Reasoning raw response: {response}\n")
 
     thought = extract_thought(response)

@@ -2,14 +2,14 @@ from src.agent.tools.registry import ALL_TOOLS_BY_NAME
 from langchain_core.messages import ToolMessage
 
 
-def action_node(state):
+async def action_node(state):
     """Performs the tool call"""
     result = []
     state_updates = {}
 
     for tool_call in state["messages"][-1].tool_calls:
         tool = ALL_TOOLS_BY_NAME[tool_call["name"]]
-        observation = tool.invoke(tool_call["args"])
+        observation = await tool.ainvoke(tool_call["args"])
         
         # draft and send handle
         if tool_call["name"] == "draft_email":

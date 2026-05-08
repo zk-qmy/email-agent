@@ -307,7 +307,7 @@ class AgentService:
                     f"[handle_backend_push] Error processing reply for thread {thread_id}: {e}"
                 )
 
-    def create_draft(
+    async def create_draft(
         self,
         user_id: int,
         prompt: str,
@@ -316,7 +316,7 @@ class AgentService:
         created_at = datetime.now(timezone.utc).isoformat()
 
         try:
-            result = self.graph.invoke(
+            result = await self.graph.ainvoke(
                 cast(
                     AgentState,
                     {  # type: ignore[arg-type]
@@ -417,7 +417,7 @@ class AgentService:
 
     async def _run_create_draft(self, thread_id: str, user_id: int, prompt: str):
         try:
-            result = self.graph.invoke(
+            result = await self.graph.ainvoke(
                 cast(
                     AgentState,
                     {"messages": [{"role": "user", "content": prompt}]},
@@ -628,7 +628,7 @@ class AgentService:
             "email_id": draft.email_id,
         }
 
-    def reply_to_draft(
+    async def reply_to_draft(
         self,
         draft_id: str,
         user_id: int,
@@ -658,12 +658,12 @@ class AgentService:
                         thread_config,
                         {"messages": [HumanMessage(content=response)]},
                     )
-                    result = self.graph.invoke(
+                    result = await self.graph.ainvoke(
                         Command(resume=response),
                         config=thread_config,
                     )
                 else:
-                    result = self.graph.invoke(
+                    result = await self.graph.ainvoke(
                         Command(resume={"response": response}),
                         config=thread_config,
                     )
@@ -801,12 +801,12 @@ class AgentService:
                         thread_config,
                         {"messages": [HumanMessage(content=response)]},
                     )
-                    result = self.graph.invoke(
+                    result = await self.graph.ainvoke(
                         Command(resume=response),
                         config=thread_config,
                     )
                 else:
-                    result = self.graph.invoke(
+                    result = await self.graph.ainvoke(
                         Command(resume={"response": response}),
                         config=thread_config,
                     )

@@ -2,304 +2,37 @@
 
 AI-powered email automation agent with LangGraph-based workflows for intelligent email processing.
 
-## Project Overview
-
-The Email Agent is a multi-service system that:
-
-- Routes incoming emails to appropriate workflows
-- Handles meeting scheduling with calendar integration
-- Manages email drafts with human-in-the-loop approval
-- Provides real-time WebSocket notifications
-
-## Architecture
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Client    │───▶│   Agent API  │───▶│   Backend   │
-│  (Browser)  │◀───│  (Port 8000) │◀───│ (Port 5001) │
-└─────────────┘     └──────────────┘     └─────────────┘
-                            │              ┌─────────────┐
-                     ┌──────┴──────┐      │  Web UI     │
-                     │  LangGraph  │      │  (Static)   │
-                     │  Workflows  │      └─────────────┘
-                     └─────────────┘
-```
-
-## Agent Loop
-![Meeting Graph](assets/graph/agent_graph_20260501_200012.png)
-
-## Actual Directory Structure
-
-```
-email-agent/
-│
-├── README.md
-├── .env.example
-├── .gitignore
-├── .python-version
-├── pyproject.toml
-├── uv.lock
-├── email-agent.db              # SQLite database
-│
-├── main.py                     # Package entry point
-│
-├── agent/                      # Agent API service (FastAPI)
-│   ├── __init__.py
-│   ├── main.py                 # FastAPI app entry point
-│   ├── dependencies.py
-│   ├── routes/
-│   │   ├── __init__.py
-│   │   └── agent.py            # Agent endpoints (/draft, /thread, /process, /chat)
-│   └── services/
-│       ├── __init__.py
-│       ├── agent_service.py    # Core agent logic (788 lines)
-│       ├── ws_client.py        # WebSocket client to backend
-│       └── draft_models.py     # Pydantic models for drafts
-│
-├── backend/                    # Email backend service (FastAPI)
-│   ├── __init__.py
-│   ├── main.py                 # FastAPI app entry point
-│   ├── database.py             # SQLAlchemy setup + seed data
-│   ├── models.py               # User, Email models
-│   ├── routes/
-│   │   ├── __init__.py
-│   │   ├── auth.py             # /api/auth/signup, /api/auth/login
-│   │   ├── email.py            # Email CRUD endpoints
-│   │   └── ws_notifications.py # WebSocket push notifications
-│   ├── services/
-│   │   ├── __init__.py
-│   │   └── mail_service.py     # Email business logic
-│   └── static/                 # Web UI for API testing
-│       ├── index.html          # Main UI
-│       ├── styles.css          # Styling
-│       └── app.js              # Frontend JavaScript
-│
-├── config/
-│   ├── __init__.py
-│   ├── prompts/
-│   │   ├── base.py
-│   │   ├── email.py            # prompts for email tasks
-│   │   ├── system_prompt.py    # agent's system prompt
-│   │   └── __init__.py
-│   └── settings.py             # Pydantic settings
-│
-├── src/                        # Core library
-│   ├── __init__.py
-│   ├── agent/
-│   │   ├── __init__.py
-│   │   ├── nodes/
-│   │   │   ├── __init__.py
-│   │   │   ├── reasoning.py    # reasoning node
-│   │   │   └── action.py       # using tools node
-│   │   ├── tools/
-│   │   │   ├── __init__.py
-│   │   │   ├── email_tools.py      # tools for email tasks
-│   │   │   ├── registry.py         # registry point for tools
-│   │   │   └── schedule_tools.py   # tools for scheduling tasks
-│   │   ├── config.py
-│   │   ├── graph.py            # agent graph
-│   │   ├── runner.py           # handle interrupt + HIL
-│   │   ├── state.py            # AgentState, Email
-│   │   └── utils.py           
-│   ├── integrations/
-│   │   ├── __init__.py
-│   │   ├── llm/
-│   │   │   ├── __init__.py
-│   │   │   └── client.py       # Google Gemini LLM client
-│   │   └── mail/
-│   │       ├── __init__.py
-│   │       ├── client.py       # Async HTTP client to backend
-│   │       └── sync_client.py  # Sync mail operations
-│   └── nodes/
-│       ├── __init__.py
-│       ├── shared/
-│       │   ├── __init__.py
-│       │   ├── decision_nodes.py # classify_workflow
-│       │   └── email_nodes.py    # draft, approve, send, wait, followup
-│       └── specialized/
-│           ├── __init__.py
-│           └── meeting_nodes.py # Meeting scheduling nodes
-│
-├── test/
-│   └── __init__.py
-│
-└── notebook/                   # For Jupyter notebooks
-```
-
-## Installation
-
-### Prerequisites
-
-- Python 3.10 or higher
-- uv (recommended) or pip
-
-### Steps
-
-1. **Clone the repository**
-
-    ```bash
-    git clone <repository-url>
-    cd email-agent
-    ```
-
-2. **Create virtual environment**
-
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate  # Linux/macOS
-    # .venv\Scripts\activate   # Windows
-    ```
-
-3. **Install dependencies**
-
-    ```bash
-    # Using uv (recommended)
-    uv sync
-
-    # Or using pip
-    pip install -e .
-    ```
-
-4. **Configure environment variables**
-
-    ```bash
-    cp .env.example .env
-    ```
-
-    Edit `.env` and set your configuration:
-
-    ```env
-    # Database
-    DATABASE_URL=sqlite:///email-agent.db
-
-    # Email Backend
-    EMAIL_BACKEND_HOST=0.0.0.0
-    EMAIL_BACKEND_PORT=5001
-    WS_BACKEND_URL=ws://localhost:5001
-
-    # Agent API
-    AGENT_HOST=0.0.0.0
-    AGENT_PORT=8000
-
-    # External Services
-    GOOGLE_API_KEY=your_google_api_key_here
-    ```
-
-## Running the Application
-
-### Start Backend API (Port 5001)
-
-The backend handles email storage, user authentication, and WebSocket notifications.
+## Quick Start
 
 ```bash
+# Install dependencies
+uv sync
+
+# Configure environment
+cp .env.example .env
+# Edit .env and add your GOOGLE_API_KEY
+
+# Run both services (in separate terminals)
 uvicorn backend.main:app --host 0.0.0.0 --port 5001 --reload
-```
-
-### Start Agent API (Port 8000)
-
-The agent handles email processing, workflow routing, and LLM interactions.
-
-```bash
 uvicorn agent.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Quick agent test
+## Testing with Web UI
 
-Change the `initial_prompt` for a quick test. For example:
+1. Open `http://localhost:5001/` in browser
+2. Select a user from dropdown (alice/bob/charlie)
+3. Go to **Agent** tab
 
-```python
-initial_prompt = "help me write an email to prof linh to schedule a meeting on 2nd may"
+**Workflow:**
 ```
-Then,
-```bash
-python main.py
+1. Create Thread → enter prompt → copy thread_id from response
+2. Get Thread → paste thread_id to check status
+3. Reply Thread → paste thread_id → enter "y" to approve (or feedback to revise)
+4. Repeat steps 2-3 until draft is ready
+5. Draft is sent automatically when approved
 ```
-
-## Web UI
-
-A built-in web interface is available for testing the API. Access it at:
-
-```
-http://localhost:5001/
-```
-
-### Features
-
-- **Tabbed Interface**: Switch between Auth, Email, and Agent endpoints
-- **User Selection**: Dropdown to select test users (alice, bob, charlie)
-- **Agent Status**: Real-time WebSocket connection indicator
-- **Collapsible Sections**: Organize API calls by category
-- **Response Panel**: View JSON responses from API calls
-
-### Usage
-
-1. Start the backend: `uvicorn backend.main:app --host 0.0.0.0 --port 5001 --reload`
-2. Open `http://localhost:5001/` in your browser
-3. Select a user from the dropdown
-4. Click any test button to make API calls
-5. View responses in the panel on the right
-
-## Workflows
-
-### Meeting Scheduler
-
-Handles meeting requests by:
-
-1. Extracting meeting details (date, time, participants)
-2. Checking for missing information
-3. Drafting confirmation email
-4. Sending for human approval
-5. Sending confirmation or follow-up
-
-### Email Auto-Responder
-
-Routes and responds to emails based on intent classification.
-
-## API Endpoints
-
-### Agent API (Port 8000)
-
-| Method | Endpoint                                | Description                     |
-| ------ | --------------------------------------- | ------------------------------- |
-| POST   | `/api/agent/draft`                      | Create a new draft              |
-| GET    | `/api/agent/draft/{draft_id}`           | Get specific draft              |
-| POST   | `/api/agent/draft/{draft_id}/send`      | Send draft                      |
-| DELETE | `/api/agent/draft/{draft_id}`           | Cancel draft                    |
-| GET    | `/api/agent/drafts`                     | List user's drafts              |
-| GET    | `/api/agent/thread/{thread_id}`         | Get thread messages             |
-| GET    | `/api/agent/threads`                    | List user's threads             |
-| POST   | `/api/agent/thread/{thread_id}/confirm` | Confirm meeting                 |
-| POST   | `/api/agent/thread/{thread_id}/decline` | Decline meeting                 |
-| GET    | `/api/agent/status/{thread_id}`         | Get workflow status             |
-| GET    | `/api/agent/history/{thread_id}`        | Get workflow history            |
-| WS     | `/api/agent/ws/{user_id}`               | WebSocket for real-time updates |
-| GET    | `/health`                               | Health check                    |
-
-### Backend API (Port 5001)
-
-| Method | Endpoint                    | Description                  |
-| ------ | --------------------------- | ---------------------------- |
-| GET    | `/api/auth/users`           | List all users               |
-| GET    | `/api/auth/users/{user_id}` | Get specific user            |
-| PUT    | `/api/auth/users/{user_id}` | Update user                  |
-| DELETE | `/api/auth/users/{user_id}` | Delete user                  |
-| POST   | `/api/auth/signup`          | User registration            |
-| POST   | `/api/auth/login`           | User login                   |
-| POST   | `/api/emails/send`          | Send email                   |
-| POST   | `/api/emails/reply`         | Reply to email               |
-| GET    | `/api/emails/inbox`         | Get inbox                    |
-| GET    | `/api/emails/sent`          | Get sent emails              |
-| GET    | `/api/emails/{email_id}`    | Get specific email           |
-| POST   | `/api/emails/query`         | Query emails                 |
-| GET    | `/api/emails/poll`          | Poll for new emails          |
-| PUT    | `/api/emails/mark_read`     | Mark email as read           |
-| WS     | `/ws/push/{user_id}`        | WebSocket push notifications |
-| GET    | `/health`                   | Health check                 |
-| GET    | `/`                         | Web UI                       |
 
 ## Test Users
-
-The database is seeded with test users:
 
 | Username | Password    |
 | -------- | ----------- |
@@ -370,3 +103,24 @@ pytest -v
 - `tests/integration/test_backend_ws.py` - Backend WebSocket tests
 - `tests/integration/test_agent_ws.py` - Agent WebSocket tests
 
+## Tech Stack
+
+- **Python** 3.11+
+- **FastAPI** - API services
+- **LangGraph** - Workflow orchestration
+- **Google Gemini** - LLM
+- **SQLite** - Database
+- **WebSocket** - Real-time notifications
+
+## Project Structure
+
+```
+email-agent/
+├── agent/            # Agent API (port 8000)
+├── backend/          # Backend API (port 5001) + static UI
+├── config/           # Settings + prompts
+├── src/              # Core library
+│   ├── agent/        # Graph, nodes, tools
+│   └── integrations/# LLM + mail clients
+└── email-agent.db   # SQLite database
+```
