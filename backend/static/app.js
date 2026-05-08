@@ -387,6 +387,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 ) {
                     loadUsers();
                 }
+                if (method === "POST" && endpoint === "/api/agent/thread" && result.data?.thread_id) {
+                    const threadInput = sectionContent.querySelector('.input-field[data-var="thread_id"]');
+                    if (threadInput) threadInput.value = result.data.thread_id;
+                }
             }
         });
     });
