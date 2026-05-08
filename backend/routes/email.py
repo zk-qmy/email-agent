@@ -83,6 +83,18 @@ async def query_emails(request: QueryEmailsRequest):
     return {"emails": emails}
 
 
+@router.get("/threads")
+async def get_threads(user_id: int = Query(...)):
+    threads = mail_service.get_threads(user_id)
+    return {"threads": threads}
+
+
+@router.get("/threads/{thread_id}")
+async def get_thread_emails(thread_id: str, user_id: int = Query(...)):
+    emails = mail_service.get_thread_emails(thread_id, user_id)
+    return {"emails": emails}
+
+
 @router.get("/{email_id}")
 async def get_email(email_id: int):
     email = mail_service.get_email(email_id)

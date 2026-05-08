@@ -286,6 +286,45 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="api-section">
+                            <h2
+                                class="section-title"
+                                data-section="emails-threads"
+                            >
+                                <span>Threads</span>
+                                <span class="toggle">▼</span>
+                            </h2>
+                            <div
+                                class="section-content"
+                                id="emails-threads-section"
+                            >
+                                <div class="test-group">
+                                    <button
+                                        class="test-btn"
+                                        data-method="GET"
+                                        data-endpoint="/api/emails/threads?user_id={{user_id}}"
+                                    >
+                                        Get Threads
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="GET"
+                                        data-endpoint="/api/emails/threads/{{thread_id}}?user_id={{user_id}}"
+                                    >
+                                        Get Thread Emails
+                                    </button>
+                                </div>
+                                <div class="input-row">
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="thread_id"
+                                        placeholder="thread_id"
+                                        value=""
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div id="calendar-tab" class="tab-pane">

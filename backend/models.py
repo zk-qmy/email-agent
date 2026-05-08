@@ -35,6 +35,7 @@ class Email(Base):
     subject = Column(String(200), nullable=False)
     body = Column(Text, nullable=False)
     parent_id = Column(Integer, ForeignKey("emails.id"), nullable=True)
+    thread_id = Column(String(64), nullable=True, index=True)
     folder = Column(String(10), nullable=False, default="inbox")
     is_read = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -53,6 +54,7 @@ class Email(Base):
             "subject": self.subject,
             "body": self.body,
             "parent_id": self.parent_id,
+            "thread_id": self.thread_id,
             "folder": self.folder,
             "is_read": self.is_read,
             "created_at": self.created_at.isoformat() if self.created_at is not None else None,
