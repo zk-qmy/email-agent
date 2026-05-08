@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
-from config.prompts.base import NodePrompt, PromptConfig
-from config.prompts.system_prompt import SystemPrompt
+from config.tool_prompts.base import NodePrompt, PromptConfig
+from config.tool_prompts.system_prompt import SystemPrompt
 from datetime import datetime
 
 

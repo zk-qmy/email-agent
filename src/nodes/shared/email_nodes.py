@@ -10,8 +10,8 @@ from src.integrations.mail.sync_client import (
     mark_read_sync,
 )
 from datetime import datetime
-from config.prompts.base import PromptConfig
-from config.prompts.email import email_prompts
+from config.tool_prompts.base import PromptConfig
+from config.tool_prompts.email import email_prompts
 
 
 def format_time(time_str: str) -> str:

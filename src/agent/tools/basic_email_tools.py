@@ -3,7 +3,7 @@ import os
 from src.integrations.llm.client import get_llm
 from src.agent.utils import extract_text
 from src.integrations.mail.sync_client import send_email_sync
-from config.prompts.email import email_prompts
+from config.tool_prompts.email import email_prompts
 
 from typing import List
 from langchain_core.tools import tool

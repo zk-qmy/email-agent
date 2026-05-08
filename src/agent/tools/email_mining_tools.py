@@ -1,15 +1,15 @@
 import base64
 from src.integrations.llm.client import get_llm
 from src.agent.utils import extract_text
-from config.prompts.files import file_prompts
-from config.prompts.email import email_prompts
+from config.tool_prompts.files import file_prompts
+from config.tool_prompts.email import email_prompts
+from config.tool_prompts.rag import rag_prompts
 from src.integrations.mail.sync_client import get_email_by_index_sync
 import json
 import pdfplumber
 from langchain_core.tools import tool
 from langgraph.types import interrupt
 from src.agent.tools.rag.pipeline import query_guide
-from config.prompts.rag import rag_prompts
 
 # === CLASSIFICATION ===
 @tool
@@ -26,7 +26,9 @@ def suggest_department(student_request: str) -> dict:
             student_request=student_request
         )
         result = extract_text(get_llm().invoke(rendered.to_prompt()))
+        print(f'raw suggest_department llm response: {result}')
         clean = result.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        print(f"clean version: {clean}")
         return json.loads(clean)
     except Exception as e:
         return {"error": str(e)}

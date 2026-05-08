@@ -26,9 +26,13 @@ if __name__ == "__main__":
     #run(app, initial_prompt, pdf_path)
     
     # Test suggest department with RAG
-    initial_prompt = "I want to change my room who should i contact"
-    run(app, initial_prompt)
+    #initial_prompt = "I want to change my room who should i contact"
+    #run(app, initial_prompt)
     
     # Test ask guide with RAG
     # initial_prompt = ""
     # run(app, initial_prompt)
+    
+    # Test many tools: should retrieve email from db, then suggest department, then draft and send
+    initial_prompt = "I need to ask about the military certification draft me an email and send to the according department"
+    run(app, initial_prompt)

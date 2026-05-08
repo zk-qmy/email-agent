@@ -20,5 +20,5 @@ def retrieve(query: str, index, chunks: list[Chunk], top_k: int = 3) -> list[Chu
             # Changed from chunk.page to chunk.section
             print(f"  [RAG] section={chunk.section} score={score:.3f} → {chunk.text[:80]}...")
             results.append(chunk)
-
+    print(f"Original RAG result from retrive(): {results}")
     return results
