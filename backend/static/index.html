@@ -329,11 +329,17 @@
 
                     <div id="calendar-tab" class="tab-pane">
                         <div class="api-section">
-                            <h2 class="section-title" data-section="calendar-availability">
+                            <h2
+                                class="section-title"
+                                data-section="calendar-availability"
+                            >
                                 <span>Availability</span>
                                 <span class="toggle">▼</span>
                             </h2>
-                            <div class="section-content" id="calendar-availability-section">
+                            <div
+                                class="section-content"
+                                id="calendar-availability-section"
+                            >
                                 <div class="test-group">
                                     <button
                                         class="test-btn"
@@ -364,11 +370,17 @@
                         </div>
 
                         <div class="api-section">
-                            <h2 class="section-title" data-section="calendar-events">
+                            <h2
+                                class="section-title"
+                                data-section="calendar-events"
+                            >
                                 <span>Events</span>
                                 <span class="toggle">▼</span>
                             </h2>
-                            <div class="section-content" id="calendar-events-section">
+                            <div
+                                class="section-content"
+                                id="calendar-events-section"
+                            >
                                 <div class="test-group">
                                     <button
                                         class="test-btn"
@@ -475,71 +487,79 @@
                     </div>
 
                     <div id="agent-tab" class="tab-pane">
-<div class="api-section">
-                                <h2 class="section-title" data-section="agent-list">
-                                    <span>List</span>
-                                    <span class="toggle">▼</span>
-                                </h2>
-                                <div
-                                    class="section-content"
-                                    id="agent-list-section"
-                                >
-                                    <div class="test-group">
-                                        <button
-                                            class="test-btn"
-                                            data-method="GET"
-                                            data-endpoint="/api/agent/threads?user_id={{user_id}}"
-                                        >
-                                            Get Threads
-                                        </button>
-                                    </div>
+                        <div class="api-section">
+                            <h2 class="section-title" data-section="agent-list">
+                                <span>List</span>
+                                <span class="toggle">▼</span>
+                            </h2>
+                            <div
+                                class="section-content"
+                                id="agent-list-section"
+                            >
+                                <div class="test-group">
+                                    <button
+                                        class="test-btn"
+                                        data-method="GET"
+                                        data-endpoint="/api/agent/threads?user_id={{user_id}}"
+                                    >
+                                        Get Threads
+                                    </button>
                                 </div>
                             </div>
+                        </div>
 
-                            <div class="api-section">
-                                <h2
-                                    class="section-title"
-                                    data-section="agent-thread"
-                                >
-                                    <span>Thread</span>
-                                    <span class="toggle">▼</span>
-                                </h2>
-                                <div
-                                    class="section-content"
-                                    id="agent-thread-section"
-                                >
-                                    <div class="test-group">
-                                        <button
-                                            class="test-btn"
-                                            data-method="POST"
-                                            data-endpoint="/api/agent/thread"
-                                            data-body='{"user_id": {{user_id}}, "prompt": "{{context}}"}'
-                                        >
-                                            Create Thread
-                                        </button>
-                                        <button
-                                            class="test-btn"
-                                            data-method="GET"
-                                            data-endpoint="/api/agent/thread/{{thread_id}}"
-                                        >
-                                            Get Thread
-                                        </button>
-                                        <button
-                                            class="test-btn"
-                                            data-method="DELETE"
-                                            data-endpoint="/api/agent/thread/{{thread_id}}"
-                                        >
-                                            Cancel Thread
-                                        </button>
-                                        <button
-                                            class="test-btn"
-                                            data-method="POST"
-                                            data-endpoint="/api/agent/thread/{{thread_id}}/reply"
-                                            data-body='{"user_id": {{user_id}}, "response": "{{response}}"}'
-                                        >
-                                            Reply to Thread
-                                        </button>
-                                    </div>
+                        <div class="api-section">
+                            <h2
+                                class="section-title"
+                                data-section="agent-thread"
+                            >
+                                <span>Thread</span>
+                                <span class="toggle">▼</span>
+                            </h2>
+                            <div
+                                class="section-content"
+                                id="agent-thread-section"
+                            >
+                                <div class="test-group">
+                                    <button
+                                        class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/agent/thread"
+                                        data-body='{"user_id": {{user_id}}, "prompt": "{{context}}"}'
+                                    >
+                                        Create Thread
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/agent/draft"
+                                        data-body='{"user_id": {{user_id}}, "prompt": "{{context}}", "thread_id": "{{thread_id}}"}'
+                                    >
+                                        Create Draft
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/agent/thread/{{thread_id}}/reply"
+                                        data-body='{"user_id": {{user_id}}, "response": "{{response}}"}'
+                                    >
+                                        Reply to Thread
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="GET"
+                                        data-endpoint="/api/agent/thread/{{thread_id}}"
+                                    >
+                                        Get Thread
+                                    </button>
+                                    <button
+                                        class="test-btn"
+                                        data-method="DELETE"
+                                        data-endpoint="/api/agent/thread/{{thread_id}}"
+                                    >
+                                        Cancel Thread
+                                    </button>
+                                </div>
                                 <div class="input-row">
                                     <input
                                         type="text"
@@ -654,7 +674,10 @@
                     <div class="response-panel">
                         <div class="response-header">
                             <h3>Response</h3>
-                            <button id="clear-response" class="btn btn-secondary">
+                            <button
+                                id="clear-response"
+                                class="btn btn-secondary"
+                            >
                                 Clear
                             </button>
                         </div>
@@ -664,7 +687,10 @@
                     <div class="response-panel">
                         <div class="response-header">
                             <h3>Agent Response</h3>
-                            <button id="clear-agent-response" class="btn btn-secondary">
+                            <button
+                                id="clear-agent-response"
+                                class="btn btn-secondary"
+                            >
                                 Clear
                             </button>
                         </div>
@@ -677,3 +703,4 @@
         <script src="/static/app.js"></script>
     </body>
 </html>
+
