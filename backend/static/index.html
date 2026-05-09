@@ -206,7 +206,7 @@
                                         class="test-btn"
                                         data-method="POST"
                                         data-endpoint="/api/emails/send"
-                                        data-body='{"sender_id": {{user_id}}, "recipient_email": "{{recipient_email}}", "subject": "{{subject}}", "body": "{{body}}"}'
+                                        data-body='{"sender_id": {{user_id}}, "recipient_email": "{{recipient_email}}", "subject": "{{subject}}", "body": "{{body}}", "cc": "{{cc}}", "bcc": "{{bcc}}"}'
                                     >
                                         Send Email
                                     </button>
@@ -225,6 +225,20 @@
                                         class="input-field"
                                         data-var="recipient_email"
                                         placeholder="recipient_email"
+                                        value=""
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="cc"
+                                        placeholder="cc (comma-separated)"
+                                        value=""
+                                    />
+                                    <input
+                                        type="text"
+                                        class="input-field"
+                                        data-var="bcc"
+                                        placeholder="bcc (comma-separated)"
                                         value=""
                                     />
                                     <input
