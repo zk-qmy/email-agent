@@ -27,9 +27,21 @@ def _run_async(coro):
             loop.close()
 
 
-def send_email_sync(sender_id: int, recipient_email: str, subject: str, body: str):
+from typing import List, Optional
+
+
+def send_email_sync(
+    sender_id: int,
+    recipient_email: str,
+    subject: str,
+    body: str,
+    cc: Optional[List[str]] = None,
+    bcc: Optional[List[str]] = None,
+):
     client = MailClient()
-    return _run_async(client.send_email(sender_id, recipient_email, subject, body))
+    return _run_async(
+        client.send_email(sender_id, recipient_email, subject, body, cc=cc, bcc=bcc)
+    )
 
 
 def poll_inbox_sync(user_id: int, last_check: Optional[str] = None):

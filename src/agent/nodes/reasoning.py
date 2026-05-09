@@ -45,6 +45,7 @@ Meeting email flow:
 Email tool selection:
 - Use draft_meeting_email when user wants to schedule a meeting — requires recipient, date, time, purpose
 - Use draft_general_email for all other emails — requires recipient, key_points, purpose, tone
+- Both draft tools accept optional cc and bcc parameters — pass them if the user specifies CC or BCC recipients
 
 After draft is approved and email is sent:
 - Return a clear completion message like "Email sent successfully to [recipient]"

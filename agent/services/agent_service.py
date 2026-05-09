@@ -343,6 +343,8 @@ class AgentService:
                 if not subject and draft_body:
                     subject, draft_body = _extract_subject_and_clean_body(draft_body)
 
+                cc_list = interrupt_data.get("cc")
+                bcc_list = interrupt_data.get("bcc")
                 draft = Draft(
                     draft_id=draft_id,
                     user_id=user_id,
@@ -352,6 +354,8 @@ class AgentService:
                         recipient_email=recipient_email,
                         subject=subject or "",
                         body=draft_body or "",
+                        cc=cc_list,
+                        bcc=bcc_list,
                     ),
                     context=prompt,
                     status="awaiting_input",
@@ -372,6 +376,8 @@ class AgentService:
                         "recipient_email": recipient_email,
                         "subject": subject or "",
                         "body": draft_body or "",
+                        "cc": cc_list,
+                        "bcc": bcc_list,
                     },
                     "status": "awaiting_input",
                     "interrupt": {
@@ -456,6 +462,8 @@ class AgentService:
                 draft.draft.recipient_email = recipient_email
                 draft.draft.subject = subject or ""
                 draft.draft.body = draft_body or ""
+                draft.draft.cc = interrupt_data.get("cc")
+                draft.draft.bcc = interrupt_data.get("bcc")
                 draft.status = "awaiting_input"
                 draft.updated_at = datetime.now(timezone.utc).isoformat()
 
@@ -685,9 +693,13 @@ class AgentService:
                         draft.draft.recipient_email = recipient_email
                         draft.draft.subject = subject or ""
                         draft.draft.body = draft_body or ""
+                        draft.draft.cc = interrupt_data.get("cc")
+                        draft.draft.bcc = interrupt_data.get("bcc")
                         draft.status = "awaiting_input"
                         draft.updated_at = datetime.now(timezone.utc).isoformat()
 
+                        cc = interrupt_data.get("cc")
+                        bcc = interrupt_data.get("bcc")
                         return {
                             "draft_id": draft_id,
                             "draft": {
@@ -696,16 +708,9 @@ class AgentService:
                                 "recipient_email": recipient_email,
                                 "subject": subject or "",
                                 "body": draft_body or "",
+                                "cc": cc,
+                                "bcc": bcc,
                             },
-                            "status": "awaiting_input",
-                            "interrupt": {
-                                "type": interrupt_type,
-                                "question": interrupt_data.get("question", ""),
-                            },
-                        }
-                    else:
-                        return {
-                            "draft_id": draft_id,
                             "status": "awaiting_input",
                             "interrupt": {
                                 "type": interrupt_type,
@@ -836,9 +841,13 @@ class AgentService:
                         draft.draft.recipient_email = recipient_email
                         draft.draft.subject = subject or ""
                         draft.draft.body = draft_body or ""
+                        draft.draft.cc = interrupt_data.get("cc")
+                        draft.draft.bcc = interrupt_data.get("bcc")
                         draft.status = "awaiting_input"
                         draft.updated_at = datetime.now(timezone.utc).isoformat()
 
+                        cc = interrupt_data.get("cc")
+                        bcc = interrupt_data.get("bcc")
                         await _notify_client(
                             user_id,
                             {
@@ -850,6 +859,8 @@ class AgentService:
                                     "recipient_email": recipient_email,
                                     "subject": subject or "",
                                     "body": draft_body or "",
+                                    "cc": cc,
+                                    "bcc": bcc,
                                 },
                                 "interrupt": {
                                     "type": interrupt_type,
@@ -1064,6 +1075,8 @@ class AgentService:
                 recipient_email=recipient_email,
                 subject=draft.draft.subject,
                 body=final_body,
+                cc=draft.draft.cc,
+                bcc=draft.draft.bcc,
             )
 
             email_id = result.get("email_id")

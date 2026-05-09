@@ -89,18 +89,20 @@ class MailClient:
         )
 
     async def send_email(
-        self, sender_id: int, recipient_email: str, subject: str, body: str
+        self, sender_id: int, recipient_email: str, subject: str, body: str,
+        cc: Optional[List[str]] = None, bcc: Optional[List[str]] = None
     ):
-        return await self._request(
-            "POST",
-            "/api/emails/send",
-            json={
-                "sender_id": sender_id,
-                "recipient_email": recipient_email,
-                "subject": subject,
-                "body": body,
-            },
-        )
+        payload = {
+            "sender_id": sender_id,
+            "recipient_email": recipient_email,
+            "subject": subject,
+            "body": body,
+        }
+        if cc:
+            payload["cc"] = cc
+        if bcc:
+            payload["bcc"] = bcc
+        return await self._request("POST", "/api/emails/send", json=payload)
 
     async def reply_email(self, sender_id: int, parent_email_id: int, body: str):
         return await self._request(
