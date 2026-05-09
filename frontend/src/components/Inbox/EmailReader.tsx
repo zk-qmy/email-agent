@@ -53,6 +53,7 @@ export function EmailReader() {
 
   const senderLabel = email.sender_email || String(email.sender_id || 'Unknown');
   const recipientLabel = email.recipient_email || String(email.recipient_id || 'Unknown');
+  const ccLabel = email.cc?.length ? email.cc.join(', ') : null;
 
   return (
     <div className="flex-1 bg-bg overflow-y-auto p-7">
@@ -65,7 +66,7 @@ export function EmailReader() {
           </div>
           <div className="flex-1">
             <div className="font-semibold text-sm">{escHtml(senderLabel)}</div>
-            <div className="text-xs text-text-secondary">To: {escHtml(recipientLabel)}</div>
+            <div className="text-xs text-text-secondary">To: {escHtml(recipientLabel)}{ccLabel ? `  CC: ${escHtml(ccLabel)}` : ''}</div>
           </div>
           <div className="text-xs text-text-muted">{formatFullDate(email.created_at)}</div>
         </div>
