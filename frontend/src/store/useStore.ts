@@ -24,7 +24,7 @@ interface StoreState {
 
   setCurrentUser: (user: User | null) => void;
   setCurrentTab: (tab: 'inbox' | 'compose' | 'calendar') => void;
-  setInboxFilter: (filter: 'inbox' | 'sent' | 'deleted') => void;
+  setInboxFilter: (filter: 'inbox' | 'sent') => void;
   refreshEmails: () => void;
   setEmails: (emails: Email[]) => void;
   setSelectedEmail: (email: Email | null) => void;

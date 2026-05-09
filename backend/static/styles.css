@@ -146,7 +146,6 @@ h3 {
     min-width: 0;
 }
 
-<<<<<<< HEAD
 .response-column {
     width: 400px;
     flex-shrink: 0;
@@ -156,20 +155,10 @@ h3 {
 }
 
 .response-panel {
-=======
-.response-panel {
-    width: 400px;
-    flex-shrink: 0;
->>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
     background: var(--card-bg);
     border-radius: 8px;
     border: 1px solid var(--border);
     overflow: hidden;
-<<<<<<< HEAD
-=======
-    position: sticky;
-    top: 20px;
->>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
 }
 
 .section {
@@ -278,12 +267,8 @@ h3 {
     margin: 0;
 }
 
-<<<<<<< HEAD
 #response-output,
 #agent-response-output {
-=======
-#response-output {
->>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
     padding: 16px;
     margin: 0;
     min-height: 200px;

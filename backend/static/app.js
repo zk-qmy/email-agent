@@ -19,13 +19,6 @@ function interpolateEndpoint(endpoint, userId, sectionContent) {
         getInputValue(sectionContent, "email_id"),
     );
     result = result.replace(
-<<<<<<< HEAD
-=======
-        /\{\{draft_id\}\}/g,
-        getInputValue(sectionContent, "draft_id"),
-    );
-    result = result.replace(
->>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
         /\{\{thread_id\}\}/g,
         getInputValue(sectionContent, "thread_id"),
     );
@@ -65,13 +58,6 @@ function interpolateBody(body, userId, sectionContent) {
         getInputValue(sectionContent, "body"),
     );
     result = result.replace(
-<<<<<<< HEAD
-=======
-        /\{\{draft_id\}\}/g,
-        getInputValue(sectionContent, "draft_id"),
-    );
-    result = result.replace(
->>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
         /\{\{thread_id\}\}/g,
         getInputValue(sectionContent, "thread_id"),
     );
@@ -91,13 +77,6 @@ function interpolateBody(body, userId, sectionContent) {
         /\{\{message\}\}/g,
         getInputValue(sectionContent, "message"),
     );
-<<<<<<< HEAD
-    result = result.replace(
-        /\{\{response\}\}/g,
-        getInputValue(sectionContent, "response"),
-    );
-=======
->>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
     return result;
 }
 
@@ -192,12 +171,7 @@ async function loadUsers() {
                             `<option value="${u.id}">${u.username} (${u.email})</option>`,
                     )
                     .join("");
-<<<<<<< HEAD
 
-=======
-                
-                // Auto-select first user and fill fields
->>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
                 select.selectedIndex = 0;
                 if (select.value) {
                     select.dispatchEvent(new Event("change"));
@@ -227,11 +201,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const userId = event.target.value;
             if (!userId) return;
 
-<<<<<<< HEAD
             connectWebSocket(userId);
 
-=======
->>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
             const result = await callApi(`/api/auth/users/${userId}`);
 
             if (result.status === 200 && result.data && result.data.user) {
@@ -249,58 +220,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-<<<<<<< HEAD
-    let ws = null;
-    let currentUserId = null;
-
-    function connectWebSocket(userId) {
-        if (ws && ws.readyState === WebSocket.OPEN && currentUserId === userId) {
-            return;
-        }
-
-        if (ws) {
-            ws.close();
-        }
-
-        currentUserId = userId;
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        ws = new WebSocket(`${protocol}//${window.location.host}/ws/push/${userId}`);
-
-        ws.onopen = () => {
-            console.log("[ws] Connected");
-        };
-
-        ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                console.log("[ws] Received:", data);
-                displayWsEvent(data);
-            } catch (e) {
-                console.error("[ws] Parse error:", e);
-            }
-        };
-
-        ws.onclose = () => {
-            console.log("[ws] Disconnected");
-            if (currentUserId) {
-                setTimeout(() => connectWebSocket(currentUserId), 3000);
-            }
-        };
-
-        ws.onerror = (error) => {
-            console.error("[ws] Error:", error);
-        };
-    }
-
-    function displayWsEvent(data) {
-        const output = document.getElementById("agent-response-output");
-        const color = data.event?.includes("_error") ? "#ef4444" : "#10b981";
-        const eventInfo = `<span style="color: ${color}">[${data.event}]</span>`;
-        output.innerHTML = `${eventInfo}\n\n${formatJson(data)}`;
-    }
-
-=======
->>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
     document.querySelectorAll(".tab-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
             document
@@ -339,14 +258,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-<<<<<<< HEAD
-=======
-            if (!userId && endpoint.includes("{{user_id}}")) {
-                displayError("Please select a user first");
-                return;
-            }
-
->>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
             const sectionContent = btn.closest(".section-content");
 
             endpoint = interpolateEndpoint(endpoint, userId, sectionContent);
@@ -382,12 +293,4 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("clear-response").addEventListener("click", () => {
         document.getElementById("response-output").textContent = "";
     });
-<<<<<<< HEAD
-
-    document.getElementById("clear-agent-response").addEventListener("click", () => {
-        document.getElementById("agent-response-output").textContent = "";
-    });
 });
-=======
-});
->>>>>>> dda71502ccded6c29c89c268d0c7ec7a9c0fc7bf
