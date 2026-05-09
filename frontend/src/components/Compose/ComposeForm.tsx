@@ -7,6 +7,7 @@ export function ComposeForm() {
   const setChatOpen = useStore((s) => s.setChatOpen);
   const addToast = useStore((s) => s.addToast);
   const [to, setTo] = useState('');
+  const [cc, setCc] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
@@ -25,6 +26,7 @@ export function ComposeForm() {
       await api.sendEmail(userId, to, subject || '(no subject)', body);
       addToast('Email sent!', 'success');
       setTo('');
+      setCc('');
       setSubject('');
       setBody('');
     } catch (err) {
@@ -36,6 +38,7 @@ export function ComposeForm() {
 
   const handleClear = () => {
     setTo('');
+    setCc('');
     setSubject('');
     setBody('');
   };
@@ -71,6 +74,17 @@ export function ComposeForm() {
             value={to}
             onChange={(e) => setTo(e.target.value)}
             placeholder="recipient@example.com"
+          />
+        </div>
+
+        <div className="mb-4.5">
+          <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">CC</label>
+          <input
+            type="email"
+            className="input"
+            value={cc}
+            onChange={(e) => setCc(e.target.value)}
+            placeholder="cc@example.com"
           />
         </div>
 

@@ -14,14 +14,14 @@ export function Topbar() {
 
   return (
     <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-border flex items-center px-5 gap-4 z-[200] shadow-sm">
-      <div className="flex items-center gap-2.25 flex-shrink-0">
+      <div className="flex items-center gap-2.5 flex-shrink-0">
         <div className="w-8 h-8 rounded-lg bg-primary text-white text-[11px] font-extrabold flex items-center justify-center tracking-wide">
           EA
         </div>
         <span className="font-bold text-[15px] text-text">Email Agent</span>
       </div>
 
-      <nav className="flex-1 flex justify-center gap-0.5">
+      <nav className="flex-1 flex justify-center gap-2">
         <button
           className={`px-4.5 py-1.75 rounded-lg border-none bg-transparent text-sm font-medium cursor-pointer transition-colors whitespace-nowrap ${currentTab === 'inbox' ? 'bg-primary-light text-primary font-semibold' : 'text-text-secondary hover:bg-gray-100'}`}
           onClick={() => setCurrentTab('inbox')}

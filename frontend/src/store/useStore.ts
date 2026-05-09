@@ -4,7 +4,7 @@ import type { User, Email, Thread, ChatMessage } from '../api/types';
 interface StoreState {
   currentUser: User | null;
   currentTab: 'inbox' | 'compose' | 'calendar';
-  inboxFilter: 'inbox' | 'sent';
+  inboxFilter: 'inbox' | 'sent' | 'deleted';
   emails: Email[];
   emailRefreshKey: number;
   selectedEmail: Email | null;

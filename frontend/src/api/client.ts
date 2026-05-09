@@ -15,7 +15,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   
   const res = await fetch(`${AGENT_BASE_URL}${path}`, opts);
   const data = await res.json().catch(() => ({}));
-  
+
   if (!res.ok) throw new ApiError(res.status, data.detail || `HTTP ${res.status}`);
   return data;
 }
