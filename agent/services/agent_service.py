@@ -183,7 +183,7 @@ async def _poll_thread(thread_id: str):
 
         new_emails = result.get("new_emails", [])
         replies = [
-            e for e in new_emails if e.get("sender_email") == thread["recipient"]
+            e for e in new_emails if e.get("sender_email") == thread["recipient_email"]
         ]
 
         if replies:
@@ -237,7 +237,7 @@ async def _auto_followup(thread_id: str):
         try:
             await mail_client.send_email(
                 sender_id=thread["user_id"],
-                recipient_email=thread["recipient"],
+                recipient_email=thread["recipient_email"],
                 subject=f"Re: {thread.get('meeting', {}).get('subject', 'Meeting')}",
                 body=followup_body,
             )
@@ -289,7 +289,7 @@ class AgentService:
             for tid, t in threads.items()
             if t["user_id"] == user_id
             and t["status"] == "waiting_reply"
-            and t["recipient"] == sender_email
+            and t["recipient_email"] == sender_email
         ]
 
         for thread_id, _ in matching:
@@ -367,7 +367,6 @@ class AgentService:
                 return {
                     "draft_id": draft_id,
                     "draft": {
-                        "recipient": recipient_username,
                         "recipient_username": recipient_username,
                         "recipient_email": recipient_email,
                         "subject": subject or "",
@@ -461,7 +460,6 @@ class AgentService:
 
                 thread = threads.get(thread_id)
                 if thread:
-                    thread["recipient"] = recipient_username
                     thread["recipient_email"] = recipient_email
                     thread["meeting"]["subject"] = subject or ""
                     thread["status"] = "awaiting_input"
@@ -473,7 +471,6 @@ class AgentService:
                         "event": "create_complete",
                         "thread_id": thread_id,
                         "draft": {
-                            "recipient": recipient_username,
                             "recipient_username": recipient_username,
                             "recipient_email": recipient_email,
                             "subject": subject or "",
@@ -523,7 +520,7 @@ class AgentService:
             "thread_id": thread_id,
             "email_id": None,
             "user_id": user_id,
-            "recipient": "",
+            "recipient_email": None,
             "meeting": {
                 "subject": "",
                 "date": None,
@@ -555,7 +552,7 @@ class AgentService:
                 "thread_id": thread_id,
                 "email_id": None,
                 "user_id": user_id,
-                "recipient": "",
+                "recipient_email": None,
                 "meeting": {
                     "subject": "",
                     "date": None,
@@ -613,9 +610,8 @@ class AgentService:
         return {
             "draft_id": draft.draft_id,
             "draft": {
-                "recipient": draft.draft.recipient_username,
-                "recipient_username": draft.draft.recipient_username,
-                "recipient_email": draft.draft.recipient_email,
+                        "recipient_username": draft.draft.recipient_username,
+                        "recipient_email": draft.draft.recipient_email,
                 "subject": draft.draft.subject,
                 "body": draft.draft.body,
             },
@@ -691,7 +687,6 @@ class AgentService:
                         return {
                             "draft_id": draft_id,
                             "draft": {
-                                "recipient": recipient_username,
                                 "recipient_username": recipient_username,
                                 "recipient_email": recipient_email,
                                 "subject": subject or "",
@@ -735,7 +730,6 @@ class AgentService:
 
                             thread = threads.get(draft_id)
                             if thread:
-                                thread["recipient"] = draft.draft.recipient_username
                                 thread["recipient_email"] = draft.draft.recipient_email
                                 thread["meeting"]["subject"] = draft.draft.subject
                                 thread["meeting"]["participants"] = [draft.draft.recipient_username]
@@ -745,7 +739,6 @@ class AgentService:
                             return {
                                 "draft_id": draft_id,
                                 "draft": {
-                                    "recipient": draft.draft.recipient_username,
                                     "recipient_username": draft.draft.recipient_username,
                                     "recipient_email": draft.draft.recipient_email,
                                     "subject": draft.draft.subject,
@@ -760,7 +753,6 @@ class AgentService:
                             return {
                                 "draft_id": draft_id,
                                 "draft": {
-                                    "recipient": draft.draft.recipient_username,
                                     "recipient_username": draft.draft.recipient_username,
                                     "recipient_email": draft.draft.recipient_email,
                                     "subject": draft.draft.subject,
@@ -845,13 +837,12 @@ class AgentService:
                                 "event": "reply_complete",
                                 "thread_id": thread_id,
                                 "draft": {
-                                    "recipient": recipient_username,
-                                    "recipient_username": recipient_username,
-                                    "recipient_email": recipient_email,
-                                    "subject": subject or "",
-                                    "body": draft_body or "",
-                                },
-                                "interrupt": {
+                                "recipient_username": recipient_username,
+                                "recipient_email": recipient_email,
+                                "subject": subject or "",
+                                "body": draft_body or "",
+                            },
+                            "interrupt": {
                                     "type": interrupt_type,
                                     "question": interrupt_data.get("question", ""),
                                 },
@@ -898,7 +889,6 @@ class AgentService:
                                 "draft_id": thread_id,
                                 "email_id": None,
                                 "user_id": draft.user_id,
-                                "recipient": draft.draft.recipient_username,
                                 "recipient_email": draft.draft.recipient_email,
                                 "meeting": {
                                     "subject": draft.draft.subject,
@@ -1014,7 +1004,6 @@ class AgentService:
             {
                 "draft_id": d.draft_id,
                 "draft": {
-                    "recipient": d.draft.recipient_username,
                     "recipient_username": d.draft.recipient_username,
                     "recipient_email": d.draft.recipient_email,
                     "subject": d.draft.subject,
@@ -1076,7 +1065,7 @@ class AgentService:
             thread = threads.get(thread_id)
             if thread:
                 thread["email_id"] = email_id
-                thread["recipient"] = recipient
+                thread["recipient_email"] = recipient_email
                 thread["meeting"]["subject"] = draft.draft.subject
                 thread["meeting"]["participants"] = [recipient]
                 thread["status"] = "waiting_reply"
@@ -1088,7 +1077,7 @@ class AgentService:
                     "draft_id": draft_id,
                     "email_id": email_id,
                     "user_id": draft.user_id,
-                    "recipient": recipient,
+                    "recipient_email": recipient_email,
                     "meeting": {
                         "subject": draft.draft.subject,
                         "date": None,
@@ -1135,14 +1124,13 @@ class AgentService:
             )
 
             return {
-                "draft_id": draft_id,
-                "draft": {
-                    "recipient": draft.draft.recipient_username,
-                    "recipient_username": draft.draft.recipient_username,
-                    "recipient_email": draft.draft.recipient_email,
-                    "subject": draft.draft.subject,
-                    "body": final_body,
-                },
+                                "draft_id": draft_id,
+                                "draft": {
+                                    "recipient_username": draft.draft.recipient_username,
+                                    "recipient_email": draft.draft.recipient_email,
+                                    "subject": draft.draft.subject,
+                                    "body": draft.draft.body,
+                                },
                 "thread_id": thread_id,
                 "email_id": email_id,
                 "status": "sent",
@@ -1161,7 +1149,6 @@ class AgentService:
             "thread_id": thread["thread_id"],
             "email_id": thread["email_id"],
             "user_id": thread["user_id"],
-            "recipient": thread["recipient"],
             "recipient_email": thread.get("recipient_email"),
             "meeting": thread["meeting"],
             "status": thread["status"],
@@ -1186,7 +1173,6 @@ class AgentService:
         return [
             {
                 "thread_id": t["thread_id"],
-                "recipient": t["recipient"],
                 "recipient_email": t.get("recipient_email"),
                 "status": t["status"],
                 "reply_intent": t["reply_intent"],
@@ -1270,7 +1256,7 @@ class AgentService:
         return {
             "thread_id": thread["thread_id"],
             "status": thread["status"],
-            "recipient": thread["recipient"],
+            "recipient_email": thread.get("recipient_email"),
             "meeting": thread.get("meeting"),
             "reply_intent": thread.get("reply_intent"),
             "messages": thread.get("messages", []),
@@ -1290,7 +1276,7 @@ class AgentService:
             "user_id": thread["user_id"],
             "email_id": thread.get("email_id"),
             "draft_id": thread.get("draft_id"),
-            "recipient": thread["recipient"],
+            "recipient_email": thread.get("recipient_email"),
             "meeting": thread.get("meeting"),
             "messages": thread.get("messages", []),
             "total_messages": len(thread.get("messages", [])),

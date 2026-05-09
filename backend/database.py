@@ -19,7 +19,23 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _migrate_add_thread_id()
     print("Database initialized.")
+
+
+def _migrate_add_thread_id():
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    columns = [c["name"] for c in inspector.get_columns("emails")]
+    if "thread_id" not in columns:
+        session = SessionLocal()
+        try:
+            session.execute(text("ALTER TABLE emails ADD COLUMN thread_id VARCHAR(64)"))
+            session.commit()
+            print("Added thread_id column to emails table.")
+        finally:
+            session.close()
 
 
 def seed_data():

@@ -10,7 +10,9 @@ from fastapi.responses import JSONResponse, Response, FileResponse
 from backend.database import init_db, seed_data
 from backend.routes.auth import router as auth_router
 from backend.routes.email import router as email_router
+from backend.routes.calendar import router as calendar_router
 from backend.routes.ws_notifications import router as ws_router, connection_manager
+from backend.routes.users import router as users_router
 from backend.exceptions import add_exception_handlers
 
 logger = logging.getLogger(__name__)
@@ -56,7 +58,9 @@ app.add_middleware(
 add_exception_handlers(app)
 
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+app.include_router(users_router, prefix="/api/auth", tags=["auth"])
 app.include_router(email_router, prefix="/api/emails", tags=["emails"])
+app.include_router(calendar_router, prefix="/api/calendar", tags=["calendar"])
 app.include_router(ws_router, tags=["websocket"])
 
 

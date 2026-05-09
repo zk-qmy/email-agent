@@ -1,3 +1,5 @@
+import hashlib
+import re
 from sqlalchemy.orm import Session
 from sqlalchemy import update as sql_update
 from typing import cast
@@ -21,6 +23,18 @@ def _get_connection_manager():
 class MailService:
     def __init__(self):
         pass
+
+    @staticmethod
+    def _normalize_subject(subject: str) -> str:
+        s = subject.strip()
+        return re.sub(r"^(Re|Fwd|FW|RE|re|fwd|R|r)\s*:\s*", "", s).strip()
+
+    @staticmethod
+    def _generate_thread_id(sender_id: int, recipient_id: int, subject: str) -> str:
+        norm = MailService._normalize_subject(subject)
+        a, b = sorted([sender_id, recipient_id])
+        raw = f"{a}:{b}:{norm}"
+        return hashlib.md5(raw.encode()).hexdigest()[:16]
 
     def _get_session(self) -> Session:
         return SessionLocal()
@@ -125,12 +139,22 @@ class MailService:
             if not recipient:
                 return {"success": False, "error": "Recipient not found"}
 
+            if parent_id:
+                parent = session.query(Email).filter(Email.id == parent_id).first()
+                thread_id = parent.thread_id if parent and parent.thread_id else None
+            else:
+                thread_id = None
+
+            if not thread_id:
+                thread_id = self._generate_thread_id(sender_id, recipient.id, subject)
+
             email = Email(
                 sender_id=sender_id,
                 recipient_id=recipient.id,
                 subject=subject,
                 body=body,
                 parent_id=parent_id,
+                thread_id=thread_id,
                 folder="sent",
             )
             session.add(email)
@@ -141,6 +165,7 @@ class MailService:
                 subject=subject,
                 body=body,
                 parent_id=parent_id,
+                thread_id=thread_id,
                 folder="inbox",
             )
             session.add(inbox_email)
@@ -296,6 +321,62 @@ class MailService:
             if result.rowcount == 0:  # type: ignore[union-attr]
                 return {"success": False, "error": "Email not found"}
             return {"success": True}
+        finally:
+            session.close()
+
+    def get_threads(self, user_id: int) -> List[dict]:
+        session = self._get_session()
+        try:
+            emails = (
+                session.query(Email)
+                .filter(
+                    (Email.sender_id == user_id) | (Email.recipient_id == user_id),
+                    Email.thread_id.isnot(None),
+                )
+                .order_by(Email.created_at.desc())
+                .all()
+            )
+
+            threads = {}
+            for email in emails:
+                tid = email.thread_id
+                if tid not in threads:
+                    threads[tid] = {
+                        "thread_id": tid,
+                        "subject": self._normalize_subject(email.subject),
+                        "participants": set(),
+                        "emails": [],
+                    }
+                threads[tid]["emails"].append(email.to_dict())
+                threads[tid]["participants"].add(email.sender_id)
+                threads[tid]["participants"].add(email.recipient_id)
+
+            result = []
+            for tid, data in threads.items():
+                data["emails"].sort(key=lambda e: e["created_at"])
+                data["participants"] = list(data["participants"])
+                data["email_count"] = len(data["emails"])
+                data["last_email_at"] = data["emails"][-1]["created_at"]
+                result.append(data)
+
+            result.sort(key=lambda t: t["last_email_at"], reverse=True)
+            return result
+        finally:
+            session.close()
+
+    def get_thread_emails(self, thread_id: str, user_id: int) -> List[dict]:
+        session = self._get_session()
+        try:
+            emails = (
+                session.query(Email)
+                .filter(
+                    Email.thread_id == thread_id,
+                    (Email.sender_id == user_id) | (Email.recipient_id == user_id),
+                )
+                .order_by(Email.created_at.asc())
+                .all()
+            )
+            return [e.to_dict() for e in emails]
         finally:
             session.close()
 
