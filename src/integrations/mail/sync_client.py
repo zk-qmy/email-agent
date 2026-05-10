@@ -67,3 +67,15 @@ def get_email_by_index_sync(user_id: int, index: int = 0) -> dict:
     email_id = get_email_id_sync(user_id, index)
     response = get_email_sync(email_id)
     return response["email"]
+
+
+def get_threads_sync(user_id: int):
+    """Get all threads for a user."""
+    client = MailClient()
+    return _run_async(client.get_threads(user_id))
+
+
+def get_thread_emails_sync(thread_id: str, user_id: int):
+    """Get all emails in a thread."""
+    client = MailClient()
+    return _run_async(client.get_thread_emails(thread_id, user_id))

@@ -15,6 +15,8 @@ from src.agent.tools.calendar_tools import (
 from src.agent.tools.email_mining_tools import (
     get_email_content_test,
     summarize_email,
+    list_email_threads,
+    get_thread_content,
     # PDF process
     parse_pdf,
     validate_pdf,
@@ -22,7 +24,6 @@ from src.agent.tools.email_mining_tools import (
     suggest_department,
     ask_guide,
 )
-from src.agent.tools.schedule_tools import schedule_meeting
 
 
 ALL_TOOLS = [
@@ -37,6 +38,8 @@ ALL_TOOLS = [
     # Email mining
     get_email_content_test,
     summarize_email,
+    list_email_threads,
+    get_thread_content,
     parse_pdf,
     validate_pdf,
     # RAG
@@ -46,7 +49,6 @@ ALL_TOOLS = [
     # Reply analysis tool
     analyze_reply_intent,
     # Calendar tools
-    schedule_meeting,
     check_availability,
     get_calendar_events,
     update_meeting,

@@ -4,7 +4,7 @@ from src.agent.utils import extract_text
 from config.tool_prompts.files import file_prompts
 from config.tool_prompts.email import email_prompts
 from config.tool_prompts.rag import rag_prompts
-from src.integrations.mail.sync_client import get_email_by_index_sync
+from src.integrations.mail.sync_client import get_email_by_index_sync, get_thread_emails_sync, get_threads_sync
 import json
 import pdfplumber
 from langchain_core.tools import tool
@@ -85,30 +85,89 @@ def get_email_content_test(user_id: int, index: int = 0) -> dict:
     except Exception as e:
         return {"status": "error", "error": f"Failed to get email: {e}"}
 
+# === THREAD MANAGEMENT ===
 @tool
-def summarize_email(
-    # email_id: int,
-    subject: str,
-    body: str,
-    sender: str,
-    recipient: str
-)-> str:
-    """Summarize content in a email
+def list_email_threads(user_id: int) -> str:
+    """List all email threads for the current user with their thread IDs and subjects.
+
     Args:
-    
-        subject: subject of the email
-        body: email content
-        sender: email's sender
-        recipient: email's recipient
+        user_id (int): current user id
     """
-    rendered = email_prompts.summarize_email.render(
-        subject=subject,
-        body=body,
-        sender=sender,
-        recipient=recipient
-    )
-    summarized_content = extract_text(get_llm().invoke(rendered.to_prompt()))
-    return summarized_content
+    try:
+        resp = get_threads_sync(user_id)
+        threads = resp.get("threads", [])
+        if not threads:
+            return "No threads found."
+        lines = ["Email Threads:"]
+        for t in threads:
+            lines.append(
+                f"  - Thread ID: {t['thread_id']} | Subject: {t['subject']} "
+                f"| Emails: {t['email_count']} | Last: {t['last_email_at']}"
+            )
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Failed to list threads: {e}"
+
+
+@tool
+def get_thread_content(user_id: int, thread_id: str) -> dict:
+    """Fetch all emails in a thread by thread ID so the LLM can inspect them.
+
+    Args:
+        user_id (int): current user id
+        thread_id (str): the thread ID to fetch
+    """
+    try:
+        resp = get_thread_emails_sync(thread_id, user_id)
+        emails = resp if isinstance(resp, list) else resp.get("emails", [])
+        return {
+            "status": "success",
+            "thread_id": thread_id,
+            "email_count": len(emails),
+            "emails": emails,
+        }
+    except Exception as e:
+        return {"status": "error", "error": f"Failed to get thread: {e}"}
+
+
+# === SUMMARIZATION ===
+@tool
+def summarize_email(user_id: int, thread_id: str) -> str:
+    """Summarize an entire email thread by its thread ID.
+    Fetches all emails in the thread and provides a structured summary.
+
+    Args:
+        user_id (int): current user id
+        thread_id (str): the thread ID of the email thread to summarize
+    """
+    try:
+        resp = get_thread_emails_sync(thread_id, user_id)
+        emails = resp if isinstance(resp, list) else resp.get("emails", [])
+        if not emails:
+            return "No emails found in this thread."
+
+        subject = emails[0].get("subject", "(no subject)")
+        email_lines = []
+        for i, e in enumerate(emails, 1):
+            sender = e.get("sender_email", "unknown")
+            recipient = e.get("recipient_email", "unknown")
+            body = (e.get("body") or "").strip()
+            short_body = body[:500] + "..." if len(body) > 500 else body
+            email_lines.append(
+                f"  [{i}] From: {sender}  To: {recipient}\n"
+                f"      Date: {e.get('created_at', '')}\n"
+                f"      Body: {short_body}"
+            )
+
+        email_list_str = "\n".join(email_lines)
+        rendered = email_prompts.summarize_email.render(
+            subject=subject,
+            email_list=email_list_str,
+        )
+        summarized_content = extract_text(get_llm().invoke(rendered.to_prompt()))
+        return summarized_content
+    except Exception as e:
+        return f"Failed to summarize thread: {e}"
 
 # === Information Extraction ===
 # TODO: Extract Meeting Info

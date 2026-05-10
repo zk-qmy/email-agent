@@ -2,12 +2,12 @@
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 from src.integrations.llm.client import get_llm
 from src.agent.tools.registry import ALL_TOOLS
-from config.reasoning_prompts.reasoning import REASONING_PROMPT2
+from config.reasoning_prompts.reasoning import REASONING_PROMPT3
 from langgraph.types import interrupt
 
 # Bind tools once — LLM now knows all schemas automatically
 llm_with_tools = get_llm().bind_tools(ALL_TOOLS)
-reasoning_prompt = REASONING_PROMPT2
+reasoning_prompt = REASONING_PROMPT3
 
 def extract_thought(response) -> str:
     """Extract only the text content from an AIMessage."""
