@@ -490,6 +490,25 @@ class AgentService:
                 return
 
             if "__interrupt__" not in result or not result["__interrupt__"]:
+                messages = result.get("messages", [])
+                if messages:
+                    last_msg = messages[-1]
+                    if hasattr(last_msg, "content"):
+                        content = last_msg.content
+                        if isinstance(content, list):
+                            content = " ".join(block.get("text", "") for block in content if isinstance(block, dict))
+                        draft.status = "completed"
+                        await _notify_client(
+                            user_id,
+                            {
+                                "event": "create_complete",
+                                "thread_id": thread_id,
+                                "status": "completed",
+                                "message": content
+                            }
+                        )
+                        return
+
                 await _notify_client(
                     user_id,
                     {"event": "create_error", "message": "Workflow did not produce expected interrupt"},

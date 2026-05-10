@@ -15,6 +15,7 @@ export interface Email {
   body: string;
   is_read: boolean;
   created_at: string;
+  thread_id?: string;
 }
 
 export interface Draft {

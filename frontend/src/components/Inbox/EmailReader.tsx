@@ -7,33 +7,13 @@ export function EmailReader() {
   const selectedEmail = useStore((s) => s.selectedEmail);
   const setReplyTargetId = useStore((s) => s.setReplyTargetId);
   const addToast = useStore((s) => s.addToast);
-  const currentUser = useStore((s) => s.currentUser);
 
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState<Email | null>(null);
-  const [summary, setSummary] = useState<string | null>(null);
-  const [summarizing, setSummarizing] = useState(false);
-
-  const handleSummarize = async () => {
-    if (!email || !currentUser) return;
-    const userId = currentUser.user_id ?? currentUser.id;
-    setSummarizing(true);
-    setSummary(null);
-    try {
-      const result = await api.createDraft(userId, `[User ID: ${userId}] Summarize the email thread with ID: ${email.id}`);
-      const text = result.draft?.body || (result.messages?.map(m => m.content).join('\n')) || null;
-      setSummary(text || 'No summary returned.');
-    } catch (err) {
-      addToast(`Summarize failed: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
-    } finally {
-      setSummarizing(false);
-    }
-  };
 
   useEffect(() => {
     if (!selectedEmail) {
       setEmail(null);
-      setSummary(null);
       return;
     }
 
@@ -92,19 +72,9 @@ export function EmailReader() {
 
         <div className="text-sm leading-relaxed text-text whitespace-pre-wrap mb-7">{escHtml(email.body || '')}</div>
 
-        {summary && (
-          <div className="mb-6 bg-bg border border-border rounded-lg p-4">
-            <div className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider mb-2">Summary</div>
-            <div className="text-sm leading-relaxed text-text whitespace-pre-wrap">{summary}</div>
-          </div>
-        )}
-
         <div className="flex gap-2.5">
           <button className="btn btn-primary btn-sm" onClick={() => document.getElementById('reply-modal')?.classList.remove('hidden')}>
             Reply
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={handleSummarize} disabled={summarizing}>
-            {summarizing ? 'Summarizing…' : 'Summarize'}
           </button>
         </div>
       </div>
