@@ -39,7 +39,7 @@ def _parse_decision(raw) -> dict:
     return {"approved": False, "action_input": str(raw)}
 
 
-def _review_draft(draft: str, recipient: str) -> dict:
+def _review_draft(draft: str, recipient: str, meeting_date: str = None, meeting_time: str = None, purpose: str = None) -> dict:
     """Single interrupt for draft review — shared by all draft tools."""
     decision = _parse_decision(
         interrupt(
@@ -52,6 +52,9 @@ def _review_draft(draft: str, recipient: str) -> dict:
                 ),
                 "draft": draft,
                 "recipient": recipient,
+                "meeting_date": meeting_date,
+                "meeting_time": meeting_time,
+                "purpose": purpose,
             }
         )
     )
@@ -60,6 +63,9 @@ def _review_draft(draft: str, recipient: str) -> dict:
         "draft": draft,
         "approved": decision.get("approved", False),
         "user_feedback": decision.get("action_input", ""),
+        "meeting_date": meeting_date,
+        "meeting_time": meeting_time,
+        "purpose": purpose,
     }
 
 
@@ -132,7 +138,7 @@ async def draft_meeting_email(
     else:
         draft = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
 
-    return _review_draft(draft, recipient)
+    return _review_draft(draft, recipient, date, time, purpose)
 
 
 @tool

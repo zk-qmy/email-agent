@@ -8,6 +8,9 @@ class DraftContent(BaseModel):
     recipient_email: Optional[str] = None
     subject: str
     body: str
+    meeting_date: Optional[str] = None
+    meeting_time: Optional[str] = None
+    purpose: Optional[str] = None
 
 
 class Draft(BaseModel):
