@@ -154,5 +154,13 @@ class MailClient:
             "PUT", "/api/emails/mark_read", json={"email_id": email_id}
         )
 
+    async def get_threads(self, user_id: int):
+        return await self._request("GET", f"/api/emails/threads?user_id={user_id}")
+
+    async def get_thread_emails(self, thread_id: str, user_id: int):
+        return await self._request(
+            "GET", f"/api/emails/threads/{thread_id}?user_id={user_id}"
+        )
+
 
 mail_client = MailClient()

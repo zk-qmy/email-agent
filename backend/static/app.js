@@ -22,6 +22,18 @@ function interpolateEndpoint(endpoint, userId, sectionContent) {
         /\{\{thread_id\}\}/g,
         getInputValue(sectionContent, "thread_id"),
     );
+    result = result.replace(
+        /\{\{event_id\}\}/g,
+        getInputValue(sectionContent, "event_id"),
+    );
+    result = result.replace(
+        /\{\{start_date\}\}/g,
+        getInputValue(sectionContent, "start_date"),
+    );
+    result = result.replace(
+        /\{\{end_date\}\}/g,
+        getInputValue(sectionContent, "end_date"),
+    );
     return result;
 }
 
@@ -81,6 +93,42 @@ function interpolateBody(body, userId, sectionContent) {
         /\{\{response\}\}/g,
         getInputValue(sectionContent, "response"),
     );
+    result = result.replace(
+        /\{\{start_time\}\}/g,
+        getInputValue(sectionContent, "start_time"),
+    );
+    result = result.replace(
+        /\{\{duration_minutes\}\}/g,
+        getInputValue(sectionContent, "duration_minutes"),
+    );
+    result = result.replace(
+        /\{\{title\}\}/g,
+        getInputValue(sectionContent, "title"),
+    );
+    result = result.replace(
+        /\{\{description\}\}/g,
+        getInputValue(sectionContent, "description"),
+    );
+    result = result.replace(
+        /\{\{location\}\}/g,
+        getInputValue(sectionContent, "location"),
+    );
+    result = result.replace(
+        /\{\{event_id\}\}/g,
+        getInputValue(sectionContent, "event_id"),
+    );
+    result = result.replace(
+        /\{\{start_date\}\}/g,
+        getInputValue(sectionContent, "start_date"),
+    );
+    result = result.replace(
+        /\{\{end_date\}\}/g,
+        getInputValue(sectionContent, "end_date"),
+    );
+    result = result.replace(
+        /\{\{end_time\}\}/g,
+        getInputValue(sectionContent, "end_time"),
+    );
     return result;
 }
 
@@ -125,8 +173,8 @@ async function callApi(endpoint, options = {}) {
     }
 }
 
-function displayResponse(result) {
-    const output = document.getElementById("response-output");
+function displayResponse(result, targetId = "response-output") {
+    const output = document.getElementById(targetId);
     const statusColor =
         result.status >= 200 && result.status < 300 ? "#10b981" : "#ef4444";
 
@@ -339,6 +387,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 ) {
                     loadUsers();
                 }
+                if (method === "POST" && endpoint === "/api/agent/thread" && result.data?.thread_id) {
+                    const threadInput = sectionContent.querySelector('.input-field[data-var="thread_id"]');
+                    if (threadInput) threadInput.value = result.data.thread_id;
+                }
             }
         });
     });
@@ -349,5 +401,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("clear-agent-response").addEventListener("click", () => {
         document.getElementById("agent-response-output").textContent = "";
+    });
+
+    document.getElementById("summarize-thread-btn").addEventListener("click", async () => {
+        const userSelect = document.getElementById("user-select");
+        const userId = userSelect.value;
+        const targetOutput = "agent-response-output";
+        if (!userId) {
+            displayResponse({ status: 400, statusText: "Bad Request", time: "0ms", data: { error: "No user selected" } }, targetOutput);
+            return;
+        }
+
+        const sectionContent = document.getElementById("emails-threads-section");
+        const threadId = getInputValue(sectionContent, "thread_id");
+        if (!threadId) {
+            displayResponse({ status: 400, statusText: "Bad Request", time: "0ms", data: { error: "No thread_id entered" } }, targetOutput);
+            return;
+        }
+
+        displayResponse({ status: "...", statusText: "Summarizing...", time: "...", data: { loading: true } }, targetOutput);
+
+        const result = await callApi("/api/agent/draft", {
+            method: "POST",
+            body: JSON.stringify({
+                user_id: parseInt(userId),
+                prompt: `[User ID: ${userId}] Summarize the email thread with ID: ${threadId}`,
+            }),
+        });
+
+        displayResponse(result, targetOutput);
     });
 });
