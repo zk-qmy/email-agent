@@ -12,6 +12,8 @@ from agent.services.draft_models import Draft, DraftContent
 from langgraph.types import Command
 from langchain_core.messages import HumanMessage
 
+from agent.services.ws_client import backend_ws_client
+
 
 AGENT_BACKEND_URL = os.getenv("EMAIL_BACKEND_URL", "http://localhost:5001")
 
@@ -38,7 +40,6 @@ def _resolve_recipient_name(name: str) -> tuple[str, str]:
         Tuple of (username, email). Returns (name, name) if not found.
     """
     import httpx
-    import json
 
     print(f"=== _resolve_recipient_name: looking up '{name}' ===")
 
@@ -135,26 +136,39 @@ async def _process_reply(thread_id: str, reply: dict, user_id: int):
     )
 
     try:
+        print(f"[_process_reply] Processing reply for thread {thread_id}")
+        print(f"[_process_reply] Reply body: {reply['body'][:100]}...")
+
         graph = build_graph()
+
+        state = {
+            "messages": [HumanMessage(content=reply["body"])],
+            "meeting": thread.get("meeting", {}),
+            "email": {"last_reply": reply["body"]},
+        }
+
+        print(f"[_process_reply] Invoking graph with state: email.last_reply={bool(state.get('email', {}).get('last_reply'))}")
+
         result = await graph.ainvoke(
-            cast(
-                AgentState,
-                {  # type: ignore[arg-type]
-                    "messages": [{"role": "user", "content": reply["body"]}],
-                    "workflow": "schedule",
-                    "meeting": thread.get("meeting", {}),
-                    "email": {"last_reply": reply["body"]},
-                },
-            ),
+            cast(AgentState, state),
             {"configurable": {"thread_id": thread_id, "user_id": user_id}},
         )
+
+        print(f"[_process_reply] Graph result keys: {result.keys() if result else 'None'}")
+
         result_dict = dict(result) if isinstance(result, dict) else result.model_dump()
         email_data = result_dict.get("email", {})
+
+        print(f"[_process_reply] email_data: {email_data}")
+
         if isinstance(email_data, dict):
             intent = email_data.get("reply_intent", "confirmed")
         else:
             intent = getattr(email_data, "reply_intent", None) or "confirmed"
-    except Exception:
+
+        print(f"[_process_reply] Extracted intent: {intent}")
+    except Exception as e:
+        print(f"[_process_reply] Error: {e}")
         intent = "confirmed"
 
     thread["reply_intent"] = intent
@@ -274,12 +288,16 @@ class AgentService:
 
     async def handle_backend_push(self, user_id: int, event: dict):
         evt = event.get("event")
+        print(f"[handle_backend_push] Received event: {evt}")
+
         if evt != "new_email":
             return
 
         email_data = event.get("email", {})
         sender_email = email_data.get("sender_email")
         email_id = email_data.get("id")
+
+        print(f"[handle_backend_push] New email from {sender_email}, id: {email_id}")
 
         if not sender_email or not email_id:
             return
@@ -735,6 +753,7 @@ class AgentService:
                                 thread["meeting"]["participants"] = [draft.draft.recipient_username]
                                 thread["status"] = "waiting_reply"
                                 thread["updated_at"] = datetime.now(timezone.utc).isoformat()
+                                await backend_ws_client.connect(draft.user_id)
 
                             return {
                                 "draft_id": draft_id,
@@ -909,6 +928,7 @@ class AgentService:
 
                             threads[new_thread_id] = thread
                             draft.thread_id = new_thread_id
+                            await backend_ws_client.connect(user_id)
 
                             await _notify_client(
                                 user_id,
@@ -1070,6 +1090,7 @@ class AgentService:
                 thread["meeting"]["participants"] = [recipient]
                 thread["status"] = "waiting_reply"
                 thread["updated_at"] = datetime.now(timezone.utc).isoformat()
+                await backend_ws_client.connect(draft.user_id)
             else:
                 thread_id = f"thread-{uuid.uuid4().hex[:12]}"
                 thread = {

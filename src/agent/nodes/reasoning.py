@@ -57,6 +57,17 @@ async def reasoning_node(state):
         print(f"=== Thought: {thought} ===\n")
 
     if not getattr(response, "tool_calls", None):
+        completion_keywords = [
+            "sent successfully", "sent to", "email sent", "completed",
+            "done", "finished", "task complete", "all set", "ready",
+            "meeting confirmed", "meeting scheduled", "email drafted",
+        ]
+        is_completion = any(kw in thought.lower() for kw in completion_keywords)
+
+        if is_completion:
+            print("=== Reasoning Node: Task completed ===\n")
+            return {"messages": [response]}
+
         print("=== Reasoning Node: Getting user input...")
         user_input = interrupt({"question": thought})
         user_content = (

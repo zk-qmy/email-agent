@@ -1,12 +1,26 @@
 # state.py
-from typing import Annotated, TypedDict
+from typing import Annotated, TypedDict, Optional
 from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.graph.message import add_messages
 import base64
 
+
+def merge_dict(old: dict, new: dict) -> dict:
+    """Merge two dictionaries, new values override old."""
+    result = old.copy()
+    for k, v in new.items():
+        if isinstance(v, dict) and k in result and isinstance(result[k], dict):
+            result[k] = merge_dict(result[k], v)
+        else:
+            result[k] = v
+    return result
+
+
 class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     draft_approved: bool
+    email: Optional[dict]
+    meeting: Optional[dict]
 
 
 def _load_pdf_as_base64(file_path: str) -> str:
