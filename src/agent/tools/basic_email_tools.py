@@ -160,7 +160,7 @@ async def draft_meeting_email(
     else:
         draft = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
 
-return _review_draft(draft, recipient, cc=cc, bcc=bcc, meeting_date=date, meeting_time=time, purpose=purpose)
+    return _review_draft(draft, recipient, cc=cc, bcc=bcc, meeting_date=date, meeting_time=time, purpose=purpose)
 
 
 @tool
