@@ -455,31 +455,7 @@ export function Calendar() {
               </div>
             ))}
           </div>
-        ) : (() => {
-          const dayEvents = getEventsForDate(selectedDate.getDate());
-          return !dayEvents.length ? (
-            <div className="text-center text-text-muted text-xs p-12">
-              No events scheduled for this date.
-            </div>
-          ) : (
-            <div>
-              {dayEvents.map((event) => (
-                <div key={event.id} className="bg-white rounded-lg p-3.5 mb-2.5 border-l-[3px] border-primary shadow-sm">
-                  <div className="font-semibold text-xs text-text mb-0.75">{escHtml(event.title)}</div>
-                  <div className="text-xs text-text-secondary mb-1.5">
-                    {new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(event.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                  {event.location && (
-                    <div className="text-xs text-text-secondary mb-1.5">📍 {escHtml(event.location)}</div>
-                  )}
-                  {event.description && (
-                    <div className="text-xs text-text-secondary">{escHtml(event.description)}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          );
-        })()}
+        )}
       </div>
 
       {modal && (
