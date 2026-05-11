@@ -37,6 +37,7 @@ interface StoreState {
   setChatOpen: (open: boolean) => void;
   createThread: (threadId: string) => void;
   setActiveThreadId: (threadId: string | null) => void;
+  deleteThread: (threadId: string) => void;
   addMessageToThread: (threadId: string, msg: ChatMessage) => void;
   removeMessageFromThread: (threadId: string, msgId: string) => void;
   updateMessageInThread: (threadId: string, msgId: string, updates: Partial<ChatMessage>) => void;
@@ -87,6 +88,16 @@ export const useStore = create<StoreState>((set) => ({
       chatThreads: { ...state.chatThreads, [threadId]: [] },
       allThreadIds: [...state.allThreadIds, threadId],
       activeThreadId: threadId,
+    };
+  }),
+  deleteThread: (threadId) => set((state) => {
+    const { [threadId]: _, ...rest } = state.chatThreads;
+    return {
+      chatThreads: rest,
+      allThreadIds: state.allThreadIds.filter(id => id !== threadId),
+      activeThreadId: state.activeThreadId === threadId
+        ? (state.allThreadIds.filter(id => id !== threadId)?.[0] ?? null)
+        : state.activeThreadId,
     };
   }),
   setActiveThreadId: (threadId) => set({ activeThreadId: threadId }),

@@ -44,8 +44,8 @@ export function ChatWidget() {
       )}
 
       {chatOpen && (
-        <div className="fixed bottom-6 right-6 w-[min(90vw,400px)] h-[min(85vh,500px)] bg-white rounded-2xl shadow-xl flex overflow-hidden chat-in z-[1000]">
-          <div className="w-20 bg-bg border-r border-border flex flex-col">
+        <div className="fixed bottom-6 right-6 w-[min(92vw,440px)] h-[min(85vh,500px)] bg-white rounded-2xl shadow-xl flex overflow-hidden chat-in z-[1000]">
+          <div className="w-28 bg-bg border-r border-border flex flex-col">
             <ThreadSidebar />
           </div>
           <div className="flex-1 flex flex-col">
@@ -69,7 +69,9 @@ function ThreadSidebar() {
   const allThreadIds = useStore((s) => s.allThreadIds);
   const activeThreadId = useStore((s) => s.activeThreadId);
   const setActiveThreadId = useStore((s) => s.setActiveThreadId);
+  const deleteThread = useStore((s) => s.deleteThread);
   const createThread = useStore((s) => s.createThread);
+  const addToast = useStore((s) => s.addToast);
   const currentUser = useStore((s) => s.currentUser);
 
   const handleNewThread = async () => {
@@ -84,20 +86,38 @@ function ThreadSidebar() {
     }
   };
 
+  const handleDelete = async (threadId: string) => {
+    try {
+      await api.cancelDraft(threadId);
+      deleteThread(threadId);
+      addToast('Thread deleted.', 'info');
+    } catch (err) {
+      addToast(`Error: ${err instanceof Error ? err.message : 'Unknown'}`, 'error');
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col p-2 gap-1.5 overflow-y-auto">
       {allThreadIds.map((threadId, idx) => (
-        <button
-          key={threadId}
-          className={`p-2 rounded text-[10px] font-medium text-left transition-colors ${
-            activeThreadId === threadId
-              ? 'bg-primary text-white'
-              : 'text-text-secondary hover:bg-border'
-          }`}
-          onClick={() => setActiveThreadId(threadId)}
-        >
-          Thread {idx + 1}
-        </button>
+        <div key={threadId} className="flex items-center gap-0.5 group">
+          <button
+            className={`flex-1 p-2 rounded text-[10px] font-medium text-left transition-colors ${
+              activeThreadId === threadId
+                ? 'bg-primary text-white'
+                : 'text-text-secondary hover:bg-border'
+            }`}
+            onClick={() => setActiveThreadId(threadId)}
+          >
+            Thread {idx + 1}
+          </button>
+          <button
+            className="p-1 rounded text-[9px] text-text-muted opacity-0 group-hover:opacity-100 hover:text-danger hover:bg-border transition-all cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); handleDelete(threadId); }}
+            title="Delete thread"
+          >
+            ✕
+          </button>
+        </div>
       ))}
       <button
         className="p-2 rounded text-[10px] font-medium text-text-secondary hover:bg-border hover:text-text transition-colors border border-dashed border-border"
