@@ -2,7 +2,7 @@ import logging
 import os
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, Query
+from fastapi import FastAPI, WebSocket, Query, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -22,6 +22,12 @@ from agent.routes.agent import (
     get_status,
     get_history,
     websocket_endpoint,
+)
+from agent.routes.pdf import (
+    ValidatePdfRequest,
+    parse_pdf_file,
+    validate_pdf_content,
+    validate_pdf_upload,
 )
 
 logger = logging.getLogger(__name__)
@@ -103,6 +109,24 @@ async def agent_status(thread_id: str):
 @app.get("/api/agent/history/{thread_id}")
 async def agent_history(thread_id: str):
     return await get_history(thread_id)
+
+
+@app.post("/api/agent/pdf/parse")
+async def agent_parse_pdf(file: UploadFile = File(...)):
+    return await parse_pdf_file(file)
+
+
+@app.post("/api/agent/pdf/validate")
+async def agent_validate_pdf(request: ValidatePdfRequest):
+    return await validate_pdf_content(request)
+
+
+@app.post("/api/agent/pdf/validate-upload")
+async def agent_validate_pdf_upload(
+    file: UploadFile = File(...),
+    user_role: str = Form(...),
+):
+    return await validate_pdf_upload(file=file, user_role=user_role)
 
 
 @app.websocket("/api/agent/ws/{user_id}")

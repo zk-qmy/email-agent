@@ -94,7 +94,14 @@ function interpolateBody(body, userId, sectionContent) {
         getInputValue(sectionContent, "response"),
     );
     result = result.replace(
-result = result.replace(
+        /\{\{text\}\}/g,
+        getInputValue(sectionContent, "text"),
+    );
+    result = result.replace(
+        /\{\{user_role\}\}/g,
+        getInputValue(sectionContent, "user_role"),
+    );
+    result = result.replace(
         /\{\{cc\}\}/g,
         getInputValue(sectionContent, "cc"),
     );
@@ -137,7 +144,6 @@ result = result.replace(
     result = result.replace(
         /\{\{end_time\}\}/g,
         getInputValue(sectionContent, "end_time"),
-    );
     );
     return result;
 }
@@ -455,5 +461,48 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         displayResponse(result, targetOutput);
+    });
+
+    document.querySelectorAll(".test-btn[data-action]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const action = btn.dataset.action;
+            const sectionContent = btn.closest(".section-content");
+            const fileInput = sectionContent?.querySelector('.input-file[data-var="pdf_file"]');
+            const file = fileInput?.files?.[0];
+
+            if (!file) {
+                displayResponse({ status: 400, statusText: "Bad Request", time: "0ms", data: { error: "No PDF file selected" } });
+                return;
+            }
+
+            displayResponse({ status: "...", statusText: "Loading", time: "...", data: { loading: true } });
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            if (action === "pdf-validate-upload") {
+                const role = getInputValue(sectionContent, "user_role");
+                formData.append("user_role", role);
+            }
+
+            const startTime = Date.now();
+            try {
+                const response = await fetch(`/api/agent/pdf/${action === "pdf-validate-upload" ? "validate-upload" : "parse"}`, {
+                    method: "POST",
+                    body: formData,
+                });
+                const elapsed = Date.now() - startTime;
+                const contentType = response.headers.get("content-type") || "";
+                let data;
+                if (contentType.includes("application/json")) {
+                    data = await response.json();
+                } else {
+                    data = await response.text();
+                }
+                displayResponse({ status: response.status, statusText: response.statusText, time: `${elapsed}ms`, data });
+            } catch (error) {
+                displayResponse({ status: 0, statusText: "Error", time: `${Date.now() - startTime}ms`, error: error.message });
+            }
+        });
     });
 });

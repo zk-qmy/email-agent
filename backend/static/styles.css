@@ -254,6 +254,32 @@ h3 {
     border-color: var(--primary);
 }
 
+.input-textarea {
+    width: 100%;
+    resize: vertical;
+    font-family: inherit;
+    line-height: 1.4;
+}
+
+.input-file {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    background: var(--card-bg);
+    cursor: pointer;
+}
+
+.input-file::file-selector-button {
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    font-size: 12px;
+    cursor: pointer;
+    margin-right: 8px;
+}
+
 .response-header {
     display: flex;
     justify-content: space-between;
