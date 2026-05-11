@@ -1,4 +1,4 @@
-import type { User, Email, DraftResponse, Thread } from './types';
+import type { User, Email, DraftResponse, Thread, CalendarEvent } from './types';
 
 const AGENT_BASE_URL = '';
 
@@ -75,6 +75,34 @@ export const api = {
 
   getThreadHistory: (threadId: string) =>
     req<{ messages: { role: string; content: string }[] }>('GET', `/api/agent/history/${threadId}`),
+
+  getCalendarEvents: (userId: number, startDate?: string, endDate?: string) =>
+    req<{ events: CalendarEvent[] }>('GET', `/api/calendar/events?user_id=${userId}${startDate ? `&start_date=${startDate}` : ''}${endDate ? `&end_date=${endDate}` : ''}`)
+      .then(r => r.events || []),
+
+  createCalendarEvent: (organizerId: number, title: string, startTime: string, endTime: string, description?: string, attendeeIds?: number[], location?: string) =>
+    req<{ event: CalendarEvent }>('POST', '/api/calendar/events', {
+      organizer_id: organizerId,
+      title,
+      start_time: startTime,
+      end_time: endTime,
+      description: description || undefined,
+      attendee_ids: attendeeIds || undefined,
+      location: location || undefined,
+    }),
+
+  updateCalendarEvent: (eventId: number, updates: { title?: string; description?: string; start_time?: string; end_time?: string; attendee_ids?: number[]; location?: string }) =>
+    req<{ event: CalendarEvent }>('PUT', `/api/calendar/events/${eventId}`, updates),
+
+  deleteCalendarEvent: (eventId: number) =>
+    req<{ success: boolean }>('DELETE', `/api/calendar/events/${eventId}`),
+
+  checkCalendarAvailability: (userId: number, startTime: string, durationMinutes: number) =>
+    req<{ available: boolean; conflicts: CalendarEvent[] }>('POST', '/api/calendar/availability', {
+      user_id: userId,
+      start_time: startTime,
+      duration_minutes: durationMinutes,
+    }),
 };
 
 export function extractEmail(text: string): string | null {

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { User, Email, Thread, ChatMessage } from '../api/types';
+import type { User, Email, Thread, ChatMessage, CalendarEvent } from '../api/types';
 
 interface StoreState {
   currentUser: User | null;
@@ -20,7 +20,9 @@ interface StoreState {
   calYear: number;
   calMonth: number;
   calSelectedDate: Date;
+  calendarEvents: CalendarEvent[];
   setCalSelectedDate: (d: Date) => void;
+  setCalendarEvents: (events: CalendarEvent[]) => void;
   toasts: { id: number; message: string; type: 'info' | 'success' | 'error' }[];
   toastId: number;
 
@@ -66,6 +68,7 @@ export const useStore = create<StoreState>((set) => ({
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth(),
   calSelectedDate: new Date(),
+  calendarEvents: [],
   toasts: [],
   toastId: 0,
 
@@ -112,6 +115,7 @@ export const useStore = create<StoreState>((set) => ({
   setAwaitingRecipient: (awaiting) => set({ awaitingRecipient: awaiting }),
   setActiveDraftId: (id) => set({ activeDraftId: id }),
   setCalSelectedDate: (d) => set({ calSelectedDate: d }),
+  setCalendarEvents: (events) => set({ calendarEvents: events }),
   navigateCalendar: (prev) => set((state) => {
     let month = state.calMonth;
     let year = state.calYear;
@@ -141,5 +145,6 @@ export const useStore = create<StoreState>((set) => ({
     pendingContext: null,
     awaitingRecipient: false,
     activeDraftId: null,
+    calendarEvents: [],
   }),
 }));

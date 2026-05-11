@@ -71,3 +71,17 @@ export interface ThreadStatus {
 export interface ThreadHistory {
   messages: { role: string; content: string }[];
 }
+
+export interface CalendarEvent {
+  id: number;
+  organizer_id: number;
+  organizer_email?: string;
+  title: string;
+  description?: string;
+  start_time: string;
+  end_time: string;
+  attendee_ids: number[];
+  location?: string;
+  created_at: string;
+  updated_at?: string;
+}
