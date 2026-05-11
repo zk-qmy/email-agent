@@ -146,6 +146,7 @@ async def _process_reply(thread_id: str, reply: dict, user_id: int):
             "messages": [HumanMessage(content=reply["body"])],
             "meeting": thread.get("meeting", {}),
             "email": {"last_reply": reply["body"]},
+            "user_id": user_id,
         }
 
         print(f"[_process_reply] Invoking graph with state: email.last_reply={bool(state.get('email', {}).get('last_reply'))}")
@@ -366,6 +367,7 @@ class AgentService:
                     AgentState,
                     {  # type: ignore[arg-type]
                         "messages": [{"role": "user", "content": prompt}],
+                        "user_id": user_id,
                     },
                 ),
                 {"configurable": {"thread_id": draft_id, "user_id": user_id}},
@@ -482,7 +484,7 @@ class AgentService:
             result = await self.graph.ainvoke(
                 cast(
                     AgentState,
-                    {"messages": [{"role": "user", "content": prompt}]},
+                    {"messages": [{"role": "user", "content": prompt}], "user_id": user_id},
                 ),
                 {"configurable": {"thread_id": thread_id, "user_id": user_id}},
             )

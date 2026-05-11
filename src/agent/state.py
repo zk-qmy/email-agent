@@ -21,6 +21,7 @@ class AgentState(TypedDict):
     draft_approved: bool
     email: Optional[dict]
     meeting: Optional[dict]
+    user_id: int
 
 
 def _load_pdf_as_base64(file_path: str) -> str:
@@ -30,7 +31,7 @@ def _load_pdf_as_base64(file_path: str) -> str:
     except Exception as e:
         print(f"Error loading PDF path: {e}")
 
-def initial_state(user_message: str, pdf_path: str = None) -> AgentState:
+def initial_state(user_message: str, user_id: int = 1, pdf_path: str = None) -> AgentState:
     content = [{"type": "text", "text": user_message}]
 
     if pdf_path:
@@ -44,4 +45,5 @@ def initial_state(user_message: str, pdf_path: str = None) -> AgentState:
 
     return {
         "messages": [HumanMessage(content=content)],
+        "user_id": user_id,
     }
