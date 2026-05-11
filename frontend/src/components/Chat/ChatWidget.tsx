@@ -42,7 +42,7 @@ export function ChatWidget() {
       )}
 
       {chatOpen && (
-        <div className="fixed bottom-6 right-6 w-[400px] h-[500px] bg-white rounded-2xl shadow-xl flex overflow-hidden chat-in z-[1000]">
+        <div className="fixed bottom-6 right-6 w-[min(90vw,400px)] h-[min(85vh,500px)] bg-white rounded-2xl shadow-xl flex overflow-hidden chat-in z-[1000]">
           <div className="w-20 bg-bg border-r border-border flex flex-col">
             <ThreadSidebar />
           </div>
@@ -175,7 +175,7 @@ function ThreadedChatMessage({ msg }: { msg: ChatMessage }) {
         <div className="w-6 h-6 rounded-full bg-primary text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">AI</div>
       )}
       {isUser && (
-        <div className="w-6 h-6 rounded-full text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#e84b5a' }}>
+        <div className="w-6 h-6 rounded-full text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0 bg-primary">
           {name[0].toUpperCase()}
         </div>
       )}
@@ -294,6 +294,8 @@ function ThreadMeetingCard({ meeting, threadId }: { meeting: Meeting; threadId: 
 
 function ChatInput() {
   const [text, setText] = useState('');
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const currentUser = useStore((s) => s.currentUser);
   const activeThreadId = useStore((s) => s.activeThreadId);
   const allThreadIds = useStore((s) => s.allThreadIds);
@@ -301,11 +303,22 @@ function ChatInput() {
 
   const hasThread = activeThreadId && allThreadIds.length > 0;
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setAttachments(prev => [...prev, ...files]);
+    e.target.value = '';
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSend = async () => {
     if (!text.trim() || !currentUser || !hasThread) return;
 
     const userMsg = text.trim();
     setText('');
+    setAttachments([]);
 
     const userId = currentUser.user_id ?? currentUser.id;
 
@@ -368,7 +381,41 @@ function ChatInput() {
 
   return (
     <div className="p-2 border-t border-border flex-shrink-0 bg-white">
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {attachments.map((file, i) => (
+            <div key={i} className="flex items-center gap-1 bg-bg border border-border rounded-full px-2 py-0.5 text-[10px] text-text">
+              <span className="truncate max-w-[100px]">{file.name}</span>
+              <button
+                type="button"
+                className="text-text-muted hover:text-primary leading-none ml-0.5"
+                onClick={() => removeAttachment(i)}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="flex gap-1.5 items-end">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        <button
+          type="button"
+          className={`flex-shrink-0 w-5 h-5 flex items-center justify-center ${hasThread ? 'cursor-pointer text-text-secondary hover:text-primary' : 'opacity-50 cursor-not-allowed text-text-muted'}`}
+          onClick={() => fileInputRef.current?.click()}
+          disabled={!hasThread}
+          title="Attach files"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+          </svg>
+        </button>
         <textarea
           id="chat-input"
           className={`flex-1 border border-border-input rounded-full px-2.5 py-1.5 text-xs resize-none max-h-[80px] text-text bg-bg ${!hasThread ? 'opacity-50 cursor-not-allowed' : ''}`}
