@@ -42,7 +42,7 @@ export function ChatWidget() {
       )}
 
       {chatOpen && (
-        <div className="fixed bottom-6 right-6 w-[400px] h-[500px] bg-white rounded-2xl shadow-xl flex overflow-hidden chat-in z-[1000]">
+        <div className="fixed bottom-6 right-6 w-[min(90vw,400px)] h-[min(85vh,500px)] bg-white rounded-2xl shadow-xl flex overflow-hidden chat-in z-[1000]">
           <div className="w-20 bg-bg border-r border-border flex flex-col">
             <ThreadSidebar />
           </div>
@@ -175,7 +175,7 @@ function ThreadedChatMessage({ msg }: { msg: ChatMessage }) {
         <div className="w-6 h-6 rounded-full bg-primary text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">AI</div>
       )}
       {isUser && (
-        <div className="w-6 h-6 rounded-full text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#e84b5a' }}>
+        <div className="w-6 h-6 rounded-full text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0 bg-primary">
           {name[0].toUpperCase()}
         </div>
       )}

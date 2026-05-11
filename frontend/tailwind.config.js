@@ -8,27 +8,27 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#e84b5a',
-          hover: '#d03a48',
-          light: '#fff0f1',
+          DEFAULT: '#1d7c93',
+          hover: '#15803d',
+          light: '#d9f99d',
         },
         success: {
           DEFAULT: '#10b981',
           light: '#ecfdf5',
         },
         danger: {
-          DEFAULT: '#e84b5a',
-          light: '#fff0f1',
+          DEFAULT: '#a1a932',
+          light: '#dcfce7',
         },
         warning: {
-          DEFAULT: '#f59e0b',
-          light: '#fffbeb',
+          DEFAULT: '#9e1d2c',
+          light: '#dcfce7',
         },
         bg: '#f4f5f9',
         card: '#ffffff',
         border: '#e8e8f0',
         'border-input': '#e0e1eb',
-        'border-focus': '#e84b5a',
+        'border-focus': '#16a34a',
         text: '#111827',
         'text-secondary': '#6b7280',
         'text-muted': '#9ca3af',

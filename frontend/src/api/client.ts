@@ -121,7 +121,7 @@ export function escHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-const AVATAR_COLORS = ['#e84b5a', '#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#0ea5e9', '#ec4899', '#14b8a6'];
+const AVATAR_COLORS = ['#16a34a', '#059669', '#10b981', '#22c55e', '#84cc16', '#8b5cf6', '#0ea5e9', '#14b8a6'];
 
 export function avatarColor(name: string): string {
   let n = 0;

@@ -161,7 +161,7 @@ export function ComposeForm() {
                   <span className="text-text-muted">({(file.size / 1024).toFixed(0)}KB)</span>
                   <button
                     type="button"
-                    className="text-text-muted hover:text-danger ml-1 leading-none"
+                    className="text-text-muted hover:text-primary ml-1 leading-none"
                     onClick={() => removeAttachment(i)}
                   >
                     ✕
