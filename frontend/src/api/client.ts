@@ -1,4 +1,4 @@
-import type { User, Email, DraftResponse, Thread } from './types';
+import type { User, Email, DraftResponse, Thread, CalendarEvent } from './types';
 
 const AGENT_BASE_URL = '';
 
@@ -79,6 +79,10 @@ export const api = {
 
   getThreadHistory: (threadId: string) =>
     req<{ messages: { role: string; content: string }[] }>('GET', `/api/agent/history/${threadId}`),
+
+  getCalendarEvents: (userId: number, startDate?: string, endDate?: string) =>
+    req<{ events: CalendarEvent[] }>('GET', `/api/calendar/events?user_id=${userId}${startDate ? `&start_date=${startDate}` : ''}${endDate ? `&end_date=${endDate}` : ''}`)
+      .then(r => r.events || []),
 };
 
 export function extractEmail(text: string): string | null {

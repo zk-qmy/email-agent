@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useStore } from '../../store/useStore';
-import { api, formatDate, escHtml } from '../../api/client';
+import { api, escHtml } from '../../api/client';
+import type { CalendarEvent } from '../../api/types';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -8,18 +9,26 @@ export function Calendar() {
   const currentUser = useStore((s) => s.currentUser);
   const calYear = useStore((s) => s.calYear);
   const calMonth = useStore((s) => s.calMonth);
-  const threads = useStore((s) => s.threads);
-  const setThreads = useStore((s) => s.setThreads);
+  const calendarEvents = useStore((s) => s.calendarEvents);
+  const selectedDate = useStore((s) => s.selectedDate);
+  const setCalendarEvents = useStore((s) => s.setCalendarEvents);
+  const setSelectedDate = useStore((s) => s.setSelectedDate);
   const navigateCalendar = useStore((s) => s.navigateCalendar);
 
   useEffect(() => {
     const userId = currentUser?.user_id ?? currentUser?.id;
     if (!userId) return;
 
-    api.getThreads(userId)
-      .then(setThreads)
+    // Fetch events for the current month
+    const startOfMonth = new Date(calYear, calMonth, 1);
+    const endOfMonth = new Date(calYear, calMonth + 1, 0);
+    const startDate = startOfMonth.toISOString().split('T')[0];
+    const endDate = endOfMonth.toISOString().split('T')[0];
+
+    api.getCalendarEvents(userId, startDate, endDate)
+      .then(setCalendarEvents)
       .catch(console.error);
-  }, [currentUser, setThreads]);
+  }, [currentUser, calYear, calMonth, setCalendarEvents]);
 
   const today = new Date();
   const firstDay = new Date(calYear, calMonth, 1).getDay();
@@ -29,6 +38,30 @@ export function Calendar() {
   const days: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) days.push(null);
   for (let d = 1; d <= daysCount; d++) days.push(d);
+
+  // Helper function to check if a date has events
+  const hasEventsOnDate = (day: number): boolean => {
+    const date = new Date(calYear, calMonth, day);
+    return calendarEvents.some(event => {
+      const eventDate = new Date(event.start_time);
+      return eventDate.toDateString() === date.toDateString();
+    });
+  };
+
+  // Helper function to get events for a specific date
+  const getEventsForDate = (day: number): CalendarEvent[] => {
+    const date = new Date(calYear, calMonth, day);
+    return calendarEvents.filter(event => {
+      const eventDate = new Date(event.start_time);
+      return eventDate.toDateString() === date.toDateString();
+    });
+  };
+
+  // Handle date click
+  const handleDateClick = (day: number) => {
+    const date = new Date(calYear, calMonth, day);
+    setSelectedDate(selectedDate?.toDateString() === date.toDateString() ? null : date);
+  };
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -50,35 +83,76 @@ export function Calendar() {
         </div>
 
         <div className="grid grid-cols-7 gap-0.75">
-          {days.map((day, i) => (
-            <div
-              key={i}
-              className={`aspect-square flex items-center justify-center rounded-full text-sm cursor-default transition-colors ${day === null ? 'pointer-events-none' : ''} ${isNow && day === today.getDate() ? 'bg-primary text-white font-bold' : 'text-text'}`}
-            >
-              {day}
-            </div>
-          ))}
+          {days.map((day, i) => {
+            if (day === null) {
+              return <div key={i} className="aspect-square" />;
+            }
+
+            const isToday = isNow && day === today.getDate();
+            const isSelected = selectedDate && selectedDate.getDate() === day && selectedDate.getMonth() === calMonth && selectedDate.getFullYear() === calYear;
+            const hasEvents = hasEventsOnDate(day);
+
+            return (
+              <div
+                key={i}
+                className={`aspect-square flex items-center justify-center rounded-full text-sm cursor-pointer transition-colors relative ${
+                  isSelected
+                    ? 'bg-blue-500 text-white font-bold'
+                    : isToday
+                    ? 'bg-primary text-white font-bold'
+                    : hasEvents
+                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                    : 'text-text hover:bg-gray-100'
+                }`}
+                onClick={() => handleDateClick(day)}
+              >
+                {day}
+                {hasEvents && !isSelected && !isToday && (
+                  <div className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-green-500 rounded-full"></div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       <div className="flex-1 p-7 overflow-y-auto">
-        <h3 className="font-bold text-sm mb-4">Scheduled Meetings</h3>
+        <h3 className="font-bold text-sm mb-4">
+          {selectedDate
+            ? `Events for ${selectedDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}`
+            : 'Scheduled Events'
+          }
+        </h3>
         
-        {!threads.length ? (
-          <div className="text-center text-text-muted text-xs p-12">No scheduled meetings yet<br/>Use the AI assistant to schedule one.</div>
-        ) : (
-          <div>
-            {threads.map((thread) => (
-              <div key={thread.id} className="bg-white rounded-lg p-3.5 mb-2.5 border-l-[3px] border-primary shadow-sm">
-                <div className="font-semibold text-xs text-text mb-0.75">{escHtml(thread.recipient_username || '—')}</div>
-                <div className="text-xs text-text-secondary mb-1.5">Sent {formatDate(thread.created_at)}</div>
-                <span className={`inline-block text-[11px] font-medium px-2 py-0.5 rounded-full ${thread.status === 'waiting_reply' ? 'bg-warning-light text-warning' : thread.status === 'completed' ? 'bg-success-light text-success' : thread.status === 'declined' ? 'bg-danger-light text-danger' : 'bg-blue-50 text-blue-500'}`}>
-                  {escHtml((thread.status || '').replace(/_/g, ' '))}
-                </span>
-              </div>
-            ))}
+        {!selectedDate ? (
+          <div className="text-center text-text-muted text-xs p-12">
+            Click on a date to view events for that day.
           </div>
-        )}
+        ) : (() => {
+          const dayEvents = getEventsForDate(selectedDate.getDate());
+          return !dayEvents.length ? (
+            <div className="text-center text-text-muted text-xs p-12">
+              No events scheduled for this date.
+            </div>
+          ) : (
+            <div>
+              {dayEvents.map((event) => (
+                <div key={event.id} className="bg-white rounded-lg p-3.5 mb-2.5 border-l-[3px] border-primary shadow-sm">
+                  <div className="font-semibold text-xs text-text mb-0.75">{escHtml(event.title)}</div>
+                  <div className="text-xs text-text-secondary mb-1.5">
+                    {new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(event.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                  {event.location && (
+                    <div className="text-xs text-text-secondary mb-1.5">📍 {escHtml(event.location)}</div>
+                  )}
+                  {event.description && (
+                    <div className="text-xs text-text-secondary">{escHtml(event.description)}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
