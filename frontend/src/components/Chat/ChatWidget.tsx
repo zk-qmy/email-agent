@@ -7,15 +7,35 @@ export function ChatWidget() {
   const currentUser = useStore((s) => s.currentUser);
   const chatOpen = useStore((s) => s.chatOpen);
   const setChatOpen = useStore((s) => s.setChatOpen);
+  const allThreadIds = useStore((s) => s.allThreadIds);
+  const createThread = useStore((s) => s.createThread);
+  const setActiveThreadId = useStore((s) => s.setActiveThreadId);
 
   if (!currentUser) return null;
+
+  const handleOpenChat = async () => {
+    if (!currentUser) return;
+    const userId = currentUser.user_id ?? currentUser.id;
+
+    if (allThreadIds.length === 0) {
+      try {
+        const result = await api.createThread(userId);
+        createThread(result.thread_id);
+        setActiveThreadId(result.thread_id);
+      } catch (err) {
+        console.error('Failed to create thread:', err);
+      }
+    }
+
+    setChatOpen(true);
+  };
 
   return (
     <>
       {!chatOpen && (
         <button
           className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-primary text-white border-none cursor-pointer text-xs font-bold shadow-lg hover:shadow-xl hover:scale-105 transition-all z-[1000] flex items-center justify-center"
-          onClick={() => setChatOpen(true)}
+          onClick={handleOpenChat}
         >
           AI
         </button>
