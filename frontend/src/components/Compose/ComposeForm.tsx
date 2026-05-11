@@ -75,8 +75,8 @@ export function ComposeForm() {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-8 flex justify-center">
-      <div className="bg-white rounded-xl shadow-md p-8 w-full max-w-[680px]">
+    <div className="h-full overflow-y-auto p-8">
+      <div className="bg-white rounded-xl shadow-md p-8 w-full max-w-[680px] mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold">New Message</h2>
           <button className="btn btn-ghost btn-sm" onClick={handleClear}>Clear</button>
