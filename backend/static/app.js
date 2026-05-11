@@ -145,6 +145,22 @@ function interpolateBody(body, userId, sectionContent) {
         /\{\{end_time\}\}/g,
         getInputValue(sectionContent, "end_time"),
     );
+    result = result.replace(
+        /\{\{student_request\}\}/g,
+        getInputValue(sectionContent, "student_request"),
+    );
+    result = result.replace(
+        /\{\{question\}\}/g,
+        getInputValue(sectionContent, "question"),
+    );
+    result = result.replace(
+        /\{\{query\}\}/g,
+        getInputValue(sectionContent, "query"),
+    );
+    result = result.replace(
+        /\{\{top_k\}\}/g,
+        getInputValue(sectionContent, "top_k"),
+    );
     return result;
 }
 

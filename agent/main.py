@@ -29,6 +29,15 @@ from agent.routes.pdf import (
     validate_pdf_content,
     validate_pdf_upload,
 )
+from agent.routes.rag import (
+    SuggestDepartmentRequest,
+    AskGuideRequest,
+    SearchRequest,
+    handle_suggest_department,
+    handle_ask_guide,
+    handle_search,
+    handle_rag_status,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +136,26 @@ async def agent_validate_pdf_upload(
     user_role: str = Form(...),
 ):
     return await validate_pdf_upload(file=file, user_role=user_role)
+
+
+@app.post("/api/agent/rag/suggest-department")
+async def agent_suggest_department(request: SuggestDepartmentRequest):
+    return await handle_suggest_department(request)
+
+
+@app.post("/api/agent/rag/ask-guide")
+async def agent_ask_guide(request: AskGuideRequest):
+    return await handle_ask_guide(request)
+
+
+@app.post("/api/agent/rag/search")
+async def agent_rag_search(request: SearchRequest):
+    return await handle_search(request)
+
+
+@app.get("/api/agent/rag/status")
+async def agent_rag_status():
+    return await handle_rag_status()
 
 
 @app.websocket("/api/agent/ws/{user_id}")

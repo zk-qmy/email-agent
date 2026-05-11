@@ -1,4 +1,4 @@
-import type { User, Email, DraftResponse, Thread, CalendarEvent, PdfValidateResponse } from './types';
+import type { User, Email, DraftResponse, Thread, CalendarEvent, PdfValidateResponse, RagSuggestDepartmentResponse, RagAskGuideResponse, RagSearchResponse, RagStatusResponse } from './types';
 
 const AGENT_BASE_URL = '';
 
@@ -117,6 +117,18 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, data.detail || `HTTP ${res.status}`);
     return data;
   },
+
+  suggestDepartment: (studentRequest: string) =>
+    req<RagSuggestDepartmentResponse>('POST', '/api/agent/rag/suggest-department', { student_request: studentRequest }),
+
+  askGuide: (question: string) =>
+    req<RagAskGuideResponse>('POST', '/api/agent/rag/ask-guide', { question }),
+
+  searchIndex: (query: string, topK: number = 3) =>
+    req<RagSearchResponse>('POST', '/api/agent/rag/search', { query, top_k: topK }),
+
+  getRagStatus: () =>
+    req<RagStatusResponse>('GET', '/api/agent/rag/status'),
 };
 
 export function extractEmail(text: string): string | null {

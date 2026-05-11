@@ -699,6 +699,50 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div class="api-section">
+                            <h2 class="section-title" data-section="agent-rag">
+                                <span>RAG</span>
+                                <span class="toggle">▼</span>
+                            </h2>
+                            <div class="section-content" id="agent-rag-section">
+                                <div class="test-group">
+                                    <button class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/agent/rag/suggest-department"
+                                        data-body='{"student_request": "{{student_request}}"}'>
+                                        Suggest Department
+                                    </button>
+                                    <button class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/agent/rag/ask-guide"
+                                        data-body='{"question": "{{question}}"}'>
+                                        Ask Guide
+                                    </button>
+                                    <button class="test-btn"
+                                        data-method="POST"
+                                        data-endpoint="/api/agent/rag/search"
+                                        data-body='{"query": "{{query}}", "top_k": {{top_k}}}'>
+                                        Search Index
+                                    </button>
+                                    <button class="test-btn"
+                                        data-method="GET"
+                                        data-endpoint="/api/agent/rag/status">
+                                        RAG Status
+                                    </button>
+                                </div>
+                                <div class="input-row">
+                                    <input type="text" class="input-field"
+                                        data-var="student_request" placeholder="student_request" value="">
+                                    <input type="text" class="input-field"
+                                        data-var="question" placeholder="question" value="">
+                                    <input type="text" class="input-field"
+                                        data-var="query" placeholder="query (for search)" value="">
+                                    <input type="number" class="input-field"
+                                        data-var="top_k" placeholder="top_k" value="3">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
