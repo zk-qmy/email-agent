@@ -94,7 +94,6 @@ function interpolateBody(body, userId, sectionContent) {
         getInputValue(sectionContent, "response"),
     );
     result = result.replace(
-result = result.replace(
         /\{\{cc\}\}/g,
         getInputValue(sectionContent, "cc"),
     );
@@ -137,7 +136,6 @@ result = result.replace(
     result = result.replace(
         /\{\{end_time\}\}/g,
         getInputValue(sectionContent, "end_time"),
-    );
     );
     return result;
 }

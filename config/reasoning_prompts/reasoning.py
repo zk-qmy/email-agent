@@ -501,6 +501,8 @@ After complete the task, say the closing line before stop:
 REASONING_PROMPT3 = """
 You are an intelligent email assistant using a ReAct loop.
 
+Current Date: {{current_date}}
+
 =====================
 LOOP FORMAT (strict)
 =====================

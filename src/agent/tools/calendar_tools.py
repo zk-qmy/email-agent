@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional, List
 from langchain_core.tools import tool
+import re
 
 from src.integrations.calendar.sync_client import (
     create_event_sync,
@@ -10,6 +11,31 @@ from src.integrations.calendar.sync_client import (
     delete_event_sync,
     check_availability_sync,
 )
+
+
+def _normalize_time_sync(time_str: str) -> str:
+    """Convert 12-hour format like '2pm', '3:30pm' to 24-hour 'HH:MM'."""
+    t = time_str.strip().lower().replace(" ", "")
+    if re.match(r"^\d{1,2}:\d{2}(am|pm)$", t):
+        hour, rest = t.split(":")
+        minute = rest[:2]
+        ampm = rest[2:]
+        h = int(hour)
+        if ampm == "pm" and h != 12:
+            h += 12
+        elif ampm == "am" and h == 12:
+            h = 0
+        return f"{h:02d}:{minute}"
+    if re.match(r"^\d{1,2}(am|pm)$", t):
+        hour = t[:-2]
+        ampm = t[-2:]
+        h = int(hour)
+        if ampm == "pm" and h != 12:
+            h += 12
+        elif ampm == "am" and h == 12:
+            h = 0
+        return f"{h:02d}:00"
+    return time_str
 
 
 @tool
@@ -27,11 +53,12 @@ def check_availability(
         time: Time in HH:MM format (e.g., "14:00")
         duration_minutes: Meeting duration in minutes (default 60)
     """
+    norm_time = _normalize_time_sync(time)
     try:
-        start_dt = datetime.fromisoformat(f"{date}T{time}")
+        start_dt = datetime.fromisoformat(f"{date}T{norm_time}")
     except ValueError:
         try:
-            parsed = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
+            parsed = datetime.strptime(f"{date} {norm_time}", "%Y-%m-%d %H:%M")
             start_dt = parsed
         except ValueError:
             return "Error: Please provide date in YYYY-MM-DD format and time in HH:MM format."
@@ -86,10 +113,14 @@ def schedule_meeting(
         attendee_ids: List of attendee user IDs
         location: Optional location/room
     """
+    norm_time = _normalize_time_sync(time)
     try:
-        start_dt = datetime.fromisoformat(f"{date}T{time}")
+        start_dt = datetime.fromisoformat(f"{date}T{norm_time}")
     except ValueError:
-        return "Error: Please provide date in YYYY-MM-DD format and time in HH:MM format."
+        try:
+            start_dt = datetime.strptime(f"{date} {norm_time}", "%Y-%m-%d %H:%M")
+        except ValueError:
+            return "Error: Please provide date in YYYY-MM-DD format and time in HH:MM format."
 
     end_dt = start_dt + timedelta(minutes=duration_minutes)
 
@@ -242,11 +273,19 @@ def update_meeting(
         try:
             if start_time:
                 if date and time:
-                    new_start = datetime.fromisoformat(f"{date}T{time}")
+                    norm_time = _normalize_time_sync(time)
+                    try:
+                        new_start = datetime.fromisoformat(f"{date}T{norm_time}")
+                    except ValueError:
+                        new_start = datetime.strptime(f"{date} {norm_time}", "%Y-%m-%d %H:%M")
                 elif date:
                     new_start = datetime.fromisoformat(f"{date}T{start_time[11:16]}")
                 elif time:
-                    new_start = datetime.fromisoformat(f"{start_time[:10]}T{time}")
+                    norm_time = _normalize_time_sync(time)
+                    try:
+                        new_start = datetime.fromisoformat(f"{start_time[:10]}T{norm_time}")
+                    except ValueError:
+                        new_start = datetime.strptime(f"{start_time[:10]} {norm_time}", "%Y-%m-%d %H:%M")
         except ValueError:
             return "Error: Invalid date/time format. Use YYYY-MM-DD and HH:MM"
 
