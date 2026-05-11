@@ -14,7 +14,10 @@ export interface Email {
   subject: string;
   body: string;
   is_read: boolean;
+  cc?: string[];
+  bcc?: string[];
   created_at: string;
+  thread_id?: string;
 }
 
 export interface Draft {

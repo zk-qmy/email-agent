@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -8,6 +8,8 @@ class DraftContent(BaseModel):
     recipient_email: Optional[str] = None
     subject: str
     body: str
+    cc: Optional[List[str]] = None
+    bcc: Optional[List[str]] = None
     meeting_date: Optional[str] = None
     meeting_time: Optional[str] = None
     purpose: Optional[str] = None

@@ -1,3 +1,4 @@
+import json
 import hashlib
 import re
 from sqlalchemy.orm import Session
@@ -123,6 +124,25 @@ class MailService:
         finally:
             session.close()
 
+    def _resolve_user(self, session: Session, email_addr: str) -> Optional[User]:
+        return session.query(User).filter(User.email == email_addr).first()
+
+    def _notify_user(self, user_id: int, email_obj: Email):
+        try:
+            cm = _get_connection_manager()
+            if cm:
+                asyncio.create_task(
+                    cm.send_to_user(
+                        cast(int, user_id),
+                        {
+                            "event": "new_email",
+                            "email": email_obj.to_dict(),
+                        },
+                    )
+                )
+        except Exception:
+            pass
+
     def send_email(
         self,
         sender_id: int,
@@ -130,25 +150,44 @@ class MailService:
         subject: str,
         body: str,
         parent_id: Optional[int] = None,
+        cc: Optional[List[str]] = None,
+        bcc: Optional[List[str]] = None,
     ) -> dict:
         session = self._get_session()
         try:
-            recipient = (
-                session.query(User).filter(User.email == recipient_email).first()
-            )
+            recipient = self._resolve_user(session, recipient_email)
             if not recipient:
                 return {"success": False, "error": "Recipient not found"}
 
+            cc = cc or []
+            bcc = bcc or []
+
+            all_cc: List[User] = []
+            for addr in cc:
+                u = self._resolve_user(session, addr)
+                if not u:
+                    return {"success": False, "error": f"CC recipient '{addr}' not found"}
+                all_cc.append(u)
+
+            all_bcc: List[User] = []
+            for addr in bcc:
+                u = self._resolve_user(session, addr)
+                if not u:
+                    return {"success": False, "error": f"BCC recipient '{addr}' not found"}
+                all_bcc.append(u)
+
+            cc_json = json.dumps(cc) if cc else None
+            bcc_json = json.dumps(bcc) if bcc else None
+
+            thread_id = None
             if parent_id:
                 parent = session.query(Email).filter(Email.id == parent_id).first()
                 thread_id = parent.thread_id if parent and parent.thread_id else None
-            else:
-                thread_id = None
 
             if not thread_id:
                 thread_id = self._generate_thread_id(sender_id, recipient.id, subject)
 
-            email = Email(
+            sent_email = Email(
                 sender_id=sender_id,
                 recipient_id=recipient.id,
                 subject=subject,
@@ -156,41 +195,54 @@ class MailService:
                 parent_id=parent_id,
                 thread_id=thread_id,
                 folder="sent",
+                cc=cc_json,
+                bcc=bcc_json,
             )
-            session.add(email)
+            session.add(sent_email)
 
-            inbox_email = Email(
-                sender_id=sender_id,
-                recipient_id=recipient.id,
-                subject=subject,
-                body=body,
-                parent_id=parent_id,
-                thread_id=thread_id,
-                folder="inbox",
-            )
-            session.add(inbox_email)
+            def _make_inbox(recip: User, cc_field: Optional[str] = None) -> Email:
+                return Email(
+                    sender_id=sender_id,
+                    recipient_id=recip.id,
+                    subject=subject,
+                    body=body,
+                    parent_id=parent_id,
+                    folder="inbox",
+                    thread_id=thread_id,
+                    cc=cc_field,
+                )
+
+            inbox_primary = _make_inbox(recipient, cc_field=cc_json)
+            session.add(inbox_primary)
+
+            inbox_cc: List[Email] = []
+            for ccu in all_cc:
+                e = _make_inbox(ccu, cc_field=cc_json)
+                session.add(e)
+                inbox_cc.append(e)
+
+            inbox_bcc: List[Email] = []
+            for bccu in all_bcc:
+                e = _make_inbox(bccu)
+                session.add(e)
+                inbox_bcc.append(e)
             session.commit()
-            session.refresh(email)
-            session.refresh(inbox_email)
+            session.refresh(sent_email)
+            session.refresh(inbox_primary)
+            for e in inbox_cc:
+                session.refresh(e)
+            for e in inbox_bcc:
+                session.refresh(e)
 
-            try:
-                cm = _get_connection_manager()
-                if cm:
-                    asyncio.create_task(
-                        cm.send_to_user(
-                            cast(int, recipient.id),
-                            {
-                                "event": "new_email",
-                                "email": inbox_email.to_dict(),
-                            },
-                        )
-                    )
-            except Exception:
-                pass
+            self._notify_user(recipient.id, inbox_primary)
+            for e in inbox_cc:
+                self._notify_user(e.recipient_id, e)
+            for e in inbox_bcc:
+                self._notify_user(e.recipient_id, e)
 
             return {
                 "success": True,
-                "email_id": email.id,
+                "email_id": sent_email.id,
                 "message": "Email sent successfully",
             }
         finally:

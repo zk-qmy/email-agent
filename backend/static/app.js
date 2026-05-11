@@ -94,6 +94,15 @@ function interpolateBody(body, userId, sectionContent) {
         getInputValue(sectionContent, "response"),
     );
     result = result.replace(
+result = result.replace(
+        /\{\{cc\}\}/g,
+        getInputValue(sectionContent, "cc"),
+    );
+    result = result.replace(
+        /\{\{bcc\}\}/g,
+        getInputValue(sectionContent, "bcc"),
+    );
+    result = result.replace(
         /\{\{start_time\}\}/g,
         getInputValue(sectionContent, "start_time"),
     );
@@ -128,6 +137,7 @@ function interpolateBody(body, userId, sectionContent) {
     result = result.replace(
         /\{\{end_time\}\}/g,
         getInputValue(sectionContent, "end_time"),
+    );
     );
     return result;
 }
@@ -363,6 +373,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
             endpoint = interpolateEndpoint(endpoint, userId, sectionContent);
             body = interpolateBody(body, userId, sectionContent);
+
+            if (body && (method === "POST" || method === "PUT")) {
+                try {
+                    const parsed = JSON.parse(body);
+                    ["cc", "bcc"].forEach(field => {
+                        const v = parsed[field];
+                        if (!v || v === "") {
+                            delete parsed[field];
+                        } else if (typeof v === "string") {
+                            parsed[field] = v.split(",").map(s => s.trim()).filter(Boolean);
+                        }
+                    });
+                    body = JSON.stringify(parsed);
+                } catch (e) {}
+            }
 
             const options = { method };
             if (body && method !== "GET") {

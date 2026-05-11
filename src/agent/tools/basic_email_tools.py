@@ -6,7 +6,7 @@ from src.agent.utils import extract_text
 from src.integrations.mail.sync_client import send_email_sync
 from config.tool_prompts.email import email_prompts
 
-from typing import List
+from typing import List, Optional
 from langchain_core.tools import tool
 from langgraph.types import interrupt
 
@@ -39,19 +39,32 @@ def _parse_decision(raw) -> dict:
     return {"approved": False, "action_input": str(raw)}
 
 
-def _review_draft(draft: str, recipient: str, meeting_date: str = None, meeting_time: str = None, purpose: str = None) -> dict:
+def _review_draft(
+    draft: str,
+    recipient: str,
+    cc: Optional[List[str]] = None,
+    bcc: Optional[List[str]] = None,
+    meeting_date: str = None,
+    meeting_time: str = None,
+    purpose: str = None,
+) -> dict:
     """Single interrupt for draft review — shared by all draft tools."""
+    cc_line = f"\nCC: {', '.join(cc)}" if cc else ""
+    bcc_line = f"\nBCC: {', '.join(bcc)}" if bcc else ""
+    recipients_block = f"To: {recipient}{cc_line}{bcc_line}\n"
     decision = _parse_decision(
         interrupt(
             {
                 "type": "review_draft",
                 "question": (
                     f"\n📝 Draft email — review before sending:\n"
-                    f"{'─' * 48}\n{draft}\n{'─' * 48}\n"
+                    f"{'─' * 48}\n{recipients_block}\n{draft}\n{'─' * 48}\n"
                     f"Type 'y' to approve, or give feedback to revise:"
                 ),
                 "draft": draft,
                 "recipient": recipient,
+"cc": cc,
+                "bcc": bcc,
                 "meeting_date": meeting_date,
                 "meeting_time": meeting_time,
                 "purpose": purpose,
@@ -63,6 +76,11 @@ def _review_draft(draft: str, recipient: str, meeting_date: str = None, meeting_
         "draft": draft,
         "approved": decision.get("approved", False),
         "user_feedback": decision.get("action_input", ""),
+"draft": draft,
+        "approved": decision.get("approved", False),
+        "user_feedback": decision.get("action_input", ""),
+        "cc": cc,
+        "bcc": bcc,
         "meeting_date": meeting_date,
         "meeting_time": meeting_time,
         "purpose": purpose,
@@ -114,6 +132,8 @@ async def draft_meeting_email(
     date: str,
     time: str,
     purpose: str,
+    cc: Optional[List[str]] = None,
+    bcc: Optional[List[str]] = None,
     previous_draft: str = "",
     user_feedback: str = "",
 ) -> str:
@@ -124,6 +144,8 @@ async def draft_meeting_email(
         date:           Meeting date e.g. '2025-05-02', 'Monday'
         time:           Meeting time e.g. '2pm', '14:00'
         purpose:        Reason for the meeting
+        cc:             List of CC email addresses (optional)
+        bcc:            List of BCC email addresses (optional)
         previous_draft: Prior draft to show instead of generating a new one
         user_feedback:  Feedback from user to guide the next revision
     """
@@ -138,7 +160,7 @@ async def draft_meeting_email(
     else:
         draft = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
 
-    return _review_draft(draft, recipient, date, time, purpose)
+    return _review_draft(draft, recipient, cc=cc, bcc=bcc, meeting_date=date, meeting_time=time, purpose=purpose)
 
 
 @tool
@@ -147,6 +169,8 @@ def send_email(
     recipient: str,
     subject: str,
     body: str,
+    cc: Optional[List[str]] = None,
+    bcc: Optional[List[str]] = None,
     draft_approved: bool = False,
 ) -> str:
     """Send an email to a recipient.
@@ -155,6 +179,8 @@ def send_email(
         recipient: Recipient's email address
         subject:   Email subject line
         body:      Full email body text
+        cc:        List of CC email addresses (optional)
+        bcc:       List of BCC email addresses (optional)
         draft_approved: Flag to skip confirmation if draft was already approved
     """
     print("Tools: using `send_email` ...")
@@ -164,10 +190,17 @@ def send_email(
         recipient_email=recipient,
         subject=subject,
         body=body,
+        cc=cc,
+        bcc=bcc,
     )
     print(f"=== [send_email] sent: {result}")
-    # real send logic here (SMTP, Gmail API, etc.)
-    return f"Email sent to {recipient}. Subject: {subject}"
+    parts = [f"Email sent to {recipient}"]
+    if cc:
+        parts.append(f"CC: {', '.join(cc)}")
+    if bcc:
+        parts.append(f"BCC: {', '.join(bcc)}")
+    parts.append(f"Subject: {subject}")
+    return ". ".join(parts)
 
 
 # GENERAL EMAIL TOOLS
@@ -179,6 +212,8 @@ async def draft_general_email(
     key_points: List[str],
     purpose: str,
     tone: str = "professional",
+    cc: Optional[List[str]] = None,
+    bcc: Optional[List[str]] = None,
     previous_draft: str = "",
     user_feedback: str = "",
 ) -> str:
@@ -189,6 +224,8 @@ async def draft_general_email(
         key_points:     List of main ideas
         purpose:        Reason for the meeting
         tone:           Tone of the email e.g 'friendly', 'professional'
+        cc:             List of CC email addresses (optional)
+        bcc:            List of BCC email addresses (optional)
         previous_draft: Prior draft to show instead of generating a new one
         user_feedback:  Feedback from user to guide the next revision
     """
@@ -206,7 +243,7 @@ async def draft_general_email(
     else:
         draft = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
 
-    return _review_draft(draft, recipient)
+    return _review_draft(draft, recipient, cc=cc, bcc=bcc)
 
 
 @tool

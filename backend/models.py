@@ -1,6 +1,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import declarative_base, relationship
+import json
 
 Base = declarative_base()
 
@@ -38,6 +39,8 @@ class Email(Base):
     thread_id = Column(String(64), nullable=True, index=True)
     folder = Column(String(10), nullable=False, default="inbox")
     is_read = Column(Boolean, default=False)
+    cc = Column(Text, nullable=True)
+    bcc = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     sender = relationship("User", foreign_keys=[sender_id], back_populates="sent_emails")
@@ -57,6 +60,8 @@ class Email(Base):
             "thread_id": self.thread_id,
             "folder": self.folder,
             "is_read": self.is_read,
+            "cc": json.loads(self.cc) if self.cc else None,
+            "bcc": json.loads(self.bcc) if self.bcc else None,
             "created_at": self.created_at.isoformat() if self.created_at is not None else None,
         }
 

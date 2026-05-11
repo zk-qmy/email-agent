@@ -61,6 +61,7 @@ async def reasoning_node(state):
             "sent successfully", "sent to", "email sent", "completed",
             "done", "finished", "task complete", "all set", "ready",
             "meeting confirmed", "meeting scheduled", "email drafted",
+            "summary", "summarized"
         ]
         is_completion = any(kw in thought.lower() for kw in completion_keywords)
 

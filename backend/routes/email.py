@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Body
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from backend.services.mail_service import mail_service
 
 router = APIRouter()
@@ -11,6 +11,8 @@ class SendEmailRequest(BaseModel):
     recipient_email: str
     subject: str
     body: str
+    cc: Optional[List[str]] = None
+    bcc: Optional[List[str]] = None
 
 
 class ReplyEmailRequest(BaseModel):
@@ -34,7 +36,8 @@ class MarkReadRequest(BaseModel):
 @router.post("/send")
 async def send_email(request: SendEmailRequest):
     result = mail_service.send_email(
-        request.sender_id, request.recipient_email, request.subject, request.body
+        request.sender_id, request.recipient_email, request.subject, request.body,
+        cc=request.cc, bcc=request.bcc
     )
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])

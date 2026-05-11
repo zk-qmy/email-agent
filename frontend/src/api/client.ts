@@ -36,8 +36,12 @@ export const api = {
     req<{ email: Email }>('GET', `/api/emails/${emailId}`)
       .then(r => r.email || r),
 
-  sendEmail: (senderId: number, recipientEmail: string, subject: string, body: string) =>
-    req('POST', '/api/emails/send', { sender_id: senderId, recipient_email: recipientEmail, subject, body }),
+  sendEmail: (senderId: number, recipientEmail: string, subject: string, body: string, cc?: string[], bcc?: string[]) =>
+    req('POST', '/api/emails/send', {
+      sender_id: senderId, recipient_email: recipientEmail, subject, body,
+      ...(cc?.length ? { cc } : {}),
+      ...(bcc?.length ? { bcc } : {}),
+    }),
 
   markRead: (emailId: number) =>
     req('PUT', '/api/emails/mark_read', { email_id: emailId }),

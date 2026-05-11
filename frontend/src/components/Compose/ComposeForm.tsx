@@ -23,7 +23,10 @@ export function ComposeForm() {
 
     setSending(true);
     try {
-      await api.sendEmail(userId, to, subject || '(no subject)', body);
+      const ccList = cc.split(',').map(s => s.trim()).filter(Boolean);
+      const bccList = (document.getElementById('bcc-input') as HTMLInputElement)?.value
+        ?.split(',').map(s => s.trim()).filter(Boolean) || [];
+      await api.sendEmail(userId, to, subject || '(no subject)', body, ccList, bccList);
       addToast('Email sent!', 'success');
       setTo('');
       setCc('');
@@ -80,11 +83,21 @@ export function ComposeForm() {
         <div className="mb-4.5">
           <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">CC</label>
           <input
-            type="email"
+            type="text"
             className="input"
             value={cc}
             onChange={(e) => setCc(e.target.value)}
-            placeholder="cc@example.com"
+            placeholder="cc@example.com (comma-separated)"
+          />
+        </div>
+
+        <div className="mb-4.5">
+          <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">BCC</label>
+          <input
+            id="bcc-input"
+            type="text"
+            className="input"
+            placeholder="bcc@example.com (comma-separated)"
           />
         </div>
 

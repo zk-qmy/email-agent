@@ -108,6 +108,7 @@ class EmailPrompts(PromptConfig):
                 "- No placeholder text like [Name] or [Date]\n"
                 "- Write the subject line as the first line, prefixed with 'Subject:'"
                 "- If the user has specify requirements make sure to follow it (e.g., tone, length, specific phrases)"
+                "- If CC or BCC recipients are specified elsewhere, acknowledge them in the email body if appropriate (e.g., 'I've CC'd ...')"
             ),
             critic=(
                 "Verify:\n"
@@ -141,7 +142,8 @@ class EmailPrompts(PromptConfig):
                 "- Cover all key points from CONTEXT naturally in the body\n"
                 "- Match the tone specified in CONTEXT\n"
                 "- No placeholder text like [Name] or [Details] or $recipient, $date, or $time\n"
-                "- If the user has specified requirements, follow them (e.g., tone, length, specific phrases)"
+                "- If the user has specified requirements, follow them (e.g., tone, length, specific phrases)\n"
+                "- If CC or BCC recipients are specified elsewhere, acknowledge them in the email body if appropriate (e.g., 'I've CC'd ...')"
             ),
             critic=(
                 "Verify:\n"
