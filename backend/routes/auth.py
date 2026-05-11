@@ -55,13 +55,14 @@ async def get_current_user(request: Request) -> dict:
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    return {"id": user["id"], "username": user["username"], "email": user["email"]}
+    return {"id": user["id"], "username": user["username"], "email": user["email"], "role": user.get("role", "student")}
 
 
 class SignupRequest(BaseModel):
     username: str = Field(..., min_length=1)
     email: EmailStr
     password: str = Field(..., min_length=1)
+    role: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -82,7 +83,7 @@ async def get_users():
         users = session.query(User).all()
         return {
             "users": [
-                {"id": u.id, "username": u.username, "email": u.email} for u in users
+                {"id": u.id, "username": u.username, "email": u.email, "role": u.role} for u in users
             ]
         }
     finally:
@@ -120,7 +121,7 @@ async def delete_user(user_id: int):
 
 @router.post("/signup")
 async def signup(request: SignupRequest):
-    result = mail_service.signup(request.username, request.email, request.password)
+    result = mail_service.signup(request.username, request.email, request.password, role=request.role or "student")
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return {"user_id": result["user_id"], "message": result["message"]}
@@ -149,6 +150,7 @@ async def login(request: LoginRequest, response: Response):
         "user_id": result["user_id"],
         "username": result["username"],
         "email": result["email"],
+        "role": result.get("role", "student"),
     }
 
 

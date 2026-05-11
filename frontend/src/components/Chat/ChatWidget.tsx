@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { api, escHtml } from '../../api/client';
-import type { Draft, Meeting, ChatMessage } from '../../api/types';
+import type { Draft, Meeting, ChatMessage, PdfValidateResponse } from '../../api/types';
 
 export function ChatWidget() {
   const currentUser = useStore((s) => s.currentUser);
@@ -189,6 +189,8 @@ function ThreadedChatMessage({ msg }: { msg: ChatMessage }) {
           <ThreadDraftCard draft={msg.draft} threadId={activeThreadId || ''} />
         ) : msg.meeting ? (
           <ThreadMeetingCard meeting={msg.meeting} threadId={activeThreadId || ''} />
+        ) : msg.pdfResult ? (
+          <PdfResultCard result={msg.pdfResult} />
         ) : (
           escHtml(msg.content || '')
         )}
@@ -292,9 +294,53 @@ function ThreadMeetingCard({ meeting, threadId }: { meeting: Meeting; threadId: 
   );
 }
 
+function PdfResultCard({ result }: { result: PdfValidateResponse }) {
+  return (
+    <div className="mt-1.5 bg-white border border-border rounded overflow-hidden">
+      <div className="px-2 py-1 bg-bg border-b border-border">
+        <span className="text-[9px] font-semibold text-text-secondary uppercase">PDF Validation</span>
+      </div>
+      {result.missing_fields.length > 0 && (
+        <div className="px-2 py-1.5 border-b border-border bg-warning-bg">
+          <div className="text-[9px] font-semibold text-warning uppercase mb-0.5">
+            Missing ({result.missing_fields.length})
+          </div>
+          <ul className="text-[10px] text-text list-none m-0 p-0">
+            {result.missing_fields.map((f, i) => (
+              <li key={i} className="before:content-['•'] before:mr-1 before:text-warning"> {escHtml(f)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="px-2 py-1.5 border-b border-border">
+        <div className="text-[9px] font-semibold text-text-secondary uppercase mb-0.5">Required</div>
+        <div className="text-[10px] text-text flex flex-wrap gap-x-2">
+          {result.required_fields.map((f, i) => (
+            <span key={i}>{escHtml(f)}{i < result.required_fields.length - 1 ? ',' : ''}</span>
+          ))}
+        </div>
+      </div>
+      {result.optional_fields.length > 0 && (
+        <div className="px-2 py-1.5 border-b border-border">
+          <div className="text-[9px] font-semibold text-text-secondary uppercase mb-0.5">Optional</div>
+          <div className="text-[10px] text-text-muted flex flex-wrap gap-x-2">
+            {result.optional_fields.map((f, i) => (
+              <span key={i}>{escHtml(f)}{i < result.optional_fields.length - 1 ? ',' : ''}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="px-2 py-1.5">
+        <div className="text-[10px] text-text leading-relaxed">{escHtml(result.message_to_user)}</div>
+      </div>
+    </div>
+  );
+}
+
 function ChatInput() {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const currentUser = useStore((s) => s.currentUser);
   const activeThreadId = useStore((s) => s.activeThreadId);
@@ -314,20 +360,30 @@ function ChatInput() {
   };
 
   const handleSend = async () => {
-    if (!text.trim() || !currentUser || !hasThread) return;
+    if ((!text.trim() && attachments.length === 0) || !currentUser || !hasThread) return;
 
     const userMsg = text.trim();
-    setText('');
-    setAttachments([]);
-
+    const sendThreadId = activeThreadId;
     const userId = currentUser.user_id ?? currentUser.id;
+    const role = currentUser.role || 'student';
+    setText('');
 
-    addMessageToThread(activeThreadId, {
-      id: 'user-' + Date.now(),
-      role: 'user',
-      threadId: activeThreadId,
-      content: userMsg,
-    });
+    if (userMsg) {
+      addMessageToThread(sendThreadId, {
+        id: 'user-' + Date.now(),
+        role: 'user',
+        threadId: sendThreadId,
+        content: userMsg,
+      });
+    }
+
+    if (attachments.length > 0) {
+      setUploading(true);
+      Promise.all(attachments.map(file => uploadPdf(file, sendThreadId, role)))
+        .finally(() => { setAttachments([]); setUploading(false); });
+    }
+
+    if (!userMsg) return;
 
     let prompt = userMsg;
     const selectedEmail = useStore.getState().selectedEmail;
@@ -337,40 +393,63 @@ function ChatInput() {
     }
 
     try {
-      const result = await api.createDraft(userId, prompt, activeThreadId);
+      const result = await api.createDraft(userId, prompt, sendThreadId);
       if (result.error) {
-        addMessageToThread(activeThreadId, {
+        addMessageToThread(sendThreadId, {
           id: 'error-' + Date.now(),
           role: 'ai',
-          threadId: activeThreadId,
+          threadId: sendThreadId,
           content: result.error,
         });
       }
       if (result.status === 'interrupted' && result.question) {
-        addMessageToThread(activeThreadId, {
+        addMessageToThread(sendThreadId, {
           id: 'question-' + Date.now(),
           role: 'ai',
-          threadId: activeThreadId,
+          threadId: sendThreadId,
           question: result.question,
         });
       }
       if (result.draft) {
-        addMessageToThread(activeThreadId, {
+        addMessageToThread(sendThreadId, {
           id: 'draft-' + Date.now(),
           role: 'ai',
-          threadId: activeThreadId,
+          threadId: sendThreadId,
           draft: result.draft,
         });
       }
     } catch (err) {
-      addMessageToThread(activeThreadId, {
+      addMessageToThread(sendThreadId, {
         id: 'error-' + Date.now(),
         role: 'ai',
-        threadId: activeThreadId,
+        threadId: sendThreadId,
         content: `Error: ${err instanceof Error ? err.message : 'Unknown'}`,
       });
     }
   };
+
+  async function uploadPdf(file: File, threadId: string, role: string) {
+    const msgId = 'pdf-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+    if (file.type !== 'application/pdf') {
+      addMessageToThread(threadId, {
+        id: msgId, role: 'ai', threadId,
+        content: `Unsupported file type: ${file.type || file.name}. Only PDF files are supported.`,
+      });
+      return;
+    }
+    try {
+      const result = await api.validatePdfUpload(file, role);
+      addMessageToThread(threadId, {
+        id: msgId, role: 'ai', threadId,
+        pdfResult: result,
+      });
+    } catch (err) {
+      addMessageToThread(threadId, {
+        id: msgId, role: 'ai', threadId,
+        content: `PDF Error: ${err instanceof Error ? err.message : 'Unknown'}`,
+      });
+    }
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -384,15 +463,19 @@ function ChatInput() {
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {attachments.map((file, i) => (
-            <div key={i} className="flex items-center gap-1 bg-bg border border-border rounded-full px-2 py-0.5 text-[10px] text-text">
-              <span className="truncate max-w-[100px]">{file.name}</span>
-              <button
-                type="button"
-                className="text-text-muted hover:text-primary leading-none ml-0.5"
-                onClick={() => removeAttachment(i)}
-              >
-                ✕
-              </button>
+            <div key={i} className={`flex items-center gap-1 bg-bg border border-border rounded-full px-2 py-0.5 text-[10px] text-text ${uploading ? 'opacity-70' : ''}`}>
+              <span className={`truncate max-w-[100px] ${uploading ? 'text-text-muted' : ''}`}>{file.name}</span>
+              {uploading ? (
+                <span className="text-text-muted text-[9px] ml-0.5">⋯</span>
+              ) : (
+                <button
+                  type="button"
+                  className="text-text-muted hover:text-primary leading-none ml-0.5"
+                  onClick={() => removeAttachment(i)}
+                >
+                  ✕
+                </button>
+              )}
             </div>
           ))}
         </div>

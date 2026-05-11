@@ -1,4 +1,4 @@
-import type { User, Email, DraftResponse, Thread, CalendarEvent } from './types';
+import type { User, Email, DraftResponse, Thread, CalendarEvent, PdfValidateResponse } from './types';
 
 const AGENT_BASE_URL = '';
 
@@ -107,6 +107,16 @@ export const api = {
       start_time: startTime,
       duration_minutes: durationMinutes,
     }),
+
+  validatePdfUpload: async (file: File, userRole: string): Promise<PdfValidateResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('user_role', userRole);
+    const res = await fetch('/api/agent/pdf/validate-upload', { method: 'POST', body: formData });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(res.status, data.detail || `HTTP ${res.status}`);
+    return data;
+  },
 };
 
 export function extractEmail(text: string): string | null {

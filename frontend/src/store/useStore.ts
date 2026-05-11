@@ -44,8 +44,6 @@ interface StoreState {
   setAwaitingRecipient: (awaiting: boolean) => void;
   setActiveDraftId: (id: string | null) => void;
   navigateCalendar: (prev: boolean) => void;
-  setCalendarEvents: (events: CalendarEvent[]) => void;
-  setSelectedDate: (date: Date | null) => void;
   addToast: (message: string, type?: 'info' | 'success' | 'error') => void;
   removeToast: (id: number) => void;
   logout: () => void;
@@ -128,8 +126,6 @@ export const useStore = create<StoreState>((set) => ({
     }
     return { calMonth: month, calYear: year };
   }),
-  setCalendarEvents: (events) => set({ calendarEvents: events }),
-  setSelectedDate: (date) => set({ selectedDate: date }),
   addToast: (message, type = 'info') => set((state) => ({
     toasts: [...state.toasts, { id: state.toastId, message, type }],
     toastId: state.toastId + 1

@@ -40,7 +40,7 @@ class MailService:
     def _get_session(self) -> Session:
         return SessionLocal()
 
-    def signup(self, username: str, email: str, password: str) -> dict:
+    def signup(self, username: str, email: str, password: str, role: str = "student") -> dict:
         session = self._get_session()
         try:
             existing = (
@@ -55,6 +55,7 @@ class MailService:
                 username=username,
                 email=email,
                 password_hash=generate_password_hash(password),
+                role=role,
             )
             session.add(user)
             session.commit()
@@ -62,6 +63,7 @@ class MailService:
             return {
                 "success": True,
                 "user_id": user.id,
+                "role": user.role,
                 "message": "User created successfully",
             }
         finally:
@@ -82,6 +84,7 @@ class MailService:
                 "user_id": user.id,
                 "username": user.username,
                 "email": user.email,
+                "role": user.role,
             }
         finally:
             session.close()
@@ -118,7 +121,7 @@ class MailService:
             scored.sort(key=lambda x: -x[0])
 
             return [
-                {"id": u.id, "username": u.username, "email": u.email}
+                {"id": u.id, "username": u.username, "email": u.email, "role": u.role}
                 for _, u in scored
             ]
         finally:
@@ -448,6 +451,7 @@ class MailService:
         username: Optional[str] = None,
         email: Optional[str] = None,
         password: Optional[str] = None,
+        role: Optional[str] = None,
     ) -> dict:
         session = self._get_session()
         try:
@@ -477,6 +481,9 @@ class MailService:
 
             if password is not None:
                 user.password_hash = generate_password_hash(password)
+
+            if role is not None:
+                user.role = role
 
             session.commit()
             return {"success": True, "user": user.to_dict()}

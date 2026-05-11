@@ -13,6 +13,7 @@ class User(Base):
     username = Column(String(80), unique=True, nullable=False)
     email = Column(String(120), unique=True, nullable=False)
     password_hash = Column(String(256), nullable=False)
+    role = Column(String(20), nullable=False, default="student")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     sent_emails = relationship("Email", foreign_keys="Email.sender_id", back_populates="sender")
@@ -23,6 +24,7 @@ class User(Base):
             "id": self.id,
             "username": self.username,
             "email": self.email,
+            "role": self.role,
             "created_at": self.created_at.isoformat() if self.created_at is not None else None,
         }
 

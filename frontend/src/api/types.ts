@@ -3,6 +3,7 @@ export interface User {
   user_id?: number;
   username: string;
   email: string;
+  role?: string;
 }
 
 export interface Email {
@@ -55,6 +56,21 @@ export interface DraftResponse {
   error?: string;
 }
 
+export interface PdfFormField {
+  name: string;
+  type: string;
+  required: boolean;
+  value: string | null;
+}
+
+export interface PdfValidateResponse {
+  required_fields: string[];
+  optional_fields: string[];
+  not_user_fields: string[];
+  missing_fields: string[];
+  message_to_user: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'ai' | 'system';
@@ -64,6 +80,7 @@ export interface ChatMessage {
   meeting?: Meeting;
   question?: string;
   isThinking?: boolean;
+  pdfResult?: PdfValidateResponse;
 }
 
 export interface ThreadStatus {

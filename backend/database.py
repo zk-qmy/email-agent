@@ -49,16 +49,19 @@ def seed_data():
             username="alice",
             email="alice@example.com",
             password_hash=generate_password_hash("password123"),
+            role="admin",
         )
         bob = User(
             username="bob",
             email="bob@example.com",
             password_hash=generate_password_hash("password123"),
+            role="student",
         )
         charlie = User(
             username="charlie",
             email="charlie@example.com",
             password_hash=generate_password_hash("password123"),
+            role="student",
         )
         session.add_all([alice, bob, charlie])
         session.commit()
