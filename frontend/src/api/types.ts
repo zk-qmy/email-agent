@@ -108,6 +108,7 @@ export interface ChatMessage {
   threadId: string;
   content?: string;
   draft?: Draft;
+  draftSent?: boolean;
   meeting?: Meeting;
   question?: string;
   isThinking?: boolean;

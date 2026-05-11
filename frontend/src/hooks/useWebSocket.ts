@@ -12,6 +12,7 @@ interface WsEvent {
   sender?: string;
   intent?: string;
   status?: string;
+  email?: { folder: string };
 }
 
 export function useWebSocket(userId: number | undefined) {
@@ -57,10 +58,10 @@ export function useWebSocket(userId: number | undefined) {
         console.log('[ws] Received:', event, threadId);
 
         if (event === 'new_email') {
-          addToast('New email received!', 'info');
-          if (useStore.getState().currentTab === 'inbox') {
-            refreshEmails();
+          if (data.email?.folder === 'inbox') {
+            addToast('New email received!', 'info');
           }
+          refreshEmails();
           return;
         }
 
@@ -167,18 +168,58 @@ export function useWebSocket(userId: number | undefined) {
         }
 
         if (event === 'reply_complete') {
-          const sendingMsg = useStore.getState().chatThreads[threadId]?.find(m => m.content === 'Sending email...');
-          if (sendingMsg) {
-            removeMessageFromThread(threadId, sendingMsg.id);
+          const thinkingMsg = useStore.getState().chatThreads[threadId]?.find(m => m.isThinking);
+          if (thinkingMsg) {
+            removeMessageFromThread(threadId, thinkingMsg.id);
           }
-          addToast('Email sent successfully!', 'success');
+
+          const hasDraft = data.draft && (data.draft.subject || data.draft.body);
+          if (hasDraft) {
+            const draft: Draft = {
+              thread_id: threadId,
+              recipient_username: data.draft?.recipient_username || '',
+              recipient_email: data.draft?.recipient_email || '',
+              subject: data.draft?.subject || '',
+              body: data.draft?.body || '',
+            };
+            addMessageToThread(threadId, {
+              id: `draft-${threadId}-${Date.now()}`,
+              role: 'ai',
+              threadId,
+              draft,
+            });
+          }
+
+          if (data.interrupt?.type === 'question' && data.interrupt.question) {
+            addMessageToThread(threadId, {
+              id: `question-${threadId}-${Date.now()}`,
+              role: 'ai',
+              threadId,
+              question: data.interrupt.question,
+            });
+          }
+
+          if (data.status === 'sent') {
+            const draftMsgs = useStore.getState().chatThreads[threadId]?.filter(m => m.draft);
+            if (draftMsgs) {
+              draftMsgs.forEach(m => updateMessageInThread(threadId, m.id, { draftSent: true }));
+            }
+            addToast('Email sent successfully!', 'success');
+          } else if (data.status === 'completed' && data.message) {
+            addMessageToThread(threadId, {
+              id: `msg-${threadId}-${Date.now()}`,
+              role: 'ai',
+              threadId,
+              content: data.message,
+            });
+          }
           return;
         }
 
         if (event === 'reply_error') {
-          const sendingMsg = useStore.getState().chatThreads[threadId]?.find(m => m.content === 'Sending email...');
-          if (sendingMsg) {
-            removeMessageFromThread(threadId, sendingMsg.id);
+          const thinkingMsg = useStore.getState().chatThreads[threadId]?.find(m => m.isThinking);
+          if (thinkingMsg) {
+            removeMessageFromThread(threadId, thinkingMsg.id);
           }
           addMessageToThread(threadId, {
             id: `reply-error-${Date.now()}`,

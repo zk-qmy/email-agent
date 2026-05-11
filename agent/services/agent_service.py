@@ -1004,6 +1004,7 @@ class AgentService:
                     return
 
                 messages = result.get("messages", [])
+                last_content = None
                 if messages:
                     last_msg = messages[-1]
                     if hasattr(last_msg, "content"):
@@ -1012,6 +1013,7 @@ class AgentService:
                             content = " ".join(
                                 block.get("text", "") for block in content if isinstance(block, dict)
                             )
+                        last_content = content
                         draft.draft.body = content
                         draft.updated_at = datetime.now(timezone.utc).isoformat()
 
@@ -1057,9 +1059,10 @@ class AgentService:
                                     "thread_id": thread_id,
                                     "new_thread_id": new_thread_id,
                                     "status": "sent",
-                                    "message": content,
+                                    "message": last_content,
                                 },
                             )
+                            return
                         else:
                             draft.status = "completed"
                             await _notify_client(
@@ -1068,10 +1071,10 @@ class AgentService:
                                     "event": "reply_complete",
                                     "thread_id": thread_id,
                                     "status": "completed",
-                                    "message": content,
+                                    "message": last_content,
                                 },
                             )
-                    return
+                            return
 
                 await _notify_client(
                     user_id,
@@ -1079,6 +1082,7 @@ class AgentService:
                         "event": "reply_complete",
                         "thread_id": thread_id,
                         "status": "completed",
+                        "message": last_content,
                     },
                 )
 

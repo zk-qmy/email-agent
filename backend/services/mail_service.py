@@ -243,6 +243,8 @@ class MailService:
             for e in inbox_bcc:
                 self._notify_user(e.recipient_id, e)
 
+            self._notify_user(sender_id, sent_email)
+
             return {
                 "success": True,
                 "email_id": sent_email.id,

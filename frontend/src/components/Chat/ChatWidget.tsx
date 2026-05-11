@@ -186,7 +186,7 @@ function ThreadedChatMessage({ msg }: { msg: ChatMessage }) {
             <div>{escHtml(msg.question)}</div>
           </div>
         ) : msg.draft ? (
-          <ThreadDraftCard draft={msg.draft} threadId={activeThreadId || ''} />
+          <ThreadDraftCard draft={msg.draft} threadId={activeThreadId || ''} draftSent={msg.draftSent} />
         ) : msg.meeting ? (
           <ThreadMeetingCard meeting={msg.meeting} threadId={activeThreadId || ''} />
         ) : msg.pdfResult ? (
@@ -205,7 +205,7 @@ function ThreadedChatMessage({ msg }: { msg: ChatMessage }) {
   );
 }
 
-function ThreadDraftCard({ draft, threadId }: { draft: Draft; threadId: string }) {
+function ThreadDraftCard({ draft, threadId, draftSent }: { draft: Draft; threadId: string; draftSent?: boolean }) {
   const addToast = useStore((s) => s.addToast);
   const currentTab = useStore((s) => s.currentTab);
 
@@ -237,6 +237,7 @@ function ThreadDraftCard({ draft, threadId }: { draft: Draft; threadId: string }
     <div className="mt-1.5 bg-white border border-border rounded overflow-hidden">
       <div className="flex items-center justify-between px-2 py-1 bg-bg border-b border-border">
         <span className="text-[9px] font-semibold text-text-secondary uppercase">Draft</span>
+        {draftSent && <span className="text-[9px] font-medium text-green-600">Sent</span>}
       </div>
       <div className="px-2 py-1.5 border-b border-border">
         <div className="text-[10px] mb-0.5">
@@ -251,10 +252,12 @@ function ThreadDraftCard({ draft, threadId }: { draft: Draft; threadId: string }
       <div className="px-2 py-1.5">
         <div className="text-[10px] whitespace-pre-wrap">{draft.body}</div>
       </div>
-      <div className="flex gap-1 px-2 py-1.5 bg-bg border-t border-border">
-        <button className="btn btn-primary btn-xs" onClick={handleSend}>Send</button>
-        <button className="btn btn-ghost btn-xs" onClick={handleDiscard}>Discard</button>
-      </div>
+      {!draftSent && (
+        <div className="flex gap-1 px-2 py-1.5 bg-bg border-t border-border">
+          <button className="btn btn-primary btn-xs" onClick={handleSend}>Send</button>
+          <button className="btn btn-ghost btn-xs" onClick={handleDiscard}>Discard</button>
+        </div>
+      )}
     </div>
   );
 }

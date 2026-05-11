@@ -757,12 +757,13 @@ Example:
 
 --- FLOW: PDF validation ---
 
-Rules:
-- Call parse_pdf first on any uploaded PDF.
+Rules (only apply if user provided a PDF):
+- If user uploaded a PDF, call parse_pdf first to extract content.
 - Then call validate_pdf with extracted content + user's role.
 - If missing fields returned: list them clearly, ask user to provide.
-- Do NOT send any email until validate_pdf returns no missing fields.
+- Do NOT send the email until the PDF passes validation.
 - Re-validate if user fills in fields.
+- If no PDF was involved, skip this flow entirely.
 
 Example:
   User: [uploads PDF] "I'm an advisor. Can you check this form?"
