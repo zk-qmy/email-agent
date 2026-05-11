@@ -216,6 +216,10 @@ function ThreadDraftCard({ draft, threadId, draftSent }: { draft: Draft; threadI
     if (!userId) return;
     try {
       await api.sendDraft(threadId, userId, "y");
+      const thinkingMsg = useStore.getState().chatThreads[threadId]?.find(m => m.isThinking);
+      if (thinkingMsg) {
+        useStore.getState().removeMessageFromThread(threadId, thinkingMsg.id);
+      }
       addToast('Email sent!', 'success');
       if (currentTab === 'inbox' && useStore.getState().inboxFilter === 'sent') {
         useStore.getState().setInboxFilter('sent');
