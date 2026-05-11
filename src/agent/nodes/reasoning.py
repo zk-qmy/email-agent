@@ -1,4 +1,5 @@
 # nodes/reasoning.py
+from datetime import datetime
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 from src.integrations.llm.client import get_llm
 from src.agent.tools.registry import ALL_TOOLS
@@ -30,6 +31,7 @@ def extract_thought(response) -> str:
 
 async def reasoning_node(state):
     messages = state["messages"]
+    user_id = state.get("user_id", 1)
 
     if messages and isinstance(messages[-1], ToolMessage):
         last_tool_msg = messages[-1]
@@ -49,7 +51,8 @@ async def reasoning_node(state):
             )
         ]
 
-    response = await llm_with_tools.ainvoke([SystemMessage(content=reasoning_prompt)] + messages)
+    prompt = REASONING_PROMPT3.replace("{{user_id}}", str(user_id)).replace("{{current_date}}", datetime.now().strftime("%Y-%m-%d"))
+    response = await llm_with_tools.ainvoke([SystemMessage(content=prompt)] + messages)
     # print(f"=== Reasoning raw response: {response}\n")
 
     thought = extract_thought(response)

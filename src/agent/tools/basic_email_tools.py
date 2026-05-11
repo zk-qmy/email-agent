@@ -1,6 +1,7 @@
 # tools/email_tools.py
 import json
 import os
+from datetime import datetime
 from src.integrations.llm.client import get_llm
 from src.agent.utils import extract_text
 from src.integrations.mail.sync_client import send_email_sync
@@ -37,6 +38,39 @@ def _parse_decision(raw) -> dict:
                 return {"approved": False, "action_input": raw.get("response", "")}
         return raw
     return {"approved": False, "action_input": str(raw)}
+
+
+async def _normalize_datetime(date: str, time: str) -> tuple[str, str]:
+    """Normalize date and time to YYYY-MM-DD and HH:MM format using LLM."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    try:
+        prompt = f"""Today's date: {today}
+
+Convert the following date and time to standard formats:
+Date: {date}
+Time: {time}
+
+Return ONLY a JSON object with normalized "date" and "time" fields:
+- date: YYYY-MM-DD format (e.g., "{today}")
+- time: HH:MM format in 24-hour (e.g., "14:00", not "2pm")
+
+If the input is already normalized, return as-is.
+For relative dates like "tomorrow", "next Monday", calculate the actual date using today's date as reference.
+For times like "2pm", "3:30pm", convert to 24-hour format."""
+
+        result = await get_llm().ainvoke(prompt)
+        content = result.content if hasattr(result, "content") else str(result)
+        if isinstance(content, list):
+            content = " ".join(
+                block.get("text", "") for block in content if isinstance(block, dict) and block.get("type") == "text"
+            )
+        import re
+        match = re.search(r'\{[^}]+"date"\s*:\s*"([^"]+)"[^}]+"time"\s*:\s*"([^"]+)"', content, re.DOTALL)
+        if match:
+            return match.group(1), match.group(2)
+    except Exception as e:
+        print(f"[_normalize_datetime] Error: {e}")
+    return date, time
 
 
 def _review_draft(
@@ -149,8 +183,10 @@ async def draft_meeting_email(
         previous_draft: Prior draft to show instead of generating a new one
         user_feedback:  Feedback from user to guide the next revision
     """
+    normalized_date, normalized_time = await _normalize_datetime(date, time)
+
     rendered = email_prompts.draft_meeting_email.render(
-        recipient=recipient, date=date, time=time, purpose=purpose
+        recipient=recipient, date=normalized_date, time=normalized_time, purpose=purpose
     )
 
     if user_feedback and previous_draft:
@@ -160,7 +196,7 @@ async def draft_meeting_email(
     else:
         draft = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
 
-    return _review_draft(draft, recipient, cc=cc, bcc=bcc, meeting_date=date, meeting_time=time, purpose=purpose)
+    return _review_draft(draft, recipient, cc=cc, bcc=bcc, meeting_date=normalized_date, meeting_time=normalized_time, purpose=purpose)
 
 
 @tool

@@ -108,6 +108,18 @@ async def _notify_client(user_id: int, event: dict):
         print(f"[notify] Forward to backend failed: {e}")
 
 
+async def _parse_meeting_datetime(meeting_date: str, meeting_time: str) -> datetime:
+    try:
+        return datetime.strptime(f"{meeting_date} {meeting_time}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        try:
+            return datetime.fromisoformat(f"{meeting_date}T{meeting_time}")
+        except ValueError:
+            from src.agent.tools.basic_email_tools import _normalize_datetime
+            normalized_date, normalized_time = await _normalize_datetime(meeting_date, meeting_time)
+            return datetime.strptime(f"{normalized_date} {normalized_time}", "%Y-%m-%d %H:%M")
+
+
 async def _process_reply(thread_id: str, reply: dict, user_id: int):
     thread = threads.get(thread_id)
     if not thread:
@@ -146,6 +158,7 @@ async def _process_reply(thread_id: str, reply: dict, user_id: int):
             "messages": [HumanMessage(content=reply["body"])],
             "meeting": thread.get("meeting", {}),
             "email": {"last_reply": reply["body"]},
+            "user_id": user_id,
         }
 
         print(f"[_process_reply] Invoking graph with state: email.last_reply={bool(state.get('email', {}).get('last_reply'))}")
@@ -184,7 +197,7 @@ async def _process_reply(thread_id: str, reply: dict, user_id: int):
             try:
                 from datetime import timedelta
 
-                start_dt = datetime.strptime(f"{meeting_date} {meeting_time}", "%Y-%m-%d %H:%M")
+                start_dt = await _parse_meeting_datetime(meeting_date, meeting_time)
                 end_dt = start_dt + timedelta(hours=1)
 
                 result = create_event_sync(
@@ -366,6 +379,7 @@ class AgentService:
                     AgentState,
                     {  # type: ignore[arg-type]
                         "messages": [{"role": "user", "content": prompt}],
+                        "user_id": user_id,
                     },
                 ),
                 {"configurable": {"thread_id": draft_id, "user_id": user_id}},
@@ -482,7 +496,7 @@ class AgentService:
             result = await self.graph.ainvoke(
                 cast(
                     AgentState,
-                    {"messages": [{"role": "user", "content": prompt}]},
+                    {"messages": [{"role": "user", "content": prompt}], "user_id": user_id},
                 ),
                 {"configurable": {"thread_id": thread_id, "user_id": user_id}},
             )

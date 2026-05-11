@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { User, Email, Thread, ChatMessage } from '../api/types';
+import type { User, Email, Thread, ChatMessage, CalendarEvent } from '../api/types';
 
 interface StoreState {
   currentUser: User | null;
@@ -19,6 +19,10 @@ interface StoreState {
   activeDraftId: string | null;
   calYear: number;
   calMonth: number;
+  calSelectedDate: Date;
+  calendarEvents: CalendarEvent[];
+  setCalSelectedDate: (d: Date) => void;
+  setCalendarEvents: (events: CalendarEvent[]) => void;
   toasts: { id: number; message: string; type: 'info' | 'success' | 'error' }[];
   toastId: number;
 
@@ -40,6 +44,8 @@ interface StoreState {
   setAwaitingRecipient: (awaiting: boolean) => void;
   setActiveDraftId: (id: string | null) => void;
   navigateCalendar: (prev: boolean) => void;
+  setCalendarEvents: (events: CalendarEvent[]) => void;
+  setSelectedDate: (date: Date | null) => void;
   addToast: (message: string, type?: 'info' | 'success' | 'error') => void;
   removeToast: (id: number) => void;
   logout: () => void;
@@ -63,6 +69,8 @@ export const useStore = create<StoreState>((set) => ({
   activeDraftId: null,
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth(),
+  calSelectedDate: new Date(),
+  calendarEvents: [],
   toasts: [],
   toastId: 0,
 
@@ -108,6 +116,8 @@ export const useStore = create<StoreState>((set) => ({
   setPendingContext: (ctx) => set({ pendingContext: ctx }),
   setAwaitingRecipient: (awaiting) => set({ awaitingRecipient: awaiting }),
   setActiveDraftId: (id) => set({ activeDraftId: id }),
+  setCalSelectedDate: (d) => set({ calSelectedDate: d }),
+  setCalendarEvents: (events) => set({ calendarEvents: events }),
   navigateCalendar: (prev) => set((state) => {
     let month = state.calMonth;
     let year = state.calYear;
@@ -118,6 +128,8 @@ export const useStore = create<StoreState>((set) => ({
     }
     return { calMonth: month, calYear: year };
   }),
+  setCalendarEvents: (events) => set({ calendarEvents: events }),
+  setSelectedDate: (date) => set({ selectedDate: date }),
   addToast: (message, type = 'info') => set((state) => ({
     toasts: [...state.toasts, { id: state.toastId, message, type }],
     toastId: state.toastId + 1
@@ -137,5 +149,6 @@ export const useStore = create<StoreState>((set) => ({
     pendingContext: null,
     awaitingRecipient: false,
     activeDraftId: null,
+    calendarEvents: [],
   }),
 }));

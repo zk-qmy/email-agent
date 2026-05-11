@@ -23,7 +23,7 @@ function Toast({ message, type, onClose }: { message: string; type: string; onCl
   const typeClasses = {
     info: 'bg-blue-50 border-blue-200 text-blue-600',
     success: 'bg-success-light border-green-200 text-success',
-    error: 'bg-danger-light border-red-200 text-danger',
+    error: 'bg-danger-light border-green-200 text-danger',
   };
 
   return (
