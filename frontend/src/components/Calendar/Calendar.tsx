@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '../../store/useStore';
-import { api, formatDate, escHtml } from '../../api/client';
+import { api, formatDate, escHtml, formatDateOnly } from '../../api/client';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -8,6 +8,8 @@ export function Calendar() {
   const currentUser = useStore((s) => s.currentUser);
   const calYear = useStore((s) => s.calYear);
   const calMonth = useStore((s) => s.calMonth);
+  const calSelectedDate = useStore((s) => s.calSelectedDate);
+  const setCalSelectedDate = useStore((s) => s.setCalSelectedDate);
   const threads = useStore((s) => s.threads);
   const setThreads = useStore((s) => s.setThreads);
   const navigateCalendar = useStore((s) => s.navigateCalendar);
@@ -24,11 +26,28 @@ export function Calendar() {
   const today = new Date();
   const firstDay = new Date(calYear, calMonth, 1).getDay();
   const daysCount = new Date(calYear, calMonth + 1, 0).getDate();
-  const isNow = today.getFullYear() === calYear && today.getMonth() === calMonth;
+  const isCurrentMonth = today.getFullYear() === calYear && today.getMonth() === calMonth;
 
   const days: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) days.push(null);
   for (let d = 1; d <= daysCount; d++) days.push(d);
+
+  const isToday = (day: number | null) =>
+    isCurrentMonth && day !== null && day === today.getDate();
+
+  const isSelected = (day: number | null) =>
+    day !== null &&
+    calSelectedDate.getFullYear() === calYear &&
+    calSelectedDate.getMonth() === calMonth &&
+    calSelectedDate.getDate() === day;
+
+  const handleDayClick = (day: number | null) => {
+    if (day === null) return;
+    setCalSelectedDate(new Date(calYear, calMonth, day));
+  };
+
+  const selectedDateStr = formatDateOnly(calSelectedDate);
+  const filteredThreads = threads.filter((t) => t.meeting?.date === selectedDateStr);
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -53,7 +72,8 @@ export function Calendar() {
           {days.map((day, i) => (
             <div
               key={i}
-              className={`aspect-square flex items-center justify-center rounded-full text-sm cursor-default transition-colors ${day === null ? 'pointer-events-none' : ''} ${isNow && day === today.getDate() ? 'bg-primary text-white font-bold' : 'text-text'}`}
+              onClick={() => handleDayClick(day)}
+              className={`aspect-square flex items-center justify-center rounded-full text-sm cursor-pointer transition-colors select-none ${day === null ? 'pointer-events-none' : ''} ${isSelected(day) ? (isToday(day) ? 'bg-primary text-white font-bold ring-2 ring-primary ring-offset-1' : 'bg-primary-light text-primary font-bold ring-2 ring-primary ring-offset-1') : (isToday(day) ? 'bg-primary text-white font-bold' : 'text-text hover:bg-primary-light hover:text-primary')}`}
             >
               {day}
             </div>
@@ -62,13 +82,13 @@ export function Calendar() {
       </div>
 
       <div className="flex-1 p-7 overflow-y-auto">
-        <h3 className="font-bold text-sm mb-4">Scheduled Meetings</h3>
-        
-        {!threads.length ? (
-          <div className="text-center text-text-muted text-xs p-12">No scheduled meetings yet<br/>Use the AI assistant to schedule one.</div>
+        <h3 className="font-bold text-sm mb-4">Scheduled Meetings — {calSelectedDate.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}</h3>
+
+        {!filteredThreads.length ? (
+          <div className="text-center text-text-muted text-xs p-12">No meetings scheduled for this date<br />Use the AI assistant to schedule one.</div>
         ) : (
           <div>
-            {threads.map((thread) => (
+            {filteredThreads.map((thread) => (
               <div key={thread.id} className="bg-white rounded-lg p-3.5 mb-2.5 border-l-[3px] border-primary shadow-sm">
                 <div className="font-semibold text-xs text-text mb-0.75">{escHtml(thread.recipient_username || '—')}</div>
                 <div className="text-xs text-text-secondary mb-1.5">Sent {formatDate(thread.created_at)}</div>

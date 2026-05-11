@@ -93,6 +93,10 @@ export function formatDate(str: string | undefined): string {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
+export function formatDateOnly(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function formatFullDate(str: string | undefined): string {
   if (!str) return '—';
   const d = new Date(str);

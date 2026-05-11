@@ -19,6 +19,8 @@ interface StoreState {
   activeDraftId: string | null;
   calYear: number;
   calMonth: number;
+  calSelectedDate: Date;
+  setCalSelectedDate: (d: Date) => void;
   toasts: { id: number; message: string; type: 'info' | 'success' | 'error' }[];
   toastId: number;
 
@@ -63,6 +65,7 @@ export const useStore = create<StoreState>((set) => ({
   activeDraftId: null,
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth(),
+  calSelectedDate: new Date(),
   toasts: [],
   toastId: 0,
 
@@ -108,6 +111,7 @@ export const useStore = create<StoreState>((set) => ({
   setPendingContext: (ctx) => set({ pendingContext: ctx }),
   setAwaitingRecipient: (awaiting) => set({ awaitingRecipient: awaiting }),
   setActiveDraftId: (id) => set({ activeDraftId: id }),
+  setCalSelectedDate: (d) => set({ calSelectedDate: d }),
   navigateCalendar: (prev) => set((state) => {
     let month = state.calMonth;
     let year = state.calYear;
