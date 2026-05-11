@@ -106,4 +106,49 @@ class RAGPrompts(PromptConfig):
     )
 
 
+    search_docs: NodePrompt = field(
+        default_factory=lambda: NodePrompt(
+            system=SystemPrompt.system_prompt,
+            context=(
+                "Guide context:\n"
+                "$context\n\n"
+                "Search query:\n"
+                "$query\n"
+            ),
+            task=(
+                "Answer the SEARCH QUERY using ONLY the provided CONTEXT.\n\n"
+
+                "Rules:\n"
+                "- Do NOT use outside knowledge\n"
+                "- If the answer cannot be found in the context, clearly state that\n"
+                "- Keep the answer concise and accurate\n"
+                "- Include the related section or department if identifiable\n"
+                "- Output must be valid JSON only\n\n"
+
+                "Return JSON format:\n"
+                "{\n"
+                '  "answer": "<direct answer>",\n'
+                '  "source_section": "<related section or department>",\n'
+                '  "found_in_guide": true\n'
+                "}\n\n"
+
+                "If the information is NOT found:\n"
+                "{\n"
+                '  "answer": "Information not found in the guide.",\n'
+                '  "source_section": null,\n'
+                '  "found_in_guide": false\n'
+                "}"
+            ),
+            critic=(
+                "Verify:\n"
+                "- Answer is supported by the provided context\n"
+                "- No fabricated information exists\n"
+                "- source_section is accurate if available\n"
+                "- found_in_guide is correct\n"
+                "- Output is valid JSON only\n"
+            ),
+        )
+    )
+
+
 rag_prompts = RAGPrompts()

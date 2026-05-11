@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useStore } from '../../store/useStore';
 import { api, escHtml } from '../../api/client';
-import type { Draft, Meeting, ChatMessage, PdfValidateResponse, RagSuggestDepartmentResponse, RagAskGuideResponse, RagSearchResponse } from '../../api/types';
+import type { Draft, Meeting, ChatMessage, PdfValidateResponse, RagSuggestDepartmentResponse, RagAskGuideResponse } from '../../api/types';
 
 export function ChatWidget() {
   const currentUser = useStore((s) => s.currentUser);
@@ -196,8 +196,6 @@ function ThreadedChatMessage({ msg }: { msg: ChatMessage }) {
           <RagDepartmentCard result={msg.ragDepartmentResult} />
         ) : msg.ragGuideResult ? (
           <RagGuideCard result={msg.ragGuideResult} />
-        ) : msg.ragSearchResult ? (
-          <RagSearchCard result={msg.ragSearchResult} />
         ) : (
           <div className="markdown-content">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content || ''}</ReactMarkdown>
@@ -395,37 +393,9 @@ function RagGuideCard({ result }: { result: RagAskGuideResponse }) {
           {result.found_in_guide ? 'Found' : 'Not Found'}
         </span>
       </div>
-      {result.source_section && (
-        <div className="px-2 py-1 border-b border-border">
-          <div className="text-[10px]"><span className="text-text-muted">Section: </span><span className="font-medium">{escHtml(result.source_section)}</span></div>
-        </div>
-      )}
       <div className="px-2 py-1.5">
         <div className="text-[10px] text-text leading-relaxed">{escHtml(result.answer || '')}</div>
       </div>
-    </div>
-  );
-}
-
-function RagSearchCard({ result }: { result: RagSearchResponse }) {
-  return (
-    <div className="mt-1.5 bg-white border border-border rounded overflow-hidden">
-      <div className="px-2 py-1 bg-bg border-b border-border">
-        <span className="text-[9px] font-semibold text-text-secondary uppercase">Search Results ({result.results.length})</span>
-      </div>
-      {result.results.length === 0 ? (
-        <div className="px-2 py-2 text-[10px] text-text-muted">No results found</div>
-      ) : (
-        result.results.map((r, i) => (
-          <div key={i} className={`px-2 py-1.5 ${i < result.results.length - 1 ? 'border-b border-border' : ''}`}>
-            <div className="flex justify-between items-center mb-0.5">
-              <span className="text-[9px] font-semibold text-text-secondary truncate max-w-[80%]">{escHtml(r.section)}</span>
-              <span className="text-[9px] text-text-muted flex-shrink-0 ml-1">{(r.score * 100).toFixed(0)}%</span>
-            </div>
-            <div className="text-[10px] text-text leading-relaxed">{escHtml(r.text.slice(0, 200))}{r.text.length > 200 ? '…' : ''}</div>
-          </div>
-        ))
-      )}
     </div>
   );
 }
@@ -536,7 +506,7 @@ function ChatInput() {
           id: 'rag-search-' + Date.now(),
           role: 'ai',
           threadId: sendThreadId,
-          ragSearchResult: result,
+          ragGuideResult: result,
         });
       } catch (err) {
         addMessageToThread(sendThreadId, {

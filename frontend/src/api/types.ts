@@ -85,16 +85,6 @@ export interface RagAskGuideResponse {
   found_in_guide: boolean;
 }
 
-export interface RagSearchResultItem {
-  text: string;
-  section: string;
-  score: number;
-}
-
-export interface RagSearchResponse {
-  results: RagSearchResultItem[];
-}
-
 export interface RagStatusResponse {
   index_loaded: boolean;
   index_exists: boolean;
@@ -115,7 +105,6 @@ export interface ChatMessage {
   pdfResult?: PdfValidateResponse;
   ragDepartmentResult?: RagSuggestDepartmentResponse;
   ragGuideResult?: RagAskGuideResponse;
-  ragSearchResult?: RagSearchResponse;
 }
 
 export interface ThreadStatus {

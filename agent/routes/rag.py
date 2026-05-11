@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import HTTPException
 import json
 
-from src.agent.tools.rag.pipeline import query_guide, get_index
+from src.agent.tools.rag.pipeline import query_guide
 from src.agent.tools.rag.config import INDEX_CACHE_PATH
 from src.integrations.llm.client import get_llm
 from src.agent.utils import extract_text
@@ -36,16 +36,6 @@ class AskGuideResponse(BaseModel):
 class SearchRequest(BaseModel):
     query: str
     top_k: int = 3
-
-
-class SearchResultItem(BaseModel):
-    text: str
-    section: str
-    score: float
-
-
-class SearchResponse(BaseModel):
-    results: list[SearchResultItem]
 
 
 class RagStatusResponse(BaseModel):
@@ -91,28 +81,17 @@ async def handle_ask_guide(request: AskGuideRequest):
 
 async def handle_search(request: SearchRequest):
     try:
-        top_k = max(1, min(request.top_k, 20))
-        index, chunks = get_index()
-        from src.agent.tools.rag.config import MODEL_NAME
-        from sentence_transformers import SentenceTransformer
-        import numpy as np
-
-        model = SentenceTransformer(MODEL_NAME)
-        query_embedding = model.encode([request.query], convert_to_numpy=True)
-        query_embedding = query_embedding / np.linalg.norm(query_embedding)
-
-        scores, indices = index.search(query_embedding, top_k)
-
-        results = []
-        for score, idx in zip(scores[0], indices[0]):
-            if idx < len(chunks):
-                results.append(SearchResultItem(
-                    text=chunks[idx].text,
-                    section=chunks[idx].section,
-                    score=float(score),
-                ))
-
-        return SearchResponse(results=results)
+        context = query_guide(request.query, request.top_k)
+        rendered = rag_prompts.search_docs.render(
+            context=context,
+            query=request.query
+        )
+        result = extract_text(get_llm().invoke(rendered.to_prompt()))
+        clean = result.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        data = json.loads(clean)
+        return AskGuideResponse(**data)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=502, detail="Invalid JSON from LLM")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"search failed: {str(e)}")
 
