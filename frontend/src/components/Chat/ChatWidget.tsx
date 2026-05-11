@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { api, escHtml } from '../../api/client';
-import type { Draft, Meeting, ChatMessage, PdfValidateResponse } from '../../api/types';
+import type { Draft, Meeting, ChatMessage, PdfValidateResponse, RagSuggestDepartmentResponse, RagAskGuideResponse, RagSearchResponse } from '../../api/types';
 
 export function ChatWidget() {
   const currentUser = useStore((s) => s.currentUser);
@@ -191,6 +191,12 @@ function ThreadedChatMessage({ msg }: { msg: ChatMessage }) {
           <ThreadMeetingCard meeting={msg.meeting} threadId={activeThreadId || ''} />
         ) : msg.pdfResult ? (
           <PdfResultCard result={msg.pdfResult} />
+        ) : msg.ragDepartmentResult ? (
+          <RagDepartmentCard result={msg.ragDepartmentResult} />
+        ) : msg.ragGuideResult ? (
+          <RagGuideCard result={msg.ragGuideResult} />
+        ) : msg.ragSearchResult ? (
+          <RagSearchCard result={msg.ragSearchResult} />
         ) : (
           escHtml(msg.content || '')
         )}
@@ -337,10 +343,92 @@ function PdfResultCard({ result }: { result: PdfValidateResponse }) {
   );
 }
 
+function RagDepartmentCard({ result }: { result: RagSuggestDepartmentResponse }) {
+  return (
+    <div className="mt-1.5 bg-white border border-border rounded overflow-hidden">
+      <div className="px-2 py-1 bg-bg border-b border-border">
+        <span className="text-[9px] font-semibold text-text-secondary uppercase">Department Suggestion</span>
+      </div>
+      {result.department && (
+        <div className="px-2 py-1.5 border-b border-border">
+          <div className="text-[10px]"><span className="text-text-muted">Department: </span><span className="font-medium">{escHtml(result.department)}</span></div>
+        </div>
+      )}
+      {result.contact && (
+        <div className="px-2 py-1.5 border-b border-border">
+          <div className="text-[10px]"><span className="text-text-muted">Contact: </span><span className="font-medium">{escHtml(result.contact)}</span></div>
+        </div>
+      )}
+      {result.reply_time && (
+        <div className="px-2 py-1.5 border-b border-border">
+          <div className="text-[10px]"><span className="text-text-muted">Reply time: </span><span className="font-medium">{escHtml(result.reply_time)}</span></div>
+        </div>
+      )}
+      {result.reason && (
+        <div className="px-2 py-1.5 border-b border-border">
+          <div className="text-[9px] font-semibold text-text-secondary uppercase mb-0.5">Reason</div>
+          <div className="text-[10px] text-text">{escHtml(result.reason)}</div>
+        </div>
+      )}
+      {result.notes && (
+        <div className="px-2 py-1.5">
+          <div className="text-[9px] font-semibold text-text-secondary uppercase mb-0.5">Notes</div>
+          <div className="text-[10px] text-text">{escHtml(result.notes)}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RagGuideCard({ result }: { result: RagAskGuideResponse }) {
+  return (
+    <div className="mt-1.5 bg-white border border-border rounded overflow-hidden">
+      <div className="px-2 py-1 bg-bg border-b border-border flex items-center justify-between">
+        <span className="text-[9px] font-semibold text-text-secondary uppercase">Guide Answer</span>
+        <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded ${result.found_in_guide ? 'bg-success-light text-success' : 'bg-warning-bg text-warning'}`}>
+          {result.found_in_guide ? 'Found' : 'Not Found'}
+        </span>
+      </div>
+      {result.source_section && (
+        <div className="px-2 py-1 border-b border-border">
+          <div className="text-[10px]"><span className="text-text-muted">Section: </span><span className="font-medium">{escHtml(result.source_section)}</span></div>
+        </div>
+      )}
+      <div className="px-2 py-1.5">
+        <div className="text-[10px] text-text leading-relaxed">{escHtml(result.answer || '')}</div>
+      </div>
+    </div>
+  );
+}
+
+function RagSearchCard({ result }: { result: RagSearchResponse }) {
+  return (
+    <div className="mt-1.5 bg-white border border-border rounded overflow-hidden">
+      <div className="px-2 py-1 bg-bg border-b border-border">
+        <span className="text-[9px] font-semibold text-text-secondary uppercase">Search Results ({result.results.length})</span>
+      </div>
+      {result.results.length === 0 ? (
+        <div className="px-2 py-2 text-[10px] text-text-muted">No results found</div>
+      ) : (
+        result.results.map((r, i) => (
+          <div key={i} className={`px-2 py-1.5 ${i < result.results.length - 1 ? 'border-b border-border' : ''}`}>
+            <div className="flex justify-between items-center mb-0.5">
+              <span className="text-[9px] font-semibold text-text-secondary truncate max-w-[80%]">{escHtml(r.section)}</span>
+              <span className="text-[9px] text-text-muted flex-shrink-0 ml-1">{(r.score * 100).toFixed(0)}%</span>
+            </div>
+            <div className="text-[10px] text-text leading-relaxed">{escHtml(r.text.slice(0, 200))}{r.text.length > 200 ? '…' : ''}</div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 function ChatInput() {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [ragMode, setRagMode] = useState<'guide' | 'department' | 'search' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const currentUser = useStore((s) => s.currentUser);
   const activeThreadId = useStore((s) => s.activeThreadId);
@@ -348,6 +436,14 @@ function ChatInput() {
   const addMessageToThread = useStore((s) => s.addMessageToThread);
 
   const hasThread = activeThreadId && allThreadIds.length > 0;
+
+  const placeholderText = ragMode === 'guide'
+    ? 'Ask a question about the guide...'
+    : ragMode === 'department'
+    ? 'Describe the student request...'
+    : ragMode === 'search'
+    ? 'Search query...'
+    : 'Describe what you need...';
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -366,7 +462,9 @@ function ChatInput() {
     const sendThreadId = activeThreadId;
     const userId = currentUser.user_id ?? currentUser.id;
     const role = currentUser.role || 'student';
+    const currentRagMode = ragMode;
     setText('');
+    setRagMode(null);
 
     if (userMsg) {
       addMessageToThread(sendThreadId, {
@@ -384,6 +482,66 @@ function ChatInput() {
     }
 
     if (!userMsg) return;
+
+    if (currentRagMode === 'guide') {
+      try {
+        const result = await api.askGuide(userMsg);
+        addMessageToThread(sendThreadId, {
+          id: 'rag-guide-' + Date.now(),
+          role: 'ai',
+          threadId: sendThreadId,
+          ragGuideResult: result,
+        });
+      } catch (err) {
+        addMessageToThread(sendThreadId, {
+          id: 'error-' + Date.now(),
+          role: 'ai',
+          threadId: sendThreadId,
+          content: `Guide error: ${err instanceof Error ? err.message : 'Unknown'}`,
+        });
+      }
+      return;
+    }
+
+    if (currentRagMode === 'department') {
+      try {
+        const result = await api.suggestDepartment(userMsg);
+        addMessageToThread(sendThreadId, {
+          id: 'rag-dept-' + Date.now(),
+          role: 'ai',
+          threadId: sendThreadId,
+          ragDepartmentResult: result,
+        });
+      } catch (err) {
+        addMessageToThread(sendThreadId, {
+          id: 'error-' + Date.now(),
+          role: 'ai',
+          threadId: sendThreadId,
+          content: `Department error: ${err instanceof Error ? err.message : 'Unknown'}`,
+        });
+      }
+      return;
+    }
+
+    if (currentRagMode === 'search') {
+      try {
+        const result = await api.searchIndex(userMsg);
+        addMessageToThread(sendThreadId, {
+          id: 'rag-search-' + Date.now(),
+          role: 'ai',
+          threadId: sendThreadId,
+          ragSearchResult: result,
+        });
+      } catch (err) {
+        addMessageToThread(sendThreadId, {
+          id: 'error-' + Date.now(),
+          role: 'ai',
+          threadId: sendThreadId,
+          content: `Search error: ${err instanceof Error ? err.message : 'Unknown'}`,
+        });
+      }
+      return;
+    }
 
     let prompt = userMsg;
     const selectedEmail = useStore.getState().selectedEmail;
@@ -460,6 +618,40 @@ function ChatInput() {
 
   return (
     <div className="p-2 border-t border-border flex-shrink-0 bg-white">
+      {hasThread && (
+        <div className="flex gap-1 mb-1.5 px-0.5">
+          <button
+            type="button"
+            className={`text-[9px] font-medium px-2 py-0.5 rounded-full border transition-colors ${ragMode === 'guide' ? 'bg-primary text-white border-primary' : 'bg-bg text-text-secondary border-border hover:border-primary hover:text-primary'}`}
+            onClick={() => setRagMode(ragMode === 'guide' ? null : 'guide')}
+          >
+            Ask Guide
+          </button>
+          <button
+            type="button"
+            className={`text-[9px] font-medium px-2 py-0.5 rounded-full border transition-colors ${ragMode === 'department' ? 'bg-primary text-white border-primary' : 'bg-bg text-text-secondary border-border hover:border-primary hover:text-primary'}`}
+            onClick={() => setRagMode(ragMode === 'department' ? null : 'department')}
+          >
+            Find Dept
+          </button>
+          <button
+            type="button"
+            className={`text-[9px] font-medium px-2 py-0.5 rounded-full border transition-colors ${ragMode === 'search' ? 'bg-primary text-white border-primary' : 'bg-bg text-text-secondary border-border hover:border-primary hover:text-primary'}`}
+            onClick={() => setRagMode(ragMode === 'search' ? null : 'search')}
+          >
+            Search Docs
+          </button>
+          {ragMode && (
+            <button
+              type="button"
+              className="text-[9px] text-text-muted ml-auto"
+              onClick={() => setRagMode(null)}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {attachments.map((file, i) => (
@@ -505,7 +697,7 @@ function ChatInput() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={hasThread ? "Describe what you need..." : "Create a new thread to start"}
+          placeholder={hasThread ? placeholderText : "Create a new thread to start"}
           disabled={!hasThread}
           rows={1}
         />

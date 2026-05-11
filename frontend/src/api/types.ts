@@ -71,6 +71,37 @@ export interface PdfValidateResponse {
   message_to_user: string;
 }
 
+export interface RagSuggestDepartmentResponse {
+  department: string | null;
+  contact: string | null;
+  reply_time: string | null;
+  reason: string | null;
+  notes: string | null;
+}
+
+export interface RagAskGuideResponse {
+  answer: string | null;
+  source_section: string | null;
+  found_in_guide: boolean;
+}
+
+export interface RagSearchResultItem {
+  text: string;
+  section: string;
+  score: number;
+}
+
+export interface RagSearchResponse {
+  results: RagSearchResultItem[];
+}
+
+export interface RagStatusResponse {
+  index_loaded: boolean;
+  index_exists: boolean;
+  chunk_count: number;
+  cache_path: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'ai' | 'system';
@@ -81,6 +112,9 @@ export interface ChatMessage {
   question?: string;
   isThinking?: boolean;
   pdfResult?: PdfValidateResponse;
+  ragDepartmentResult?: RagSuggestDepartmentResponse;
+  ragGuideResult?: RagAskGuideResponse;
+  ragSearchResult?: RagSearchResponse;
 }
 
 export interface ThreadStatus {
