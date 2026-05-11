@@ -1,3 +1,4 @@
+import asyncio
 import base64
 from src.integrations.llm.client import get_llm
 from src.agent.utils import extract_text
@@ -175,7 +176,7 @@ def summarize_email(user_id: int, thread_id: str) -> str:
 
 # === CHECK MISSING PDF INFO ===
 @tool
-def parse_pdf(file_path: str)-> str:
+async def parse_pdf(file_path: str)-> str:
     '''
     Extract text content from raw PDF file
     
@@ -185,11 +186,13 @@ def parse_pdf(file_path: str)-> str:
         str: file's content
     '''
     try:
-        with pdfplumber.open(file_path) as pdf:
-            full_text = ""
-            for page in pdf.pages:
-                full_text += page.extract_text() + '\n'
-        result = " ".join(full_text.split())
+        def _read():
+            with pdfplumber.open(file_path) as pdf:
+                full_text = ""
+                for page in pdf.pages:
+                    full_text += page.extract_text() + '\n'
+            return " ".join(full_text.split())
+        result = await asyncio.to_thread(_read)
         return result
     except FileNotFoundError:
         return f"File not found: {file_path}"
@@ -198,7 +201,7 @@ def parse_pdf(file_path: str)-> str:
     
 
 @tool
-def validate_pdf(file_content: str, user_role: str) -> dict:
+async def validate_pdf(file_content: str, user_role: str) -> dict:
     """Check if there are missing fields that user should fill in
 
     Args:
@@ -212,7 +215,7 @@ def validate_pdf(file_content: str, user_role: str) -> dict:
         text=file_content,
         role=user_role
     )
-    validate_result_text = extract_text(get_llm().invoke(rendered.to_prompt()))
+    validate_result_text = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
     try:
         result = json.loads(validate_result_text)
     except json.JSONDecodeError:

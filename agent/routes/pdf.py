@@ -132,7 +132,7 @@ async def validate_pdf_content(request: ValidatePdfRequest):
     from src.agent.tools.email_mining_tools import validate_pdf as _validate_pdf
 
     try:
-        result = _validate_pdf.invoke({"file_content": request.text, "user_role": request.user_role})
+        result = await _validate_pdf.ainvoke({"file_content": request.text, "user_role": request.user_role})
         if "error" in result:
             raise HTTPException(status_code=502, detail=result.get("raw_output", result["error"]))
         return ValidatePdfResponse(**result)
@@ -172,7 +172,7 @@ async def validate_pdf_upload(
             full_text = f"{full_text}\n\n--- Filled Form Fields ---\n{lines}"
 
         from src.agent.tools.email_mining_tools import validate_pdf as _validate_pdf
-        result = _validate_pdf.invoke({"file_content": full_text, "user_role": user_role})
+        result = await _validate_pdf.ainvoke({"file_content": full_text, "user_role": user_role})
         if "error" in result:
             raise HTTPException(status_code=502, detail=result.get("raw_output", result["error"]))
         return ValidatePdfResponse(**result)
