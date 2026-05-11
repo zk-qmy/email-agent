@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useStore } from '../../store/useStore';
 import { api, escHtml } from '../../api/client';
 import type { Draft, Meeting, ChatMessage, PdfValidateResponse, RagSuggestDepartmentResponse, RagAskGuideResponse, RagSearchResponse } from '../../api/types';
@@ -181,9 +183,8 @@ function ThreadedChatMessage({ msg }: { msg: ChatMessage }) {
       )}
       <div className={`max-w-[80%] px-3 py-1.5 rounded-[10px] text-xs leading-relaxed ${isUser ? 'bg-primary text-white rounded-br-sm' : 'bg-bg text-text rounded-bl-sm'}`}>
         {msg.question ? (
-          <div className="text-text">
-            <div className="font-medium mb-1 text-[10px]">Please provide:</div>
-            <div>{escHtml(msg.question)}</div>
+          <div className="markdown-content">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.question}</ReactMarkdown>
           </div>
         ) : msg.draft ? (
           <ThreadDraftCard draft={msg.draft} threadId={activeThreadId || ''} draftSent={msg.draftSent} />
@@ -198,7 +199,9 @@ function ThreadedChatMessage({ msg }: { msg: ChatMessage }) {
         ) : msg.ragSearchResult ? (
           <RagSearchCard result={msg.ragSearchResult} />
         ) : (
-          escHtml(msg.content || '')
+          <div className="markdown-content">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content || ''}</ReactMarkdown>
+          </div>
         )}
       </div>
     </div>
