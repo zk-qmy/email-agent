@@ -1,9 +1,10 @@
 # tools/email_tools.py
+import json
 import os
 from src.integrations.llm.client import get_llm
 from src.agent.utils import extract_text
 from src.integrations.mail.sync_client import send_email_sync
-from config.prompts.email import email_prompts
+from config.tool_prompts.email import email_prompts
 
 from typing import List, Optional
 from langchain_core.tools import tool
@@ -43,6 +44,9 @@ def _review_draft(
     recipient: str,
     cc: Optional[List[str]] = None,
     bcc: Optional[List[str]] = None,
+    meeting_date: str = None,
+    meeting_time: str = None,
+    purpose: str = None,
 ) -> dict:
     """Single interrupt for draft review — shared by all draft tools."""
     cc_line = f"\nCC: {', '.join(cc)}" if cc else ""
@@ -59,8 +63,11 @@ def _review_draft(
                 ),
                 "draft": draft,
                 "recipient": recipient,
-                "cc": cc,
+"cc": cc,
                 "bcc": bcc,
+                "meeting_date": meeting_date,
+                "meeting_time": meeting_time,
+                "purpose": purpose,
             }
         )
     )
@@ -69,8 +76,14 @@ def _review_draft(
         "draft": draft,
         "approved": decision.get("approved", False),
         "user_feedback": decision.get("action_input", ""),
+"draft": draft,
+        "approved": decision.get("approved", False),
+        "user_feedback": decision.get("action_input", ""),
         "cc": cc,
         "bcc": bcc,
+        "meeting_date": meeting_date,
+        "meeting_time": meeting_time,
+        "purpose": purpose,
     }
 
 
@@ -147,7 +160,7 @@ async def draft_meeting_email(
     else:
         draft = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
 
-    return _review_draft(draft, recipient, cc=cc, bcc=bcc)
+return _review_draft(draft, recipient, cc=cc, bcc=bcc, meeting_date=date, meeting_time=time, purpose=purpose)
 
 
 @tool
@@ -231,3 +244,44 @@ async def draft_general_email(
         draft = extract_text(await get_llm().ainvoke(rendered.to_prompt()))
 
     return _review_draft(draft, recipient, cc=cc, bcc=bcc)
+
+
+@tool
+def analyze_reply_intent(reply_body: str, meeting_details: str) -> str:
+    """Analyze a reply email to determine the sender's intent regarding the meeting.
+
+    Args:
+        reply_body: The full text content of the reply email
+        meeting_details: Summary of the meeting that was proposed (date, time, purpose, recipient)
+
+    Returns:
+        JSON string with reply_intent ('confirmed', 'negotiate', or 'declined') and reason
+    """
+    print("=== analyze_reply_intent: analyzing reply ===")
+
+    prompt = f"""You are analyzing a reply to a meeting request email.
+
+Meeting details:
+{meeting_details}
+
+Reply email content:
+{reply_body}
+
+Determine the sender's intent by analyzing the reply content:
+- 'confirmed': The sender explicitly accepts the meeting (e.g., "yes", "that works", "I'll be there", "confirmed")
+- 'negotiate': The sender suggests alternative times/dates or asks for changes (e.g., "how about", "can we", "different time", "maybe")
+- 'declined': The sender declines the meeting (e.g., "no", "can't", "won't work", "declines", "busy")
+- If unclear, default to 'negotiate'
+
+Output ONLY valid JSON with this exact format:
+{{"reply_intent": "confirmed|negotiate|declined", "reason": "brief explanation"}}"""
+
+    try:
+        result = extract_text(get_llm().invoke(prompt))
+        parsed = json.loads(result)
+        if parsed.get("reply_intent") in ("confirmed", "negotiate", "declined"):
+            return json.dumps(parsed)
+        return json.dumps({"reply_intent": "negotiate", "reason": "Could not determine intent, defaulting to negotiate"})
+    except Exception as e:
+        print(f"[analyze_reply_intent] Error: {e}")
+        return json.dumps({"reply_intent": "negotiate", "reason": f"Error: {str(e)}"})

@@ -21,6 +21,11 @@ dependencies = [
     "pydantic[email]>=2.5.0",
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
+    "pdfplumber>=0.11.9",
+    "numpy>=2.2.6",
+    "sentence-transformers>=5.4.1",
+    "faiss-cpu>=1.13.2",
+    "pytest>=9.0.3",
 ]
 
 [project.optional-dependencies]

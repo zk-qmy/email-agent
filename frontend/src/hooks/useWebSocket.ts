@@ -11,6 +11,7 @@ interface WsEvent {
   reply_body?: string;
   sender?: string;
   intent?: string;
+  status?: string;
 }
 
 export function useWebSocket(userId: number | undefined) {
@@ -99,20 +100,33 @@ export function useWebSocket(userId: number | undefined) {
             removeMessageFromThread(threadId, thinkingMsg.id);
           }
 
-          const draft: Draft = {
-            thread_id: threadId,
-            recipient_username: data.draft?.recipient_username || '',
-            recipient_email: data.draft?.recipient_email || '',
-            subject: data.draft?.subject || '',
-            body: data.draft?.body || '',
-          };
+          if (data.status === 'completed' && data.message) {
+            addMessageToThread(threadId, {
+              id: `msg-${threadId}-${now}`,
+              role: 'ai',
+              threadId,
+              content: data.message,
+            });
+            return;
+          }
 
-          addMessageToThread(threadId, {
-            id: `draft-${threadId}-${now}`,
-            role: 'ai',
-            threadId,
-            draft,
-          });
+          const hasDraft = data.draft && (data.draft.subject || data.draft.body);
+          if (hasDraft) {
+            const draft: Draft = {
+              thread_id: threadId,
+              recipient_username: data.draft?.recipient_username || '',
+              recipient_email: data.draft?.recipient_email || '',
+              subject: data.draft?.subject || '',
+              body: data.draft?.body || '',
+            };
+
+            addMessageToThread(threadId, {
+              id: `draft-${threadId}-${now}`,
+              role: 'ai',
+              threadId,
+              draft,
+            });
+          }
 
           if (data.interrupt?.type === 'question' && data.interrupt.question) {
             addMessageToThread(threadId, {

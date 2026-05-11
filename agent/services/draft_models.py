@@ -10,6 +10,9 @@ class DraftContent(BaseModel):
     body: str
     cc: Optional[List[str]] = None
     bcc: Optional[List[str]] = None
+    meeting_date: Optional[str] = None
+    meeting_time: Optional[str] = None
+    purpose: Optional[str] = None
 
 
 class Draft(BaseModel):

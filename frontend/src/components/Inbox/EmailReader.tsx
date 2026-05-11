@@ -7,7 +7,7 @@ export function EmailReader() {
   const selectedEmail = useStore((s) => s.selectedEmail);
   const setReplyTargetId = useStore((s) => s.setReplyTargetId);
   const addToast = useStore((s) => s.addToast);
-  
+
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState<Email | null>(null);
 

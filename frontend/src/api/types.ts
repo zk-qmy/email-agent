@@ -17,6 +17,7 @@ export interface Email {
   cc?: string[];
   bcc?: string[];
   created_at: string;
+  thread_id?: string;
 }
 
 export interface Draft {

@@ -1,16 +1,6 @@
-"""
-extract_meeting_info
-check_missing_fields???
-ask_for _missing _info?
-draft
-followup
-extract_intent
-write_noti
-"""
-
 from dataclasses import dataclass, field
-from config.prompts.base import NodePrompt, PromptConfig
-from config.prompts.system_prompt import SystemPrompt
+from config.tool_prompts.base import NodePrompt, PromptConfig
+from config.tool_prompts.system_prompt import SystemPrompt
 from datetime import datetime
 
 
@@ -23,16 +13,51 @@ class EmailPrompts(PromptConfig):
     The NodePrompt parts (system/context/task/critic) can use $variable substitution.
     """
 
-    # classify: NodePrompt = field(
-    #     default_factory=lambda: NodePrompt(
-    #         system=SystemPrompt.system_prompt,
-    #         task=(
-    #             """
-    #     """
-    #         ),
-    #         critic=("""        """),
-    #     )
-    # )
+    summarize_email: NodePrompt = field(
+        default_factory=lambda: NodePrompt(
+            system=SystemPrompt.system_prompt,
+            context=(
+                "Email thread details (chronological order, latest first):\n"
+                "  Subject: $subject\n"
+                "$email_list"
+            ),
+            task=(
+                "Summarize the email thread in CONTEXT into a concise and structured format.\n"
+                "Format:\n"
+                "  Subject: <thread subject>\n"
+                "  Participants: <participant list>\n"
+                "  Email Count: <number of emails>\n"
+                "  Conversation Flow:\n"
+                "    - <chronological summary of each email or phase>\n"
+                "    - <...>\n"
+                "  Summary: <1-2 sentence overview>\n"
+                "  Key Points:\n"
+                "    - <bullet 1>\n"
+                "    - <bullet 2>\n"
+                "    - <bullet 3 (if needed)>\n"
+                "  Action Items (if any):\n"
+                "    - <action 1>\n"
+                "    - <action 2>\n\n"
+                "Rules:\n"
+                "- Show the conversation flow in chronological order from oldest to newest\n"
+                "- Keep the summary concise (maximum 2 sentences)\n"
+                "- Extract only the most important points from the thread\n"
+                "- Do not add information that is not in the emails\n"
+                "- Use short bullet points for Key Points\n"
+                "- Maximum 3 key points\n"
+                "- Maintain a professional and neutral tone"
+            ),
+            critic=(
+                "Verify:\n"
+                "- Conversation flow is in chronological order\n"
+                "- Summary captures the overall thread, not just one email\n"
+                "- Key Points are relevant and concise\n"
+                "- No hallucinated or extra information\n"
+                "- Output strictly follows the required format\n"
+                "- Tone is neutral and professional"
+            ),
+        )
+    )
 
     # extract_meeting_info: NodePrompt = field(
     #     default_factory=lambda: NodePrompt(

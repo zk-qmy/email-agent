@@ -2,67 +2,12 @@
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 from src.integrations.llm.client import get_llm
 from src.agent.tools.registry import ALL_TOOLS
+from config.reasoning_prompts.reasoning import REASONING_PROMPT3
 from langgraph.types import interrupt
 
 # Bind tools once — LLM now knows all schemas automatically
 llm_with_tools = get_llm().bind_tools(ALL_TOOLS)
-
-system_prompt = """
-You are an intelligent email assistant using a ReAct loop.
-
-You must follow this format strictly:
-
-Thought:
-- Analyze the current situation
-- Consider previous tool results (observations)
-
-Action:
-- If needed, call a tool with correct arguments
-- If no tool is needed, respond directly to the user
-
-Rules:
-- Always reflect on the latest tool result before taking another action
-- If a tool fails, DO NOT repeat the same action blindly
-- If required information is missing, ask the user clearly
-- Be precise with tool arguments — do not guess
-- If draft_email tool is used, only call send_email tool after user approve the draft
-from draft_email tool.
-Draft email protocol:
-- Call draft_email to generate and show a draft to the user
-- If the result has "approved": false and "feedback" is non-empty:
-  call draft_email AGAIN with previous_draft=<last draft> and user_feedback=<feedback>
-- If the result has "approved": false and "feedback" is empty:
-  the user cancelled — stop and confirm cancellation
-- Only call send_email when "approved": true
-- When calling send_email after an approved draft, always pass draft_approved=true
-
-Meeting email flow:
-- From the FIRST user message, extract ALL available info: recipient, date, time, PURPOSE
-- DO NOT ask for purpose again if it was already provided in the first message
-- Once you have at least recipient + date/time, move to drafting
-- If only time is missing when user replies with time, use the original purpose
-
-Email tool selection:
-- Use draft_meeting_email when user wants to schedule a meeting — requires recipient, date, time, purpose
-- Use draft_general_email for all other emails — requires recipient, key_points, purpose, tone
-- Both draft tools accept optional cc and bcc parameters — pass them if the user specifies CC or BCC recipients
-
-After draft is approved and email is sent:
-- Return a clear completion message like "Email sent successfully to [recipient]"
-- Do NOT echo the user's last reply as the completion message
-- Be specific about what action was completed
-
-Important:
-- When calling send_general_email or send_meeting_email, use user_id='default_user' if not provided
-- Call resolve_recipient tool to convert recipient name to email BEFORE calling send_email
-- If resolve_recipient returns an error (not found or multiple matches), ask the user for clarification or email directly
-- Never ask for the same information twice
-
-You will receive tool results as observations in the conversation.
-
-Your goal is to iteratively act, observe, and improve until the task is complete.
-"""
-
+reasoning_prompt = REASONING_PROMPT3
 
 def extract_thought(response) -> str:
     """Extract only the text content from an AIMessage."""
@@ -104,7 +49,7 @@ async def reasoning_node(state):
             )
         ]
 
-    response = await llm_with_tools.ainvoke([SystemMessage(content=system_prompt)] + messages)
+    response = await llm_with_tools.ainvoke([SystemMessage(content=reasoning_prompt)] + messages)
     # print(f"=== Reasoning raw response: {response}\n")
 
     thought = extract_thought(response)
@@ -112,6 +57,18 @@ async def reasoning_node(state):
         print(f"=== Thought: {thought} ===\n")
 
     if not getattr(response, "tool_calls", None):
+        completion_keywords = [
+            "sent successfully", "sent to", "email sent", "completed",
+            "done", "finished", "task complete", "all set", "ready",
+            "meeting confirmed", "meeting scheduled", "email drafted",
+            "summary", "summarized"
+        ]
+        is_completion = any(kw in thought.lower() for kw in completion_keywords)
+
+        if is_completion:
+            print("=== Reasoning Node: Task completed ===\n")
+            return {"messages": [response]}
+
         print("=== Reasoning Node: Getting user input...")
         user_input = interrupt({"question": thought})
         user_content = (

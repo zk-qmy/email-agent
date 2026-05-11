@@ -296,8 +296,15 @@ function ChatInput() {
       content: userMsg,
     });
 
+    let prompt = userMsg;
+    const selectedEmail = useStore.getState().selectedEmail;
+
+    if (userMsg.toLowerCase().includes('summarize') && selectedEmail?.thread_id) {
+      prompt = `[Context: User ID: ${userId}, Viewing email thread ID: ${selectedEmail.thread_id}]\n${userMsg}`;
+    }
+
     try {
-      const result = await api.createDraft(userId, userMsg, activeThreadId);
+      const result = await api.createDraft(userId, prompt, activeThreadId);
       if (result.error) {
         addMessageToThread(activeThreadId, {
           id: 'error-' + Date.now(),

@@ -7,10 +7,13 @@ from collections import defaultdict
 
 from src.agent.graph import build_graph
 from src.integrations.mail.client import mail_client
+from src.integrations.calendar.sync_client import create_event_sync
 from src.agent.state import AgentState
 from agent.services.draft_models import Draft, DraftContent
 from langgraph.types import Command
 from langchain_core.messages import HumanMessage
+
+from agent.services.ws_client import backend_ws_client
 
 
 AGENT_BACKEND_URL = os.getenv("EMAIL_BACKEND_URL", "http://localhost:5001")
@@ -38,7 +41,6 @@ def _resolve_recipient_name(name: str) -> tuple[str, str]:
         Tuple of (username, email). Returns (name, name) if not found.
     """
     import httpx
-    import json
 
     print(f"=== _resolve_recipient_name: looking up '{name}' ===")
 
@@ -135,29 +137,68 @@ async def _process_reply(thread_id: str, reply: dict, user_id: int):
     )
 
     try:
+        print(f"[_process_reply] Processing reply for thread {thread_id}")
+        print(f"[_process_reply] Reply body: {reply['body'][:100]}...")
+
         graph = build_graph()
+
+        state = {
+            "messages": [HumanMessage(content=reply["body"])],
+            "meeting": thread.get("meeting", {}),
+            "email": {"last_reply": reply["body"]},
+        }
+
+        print(f"[_process_reply] Invoking graph with state: email.last_reply={bool(state.get('email', {}).get('last_reply'))}")
+
         result = await graph.ainvoke(
-            cast(
-                AgentState,
-                {  # type: ignore[arg-type]
-                    "messages": [{"role": "user", "content": reply["body"]}],
-                    "workflow": "schedule",
-                    "meeting": thread.get("meeting", {}),
-                    "email": {"last_reply": reply["body"]},
-                },
-            ),
+            cast(AgentState, state),
             {"configurable": {"thread_id": thread_id, "user_id": user_id}},
         )
+
+        print(f"[_process_reply] Graph result keys: {result.keys() if result else 'None'}")
+
         result_dict = dict(result) if isinstance(result, dict) else result.model_dump()
         email_data = result_dict.get("email", {})
+
+        print(f"[_process_reply] email_data: {email_data}")
+
         if isinstance(email_data, dict):
             intent = email_data.get("reply_intent", "confirmed")
         else:
             intent = getattr(email_data, "reply_intent", None) or "confirmed"
-    except Exception:
+
+        print(f"[_process_reply] Extracted intent: {intent}")
+    except Exception as e:
+        print(f"[_process_reply] Error: {e}")
         intent = "confirmed"
 
     thread["reply_intent"] = intent
+
+    if intent == "confirmed":
+        meeting = thread.get("meeting", {})
+        meeting_subject = meeting.get("subject", "Meeting")
+        meeting_date = meeting.get("date")
+        meeting_time = meeting.get("time")
+
+        if meeting_date and meeting_time:
+            try:
+                from datetime import timedelta
+
+                start_dt = datetime.strptime(f"{meeting_date} {meeting_time}", "%Y-%m-%d %H:%M")
+                end_dt = start_dt + timedelta(hours=1)
+
+                result = create_event_sync(
+                    organizer_id=user_id,
+                    title=meeting_subject,
+                    start_time=start_dt,
+                    end_time=end_dt,
+                    description=meeting.get("purpose", ""),
+                )
+                print(f"[_process_reply] Calendar event created: {result}")
+            except Exception as e:
+                print(f"[_process_reply] Failed to create calendar event: {e}")
+        else:
+            print("[_process_reply] Missing meeting date/time - cannot create calendar event")
 
     await _notify_client(
         user_id,
@@ -183,7 +224,7 @@ async def _poll_thread(thread_id: str):
 
         new_emails = result.get("new_emails", [])
         replies = [
-            e for e in new_emails if e.get("sender_email") == thread["recipient"]
+            e for e in new_emails if e.get("sender_email") == thread["recipient_email"]
         ]
 
         if replies:
@@ -237,7 +278,7 @@ async def _auto_followup(thread_id: str):
         try:
             await mail_client.send_email(
                 sender_id=thread["user_id"],
-                recipient_email=thread["recipient"],
+                recipient_email=thread["recipient_email"],
                 subject=f"Re: {thread.get('meeting', {}).get('subject', 'Meeting')}",
                 body=followup_body,
             )
@@ -274,12 +315,16 @@ class AgentService:
 
     async def handle_backend_push(self, user_id: int, event: dict):
         evt = event.get("event")
+        print(f"[handle_backend_push] Received event: {evt}")
+
         if evt != "new_email":
             return
 
         email_data = event.get("email", {})
         sender_email = email_data.get("sender_email")
         email_id = email_data.get("id")
+
+        print(f"[handle_backend_push] New email from {sender_email}, id: {email_id}")
 
         if not sender_email or not email_id:
             return
@@ -289,7 +334,7 @@ class AgentService:
             for tid, t in threads.items()
             if t["user_id"] == user_id
             and t["status"] == "waiting_reply"
-            and t["recipient"] == sender_email
+            and t["recipient_email"] == sender_email
         ]
 
         for thread_id, _ in matching:
@@ -339,6 +384,9 @@ class AgentService:
                 subject = interrupt_data.get("subject")
                 raw_recipient = interrupt_data.get("recipient") or ""
                 recipient_username, recipient_email = _resolve_recipient_name(raw_recipient)
+                meeting_date = interrupt_data.get("meeting_date")
+                meeting_time = interrupt_data.get("meeting_time")
+                purpose = interrupt_data.get("purpose")
 
                 if not subject and draft_body:
                     subject, draft_body = _extract_subject_and_clean_body(draft_body)
@@ -356,6 +404,9 @@ class AgentService:
                         body=draft_body or "",
                         cc=cc_list,
                         bcc=bcc_list,
+                        meeting_date=meeting_date,
+                        meeting_time=meeting_time,
+                        purpose=purpose,
                     ),
                     context=prompt,
                     status="awaiting_input",
@@ -371,13 +422,15 @@ class AgentService:
                 return {
                     "draft_id": draft_id,
                     "draft": {
-                        "recipient": recipient_username,
                         "recipient_username": recipient_username,
                         "recipient_email": recipient_email,
                         "subject": subject or "",
                         "body": draft_body or "",
                         "cc": cc_list,
                         "bcc": bcc_list,
+                        "meeting_date": meeting_date,
+                        "meeting_time": meeting_time,
+                        "purpose": purpose,
                     },
                     "status": "awaiting_input",
                     "interrupt": {
@@ -394,6 +447,9 @@ class AgentService:
                         recipient="",
                         subject="",
                         body="",
+                        meeting_date=None,
+                        meeting_time=None,
+                        purpose=None,
                     ),
                     context=prompt,
                     status="awaiting_input",
@@ -440,6 +496,25 @@ class AgentService:
                 return
 
             if "__interrupt__" not in result or not result["__interrupt__"]:
+                messages = result.get("messages", [])
+                if messages:
+                    last_msg = messages[-1]
+                    if hasattr(last_msg, "content"):
+                        content = last_msg.content
+                        if isinstance(content, list):
+                            content = " ".join(block.get("text", "") for block in content if isinstance(block, dict))
+                        draft.status = "completed"
+                        await _notify_client(
+                            user_id,
+                            {
+                                "event": "create_complete",
+                                "thread_id": thread_id,
+                                "status": "completed",
+                                "message": content
+                            }
+                        )
+                        return
+
                 await _notify_client(
                     user_id,
                     {"event": "create_error", "message": "Workflow did not produce expected interrupt"},
@@ -455,6 +530,10 @@ class AgentService:
                 raw_recipient = interrupt_data.get("recipient") or ""
                 recipient_username, recipient_email = _resolve_recipient_name(raw_recipient)
 
+                meeting_date = interrupt_data.get("meeting_date")
+                meeting_time = interrupt_data.get("meeting_time")
+                purpose = interrupt_data.get("purpose")
+
                 if not subject and draft_body:
                     subject, draft_body = _extract_subject_and_clean_body(draft_body)
 
@@ -464,14 +543,19 @@ class AgentService:
                 draft.draft.body = draft_body or ""
                 draft.draft.cc = interrupt_data.get("cc")
                 draft.draft.bcc = interrupt_data.get("bcc")
+                draft.draft.meeting_date = meeting_date
+                draft.draft.meeting_time = meeting_time
+                draft.draft.purpose = purpose
                 draft.status = "awaiting_input"
                 draft.updated_at = datetime.now(timezone.utc).isoformat()
 
                 thread = threads.get(thread_id)
                 if thread:
-                    thread["recipient"] = recipient_username
                     thread["recipient_email"] = recipient_email
                     thread["meeting"]["subject"] = subject or ""
+                    thread["meeting"]["date"] = meeting_date
+                    thread["meeting"]["time"] = meeting_time
+                    thread["meeting"]["purpose"] = purpose
                     thread["status"] = "awaiting_input"
                     thread["updated_at"] = datetime.now(timezone.utc).isoformat()
 
@@ -481,11 +565,13 @@ class AgentService:
                         "event": "create_complete",
                         "thread_id": thread_id,
                         "draft": {
-                            "recipient": recipient_username,
                             "recipient_username": recipient_username,
                             "recipient_email": recipient_email,
                             "subject": subject or "",
                             "body": draft_body or "",
+                            "meeting_date": meeting_date,
+                            "meeting_time": meeting_time,
+                            "purpose": purpose,
                         },
                         "interrupt": {
                             "type": interrupt_type,
@@ -531,7 +617,7 @@ class AgentService:
             "thread_id": thread_id,
             "email_id": None,
             "user_id": user_id,
-            "recipient": "",
+            "recipient_email": None,
             "meeting": {
                 "subject": "",
                 "date": None,
@@ -563,7 +649,7 @@ class AgentService:
                 "thread_id": thread_id,
                 "email_id": None,
                 "user_id": user_id,
-                "recipient": "",
+                "recipient_email": None,
                 "meeting": {
                     "subject": "",
                     "date": None,
@@ -585,7 +671,7 @@ class AgentService:
         draft = Draft(
             draft_id=thread_id,
             user_id=user_id,
-            draft=DraftContent(recipient="", subject="", body=""),
+            draft=DraftContent(recipient="", subject="", body="", meeting_date=None, meeting_time=None, purpose=None),
             context=prompt,
             status="processing",
             thread_id=thread_id,
@@ -621,9 +707,8 @@ class AgentService:
         return {
             "draft_id": draft.draft_id,
             "draft": {
-                "recipient": draft.draft.recipient_username,
-                "recipient_username": draft.draft.recipient_username,
-                "recipient_email": draft.draft.recipient_email,
+                        "recipient_username": draft.draft.recipient_username,
+                        "recipient_email": draft.draft.recipient_email,
                 "subject": draft.draft.subject,
                 "body": draft.draft.body,
             },
@@ -686,6 +771,10 @@ class AgentService:
                         raw_recipient = interrupt_data.get("recipient") or ""
                         recipient_username, recipient_email = _resolve_recipient_name(raw_recipient)
 
+                        meeting_date = interrupt_data.get("meeting_date")
+                        meeting_time = interrupt_data.get("meeting_time")
+                        purpose = interrupt_data.get("purpose")
+
                         if not subject and draft_body:
                             subject, draft_body = _extract_subject_and_clean_body(draft_body)
 
@@ -695,6 +784,9 @@ class AgentService:
                         draft.draft.body = draft_body or ""
                         draft.draft.cc = interrupt_data.get("cc")
                         draft.draft.bcc = interrupt_data.get("bcc")
+                        draft.draft.meeting_date = meeting_date
+                        draft.draft.meeting_time = meeting_time
+                        draft.draft.purpose = purpose
                         draft.status = "awaiting_input"
                         draft.updated_at = datetime.now(timezone.utc).isoformat()
 
@@ -703,13 +795,15 @@ class AgentService:
                         return {
                             "draft_id": draft_id,
                             "draft": {
-                                "recipient": recipient_username,
                                 "recipient_username": recipient_username,
                                 "recipient_email": recipient_email,
                                 "subject": subject or "",
                                 "body": draft_body or "",
                                 "cc": cc,
                                 "bcc": bcc,
+                                "meeting_date": meeting_date,
+                                "meeting_time": meeting_time,
+                                "purpose": purpose,
                             },
                             "status": "awaiting_input",
                             "interrupt": {
@@ -740,17 +834,19 @@ class AgentService:
 
                             thread = threads.get(draft_id)
                             if thread:
-                                thread["recipient"] = draft.draft.recipient_username
                                 thread["recipient_email"] = draft.draft.recipient_email
                                 thread["meeting"]["subject"] = draft.draft.subject
+                                thread["meeting"]["date"] = draft.draft.meeting_date
+                                thread["meeting"]["time"] = draft.draft.meeting_time
+                                thread["meeting"]["purpose"] = draft.draft.purpose
                                 thread["meeting"]["participants"] = [draft.draft.recipient_username]
                                 thread["status"] = "waiting_reply"
                                 thread["updated_at"] = datetime.now(timezone.utc).isoformat()
+                                await backend_ws_client.connect(draft.user_id)
 
                             return {
                                 "draft_id": draft_id,
                                 "draft": {
-                                    "recipient": draft.draft.recipient_username,
                                     "recipient_username": draft.draft.recipient_username,
                                     "recipient_email": draft.draft.recipient_email,
                                     "subject": draft.draft.subject,
@@ -765,7 +861,6 @@ class AgentService:
                             return {
                                 "draft_id": draft_id,
                                 "draft": {
-                                    "recipient": draft.draft.recipient_username,
                                     "recipient_username": draft.draft.recipient_username,
                                     "recipient_email": draft.draft.recipient_email,
                                     "subject": draft.draft.subject,
@@ -834,6 +929,10 @@ class AgentService:
                         raw_recipient = interrupt_data.get("recipient") or ""
                         recipient_username, recipient_email = _resolve_recipient_name(raw_recipient)
 
+                        meeting_date = interrupt_data.get("meeting_date")
+                        meeting_time = interrupt_data.get("meeting_time")
+                        purpose = interrupt_data.get("purpose")
+
                         if not subject and draft_body:
                             subject, draft_body = _extract_subject_and_clean_body(draft_body)
 
@@ -843,6 +942,9 @@ class AgentService:
                         draft.draft.body = draft_body or ""
                         draft.draft.cc = interrupt_data.get("cc")
                         draft.draft.bcc = interrupt_data.get("bcc")
+                        draft.draft.meeting_date = meeting_date
+                        draft.draft.meeting_time = meeting_time
+                        draft.draft.purpose = purpose
                         draft.status = "awaiting_input"
                         draft.updated_at = datetime.now(timezone.utc).isoformat()
 
@@ -854,15 +956,17 @@ class AgentService:
                                 "event": "reply_complete",
                                 "thread_id": thread_id,
                                 "draft": {
-                                    "recipient": recipient_username,
-                                    "recipient_username": recipient_username,
-                                    "recipient_email": recipient_email,
-                                    "subject": subject or "",
-                                    "body": draft_body or "",
                                     "cc": cc,
                                     "bcc": bcc,
-                                },
-                                "interrupt": {
+                                "recipient_username": recipient_username,
+                                "recipient_email": recipient_email,
+                                "subject": subject or "",
+                                "body": draft_body or "",
+                                "meeting_date": meeting_date,
+                                "meeting_time": meeting_time,
+                                "purpose": purpose,
+                            },
+                            "interrupt": {
                                     "type": interrupt_type,
                                     "question": interrupt_data.get("question", ""),
                                 },
@@ -909,12 +1013,12 @@ class AgentService:
                                 "draft_id": thread_id,
                                 "email_id": None,
                                 "user_id": draft.user_id,
-                                "recipient": draft.draft.recipient_username,
                                 "recipient_email": draft.draft.recipient_email,
                                 "meeting": {
                                     "subject": draft.draft.subject,
-                                    "date": None,
-                                    "time": None,
+                                    "date": draft.draft.meeting_date,
+                                    "time": draft.draft.meeting_time,
+                                    "purpose": draft.draft.purpose,
                                     "participants": [draft.draft.recipient_username],
                                 },
                                 "status": "waiting_reply",
@@ -930,6 +1034,7 @@ class AgentService:
 
                             threads[new_thread_id] = thread
                             draft.thread_id = new_thread_id
+                            await backend_ws_client.connect(user_id)
 
                             await _notify_client(
                                 user_id,
@@ -1025,7 +1130,6 @@ class AgentService:
             {
                 "draft_id": d.draft_id,
                 "draft": {
-                    "recipient": d.draft.recipient_username,
                     "recipient_username": d.draft.recipient_username,
                     "recipient_email": d.draft.recipient_email,
                     "subject": d.draft.subject,
@@ -1051,7 +1155,7 @@ class AgentService:
 
         if not recipient_email:
             if "@" not in recipient:
-                from src.agent.tools.email_tools import resolve_recipient
+                from src.agent.tools.basic_email_tools import resolve_recipient
 
                 result = resolve_recipient(recipient)
                 import json
@@ -1089,11 +1193,15 @@ class AgentService:
             thread = threads.get(thread_id)
             if thread:
                 thread["email_id"] = email_id
-                thread["recipient"] = recipient
+                thread["recipient_email"] = recipient_email
                 thread["meeting"]["subject"] = draft.draft.subject
+                thread["meeting"]["date"] = draft.draft.meeting_date
+                thread["meeting"]["time"] = draft.draft.meeting_time
+                thread["meeting"]["purpose"] = draft.draft.purpose
                 thread["meeting"]["participants"] = [recipient]
                 thread["status"] = "waiting_reply"
                 thread["updated_at"] = datetime.now(timezone.utc).isoformat()
+                await backend_ws_client.connect(draft.user_id)
             else:
                 thread_id = f"thread-{uuid.uuid4().hex[:12]}"
                 thread = {
@@ -1101,11 +1209,12 @@ class AgentService:
                     "draft_id": draft_id,
                     "email_id": email_id,
                     "user_id": draft.user_id,
-                    "recipient": recipient,
+                    "recipient_email": recipient_email,
                     "meeting": {
                         "subject": draft.draft.subject,
-                        "date": None,
-                        "time": None,
+                        "date": draft.draft.meeting_date,
+                        "time": draft.draft.meeting_time,
+                        "purpose": draft.draft.purpose,
                         "participants": [recipient],
                     },
                     "status": "waiting_reply",
@@ -1148,14 +1257,13 @@ class AgentService:
             )
 
             return {
-                "draft_id": draft_id,
-                "draft": {
-                    "recipient": draft.draft.recipient_username,
-                    "recipient_username": draft.draft.recipient_username,
-                    "recipient_email": draft.draft.recipient_email,
-                    "subject": draft.draft.subject,
-                    "body": final_body,
-                },
+                                "draft_id": draft_id,
+                                "draft": {
+                                    "recipient_username": draft.draft.recipient_username,
+                                    "recipient_email": draft.draft.recipient_email,
+                                    "subject": draft.draft.subject,
+                                    "body": draft.draft.body,
+                                },
                 "thread_id": thread_id,
                 "email_id": email_id,
                 "status": "sent",
@@ -1174,7 +1282,6 @@ class AgentService:
             "thread_id": thread["thread_id"],
             "email_id": thread["email_id"],
             "user_id": thread["user_id"],
-            "recipient": thread["recipient"],
             "recipient_email": thread.get("recipient_email"),
             "meeting": thread["meeting"],
             "status": thread["status"],
@@ -1199,7 +1306,6 @@ class AgentService:
         return [
             {
                 "thread_id": t["thread_id"],
-                "recipient": t["recipient"],
                 "recipient_email": t.get("recipient_email"),
                 "status": t["status"],
                 "reply_intent": t["reply_intent"],
@@ -1283,7 +1389,7 @@ class AgentService:
         return {
             "thread_id": thread["thread_id"],
             "status": thread["status"],
-            "recipient": thread["recipient"],
+            "recipient_email": thread.get("recipient_email"),
             "meeting": thread.get("meeting"),
             "reply_intent": thread.get("reply_intent"),
             "messages": thread.get("messages", []),
@@ -1303,7 +1409,7 @@ class AgentService:
             "user_id": thread["user_id"],
             "email_id": thread.get("email_id"),
             "draft_id": thread.get("draft_id"),
-            "recipient": thread["recipient"],
+            "recipient_email": thread.get("recipient_email"),
             "meeting": thread.get("meeting"),
             "messages": thread.get("messages", []),
             "total_messages": len(thread.get("messages", [])),
