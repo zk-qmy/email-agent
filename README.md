@@ -24,6 +24,10 @@ npm install   # first time only
 npm run dev
 ```
 
+## Demos
+### Basic features
+[Link to demo](https://drive.google.com/file/d/1q67BI7Kdj75FA0ieiw4fzmsJ9Tl-Lx2I/view?usp=sharing)
+
 ## Services
 
 | Service  | URL                      | Description              |
